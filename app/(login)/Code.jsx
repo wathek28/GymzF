@@ -82,7 +82,7 @@ const Code = () => {
           console.log('Jeton stocké :', authToken);
   
           router.push({
-            pathname: '/profil',
+            pathname: '/user',
             query: { authToken },
           });
         } else {

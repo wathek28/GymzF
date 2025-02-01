@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function WelcomePage() {
   const handleStart = () => {
-    router.push('/singup');
+    router.push('/home');
   };
 
   return (
@@ -105,3 +105,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   }
 });
+
+
