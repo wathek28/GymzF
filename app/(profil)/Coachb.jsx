@@ -1,6 +1,5 @@
-import React , {useEffect} from 'react';
+import React from 'react';
 import { 
-  
   View, 
   Text, 
   Image, 
@@ -11,30 +10,12 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Route } from 'expo-router/build/Route';
 
 const CoachDetailsScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  useEffect(() => {
-    console.log("samir",router)
-      
-    }, []);
- 
-
-  // Vérifier et parser les paramètres
-  const fullName = `${params.firstName || ''} ${params.lastName || ''}`.trim() || "Nom non disponible";
-  const experience = params.experience ? `${params.experience} ans` : "5 ans";
-  const level = params.level || "Intermédiaire";
-  const rating = params.rating || "3.5/5";
-  const verified = params.verified === "true"; // Vérifier si le paramètre est bien un booléen
-  const specialty = params.specialty ? `Coach ${params.specialty}` : "";
-  const workplace = params.workplace ? `à ${params.workplace}` : "";
-
-  // Vérifier si une photo est bien fournie
-  const photoSource = params.photo && params.photo.startsWith("/") 
-    ? { uri: `data:image/jpeg;base64,${params.photo}` }
-    : require('../../assets/images/b.png');
+  const coach = params;
+  console.log('Coach Data:', coach); 
 
   const renderBadge = (icon, text, value) => (
     <View style={styles.badge}>
@@ -44,10 +25,21 @@ const CoachDetailsScreen = () => {
     </View>
   );
 
+  const renderLocationInfo = () => (
+    <View style={styles.locationContainer}>
+      <Text style={styles.locationHeader}>Je donne des cours :</Text>
+      <View style={styles.locationBox}>
+      <Text style={styles.locationText}>En ligne, à domicile aux alentours de {coach.typeCoaching},</Text>
+
+        <Text style={styles.locationText}>ou à {coach.disciplines}</Text>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Header Section avec le bouton retour */}
+        {/* Header Section with Back Button */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -57,43 +49,48 @@ const CoachDetailsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Affichage de la photo */}
+        {/* Profile Image */}
         <Image
-          source={photoSource}
+          source={
+            coach.photo 
+              ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+              : require('../../assets/images/b.png')
+          }
           style={styles.profileImage}
           resizeMode="cover"
         />
 
-        {/* Informations du coach */}
+        {/* Coach Info Overlay */}
         <View style={styles.infoOverlay}>
           <View style={styles.nameSection}>
             <View style={styles.nameContainer}>
-              <Text style={styles.name}>{fullName}</Text>
-              {verified && (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
-                </View>
-              )}
+            <Text style={styles.name}>{coach.firstName}</Text>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
+              </View>
             </View>
             <TouchableOpacity style={styles.profileButton}>
               <Text style={styles.profileButtonText}>Voir le profil</Text>
             </TouchableOpacity>
           </View>
           
-          <Text style={styles.title}>{`${specialty} ${workplace}`.trim()}</Text>
+          <Text style={styles.title}>Coach sportif de {coach.coursSpecifiques}</Text>
+
 
           {/* Badges Section */}
           <View style={styles.badgesContainer}>
-            {renderBadge("stats-chart", "Niveau", level)}
-            <View style={styles.experienceBadge}>
-              {renderBadge("time", "Expérience", experience)}
-            </View>
-            {renderBadge("star", "Avis", rating)}
+          {renderBadge("stats-chart", "Niveau", coach.niveauCours)}
+          <View style={styles.experienceBadge}>
+          {renderBadge("time", "Expérience", coach.dureeExperience)}
           </View>
+          {renderBadge("star", "Avis", "3.5/5")}
+          </View>
+
+          {renderLocationInfo()}
         </View>
       </ScrollView>
 
-      {/* Navigation en bas */}
+      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="home" size={24} color="#666" />
@@ -116,11 +113,6 @@ const CoachDetailsScreen = () => {
   );
 };
 
-// Styles restent inchangés
-
-
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -131,7 +123,7 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 45,
+    top: 20,
     left: 0,
     right: 0,
     zIndex: 1,
@@ -256,6 +248,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
   }
 });
-
 
 export default CoachDetailsScreen;

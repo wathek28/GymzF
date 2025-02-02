@@ -312,7 +312,7 @@ const FitnessApp = () => {
           />
           <View style={styles.coachInfo}>
             <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
-            <Text style={styles.coachSpecialty}>{coach.email || "Email non disponible"}</Text>
+            <Text style={styles.coachSpecialty}>{coach.typeCoaching || "Email non disponible"}</Text>
           </View>
         </TouchableOpacity>
       ))

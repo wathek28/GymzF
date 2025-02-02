@@ -19,8 +19,8 @@ const cardWidth = (width - 48) / 2;
 const CoachSearchScreen = () => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('online');
-  const [level, setLevel] = useState('intermediate');
+  const [location, setLocation] = useState('');
+  const [level, setLevel] = useState('');
   const [selectedCompetences, setSelectedCompetences] = useState([]);
   const [coaches, setCoaches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +46,7 @@ const CoachSearchScreen = () => {
 
   useEffect(() => {
     fetchCoaches();
-  }, []); // Retiré les dépendances pour éviter le re-fetch lors des changements de filtres
+  }, []);
 
   const toggleCompetence = (id) => {
     setSelectedCompetences(prev => 
@@ -59,16 +59,15 @@ const CoachSearchScreen = () => {
   const fetchCoaches = async () => {
     setIsLoading(true);
     try {
-      // Simplifié pour récupérer tous les coachs sans filtres
       const response = await fetch('http://192.168.0.5:8082/api/auth/coaches');
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
       }
       const data = await response.json();
-      console.log("data hhh",data)  
+      console.log('Fetched coaches:', data); 
       setCoaches(data);
-      console.log("coaches hhh",coaches.map((a) => a.email))
+      console.log('Fetched coaches:', data); 
       setError(null);  
     } catch (err) {
       console.error('Fetch error:', err);
@@ -182,18 +181,25 @@ const CoachSearchScreen = () => {
         {pairs.map((pair, index) => (
           <View key={index} style={styles.coachRow}>
             {pair.map((coach) => (
-             // In the renderCoaches function, update the TouchableOpacity's onPress:
-    <TouchableOpacity
-      key={coach.id}
-      style={styles.coachCard}
-      onPress={() => router.push({
-        pathname: "/coachp", // Ensure this matches your details screen route
-          params: {
-         id: coach.id,
-         email:coach.email
-    }
-  })}
->
+              <TouchableOpacity
+                key={coach.id}
+                style={styles.coachCard}
+                onPress={() => router.push({
+                  pathname: "/Coachb",
+                  params: {
+                    id: coach.id,
+                    firstName:coach.firstName,
+                    dureeExperience : coach.dureeExperience,
+                    entrainementPhysique : coach.entrainementPhysique,
+                    niveauCours:coach.niveauCours,
+                    photo :coach.photo,
+                    typeCoaching:coach.typeCoaching,
+                    coursSpecifiques:coach.coursSpecifiques,
+                    disciplines:coach.disciplines,
+                    nom:coach.nom
+                  }
+                })}
+              >
                 <Image
                   source={
                     coach.photo 
@@ -208,7 +214,7 @@ const CoachSearchScreen = () => {
                     {coach.firstName || coach.first_name || "Nom non disponible"}
                   </Text>
                   <Text style={styles.coachSpecialty} numberOfLines={1}>
-                    {coach.specialty || coach.role || "Spécialité non disponible"}
+                    {coach.specialty || coach.entrainementPhysique || "Spécialité non disponible"}
                   </Text>
                   {coach.verified && (
                     <View style={styles.verifiedBadge}>
