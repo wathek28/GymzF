@@ -74,7 +74,7 @@ const CoachDetailsScreen = () => {
             </TouchableOpacity>
           </View>
           
-          <Text style={styles.title}>Coach sportif de {coach.coursSpecifiques}</Text>
+          <Text style={styles.title}>Coach sportif de {coach.disciplines}</Text>
 
 
           {/* Badges Section */}

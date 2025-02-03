@@ -128,7 +128,7 @@ const ProfileCompletionForm = () => {
         });
       }
 
-      const response = await fetch('http://192.168.0.5:8082/api/auth/update-profile', {
+      const response = await fetch('http://192.168.1.194:8082/api/auth/update-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'multipart/form-data',

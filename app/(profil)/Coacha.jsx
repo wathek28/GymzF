@@ -59,7 +59,7 @@ const CoachSearchScreen = () => {
   const fetchCoaches = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.5:8082/api/auth/coaches');
+      const response = await fetch('http://192.168.1.194:8082/api/auth/coaches');
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
@@ -196,7 +196,10 @@ const CoachSearchScreen = () => {
                     typeCoaching:coach.typeCoaching,
                     coursSpecifiques:coach.coursSpecifiques,
                     disciplines:coach.disciplines,
-                    nom:coach.nom
+                    nom:coach.nom,
+                    duree_seance :coach.duree_seance,
+                    prix_seance : coach.prix_seance,
+                    poste: coach.poste
                   }
                 })}
               >
@@ -241,7 +244,7 @@ const CoachSearchScreen = () => {
         >
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recherche de Coachs</Text>
+        <Text style={styles.headerTitle}> Coachs</Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -318,7 +321,7 @@ const styles = StyleSheet.create({
   searchButton: {
     width: 44,
     height: 44,
-    backgroundColor: '#007AFF',
+    backgroundColor: 'black',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -348,15 +351,15 @@ const styles = StyleSheet.create({
     borderColor: '#DDD',
   },
   optionButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#CBFF06',
+    
   },
   optionText: {
     fontSize: 14,
     color: '#333',
   },
   optionTextSelected: {
-    color: '#FFF',
+    color: 'black',
   },
   competencesContainer: {
     flexDirection: 'row',
@@ -372,15 +375,15 @@ const styles = StyleSheet.create({
     borderColor: '#DDD',
   },
   competenceButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#CBFF06',
+    borderColor: '#DDD',
   },
   competenceText: {
     fontSize: 14,
     color: '#333',
   },
   competenceTextSelected: {
-    color: '#FFF',
+    color: 'black',
   },
   coachesContainer: {
     gap: 16,

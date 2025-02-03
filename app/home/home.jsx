@@ -12,6 +12,7 @@ import {
   Linking,
   Platform,
   Alert,
+  ImageBackground,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -59,48 +60,46 @@ const FitnessApp = () => {
   const [offers2, setOffers] = useState([]);
   const [coaches, setCoaches] = useState([]);
   const [gyms, setGyms] = useState([]);
+  const [events, setEvents] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const events = [
-    { id: 1, title: "Yoga Class", date: "25 Jan 2025" },
-    { id: 2, title: "Fitness Bootcamp", date: "30 Jan 2025" },
-    { id: 3, title: "Health Seminar", date: "5 Feb 2025" },
-  ];
+  
 
   // Effet pour charger les données
   useEffect(() => {
-    fetchData();
+    fetchAllData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [offersRes, coachesRes, gymsRes] = await Promise.all([
-        fetch("http://192.168.0.5:8082/api/offres"),
-        fetch("http://192.168.0.5:8082/api/auth/coaches"),
-        fetch("http://192.168.0.5:8082/api/auth/gyms"),
+      const [offersRes, coachesRes, gymsRes, eventsRes] = await Promise.all([
+        fetch("http://192.168.1.194:8082/api/offres"),
+        fetch("http://192.168.1.194:8082/api/auth/coaches"),
+        fetch("http://192.168.1.194:8082/api/auth/gyms"),
+        fetch("http://192.168.1.194:8082/api/events")
       ]);
 
-      if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok) {
+      if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok || !eventsRes.ok) {
         throw new Error("Erreur lors de la récupération des données");
       }
 
-      const [offersData, coachesData, gymsData] = await Promise.all([
+      const [offersData, coachesData, gymsData, eventsData] = await Promise.all([
         offersRes.json(),
         coachesRes.json(),
         gymsRes.json(),
+        eventsRes.json()
       ]);
-
-      console.log("Données reçues:", { coachesData, gymsData });
 
       const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
 
       setOffers(offersData);
       setCoaches(coachesData);
       setGyms(validGyms);
+      setEvents(eventsData);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -170,9 +169,7 @@ const FitnessApp = () => {
     coaches: coaches.filter((coach) =>
       coach.firstName?.toLowerCase().includes(searchText.toLowerCase())
     ),
-    events: events.filter((event) =>
-      event.title.toLowerCase().includes(searchText.toLowerCase())
-    ),
+    
   };
 
   return (
@@ -312,7 +309,7 @@ const FitnessApp = () => {
           />
           <View style={styles.coachInfo}>
             <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
-            <Text style={styles.coachSpecialty}>{coach.typeCoaching || "Email non disponible"}</Text>
+            <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
           </View>
         </TouchableOpacity>
       ))
@@ -345,7 +342,7 @@ const FitnessApp = () => {
           />
           <View style={styles.gymInfo}>
             <Text style={styles.gymName}>{gym.firstName || "Nom non disponible"}</Text>
-            <Text style={styles.gymLocation}>{gym.type_coaching || "Email non disponible"}</Text>
+            <Text style={styles.gymLocation}>{gym.email || "Email non disponible"}</Text>
           </View>
         </TouchableOpacity>
       ))
@@ -357,23 +354,69 @@ const FitnessApp = () => {
 
         {/* Événements */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Événements</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {filteredItems.events.map((event, index) => (
-              <TouchableOpacity
-                key={`event-${event.id || index}`}
-                style={styles.eventCard}
-              >
-                <Image
-                  source={require("../../assets/images/F.png")}
-                  style={styles.eventImage}
-                />
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDate}>{event.date}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Événements</Text>
+            <TouchableOpacity style={styles.seeMoreButton}>
+            onPress={() => navigation.navigate('(event)')}
+              <Feather name="chevron-right" size={24} color="#666" />
+              
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+          >
+            {isLoading ? (
+              <Text>Chargement...</Text>
+            ) : error ? (
+              <Text>Erreur: {error}</Text>
+            ) : events.length > 0 ? (
+              events.map((event) => (
+                <TouchableOpacity key={event.id} style={styles.container1}>
+  <ImageBackground
+    source={
+      event.photo
+        ? { uri: `data:image/jpeg;base64,${event.photo}` }
+        : require("../../assets/images/F.png")
+    }
+    style={styles.backgroundImage1}
+    imageStyle={styles.backgroundImageStyle1}
+  >
+    <View style={styles.overlay1}>
+      <View style={styles.header1}>
+        <View style={styles.dateContainer1}>
+          <Text style={styles.dateNumber1}>
+            {new Date(event.date).getDate()}
+          </Text>
+          <Text style={styles.dateMonth1}>
+            {new Date(event.date)
+              .toLocaleString("default", { month: "short" })
+              .toUpperCase()}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.content1}>
+        <Text style={styles.title1}>{event.titre}</Text>
+        <Text style={styles.location1}>{event.adresse}</Text>
+        <Text style={styles.time1}>
+          {event.heureDebut.slice(0, 5)} - {event.heureFin.slice(0, 5)}
+        </Text>
+        <Text style={styles.price1}>
+          {event.prix.toFixed(2)} DT / Pers
+        </Text>
+        <TouchableOpacity style={styles.participateButton1}>
+          <Text style={styles.participateButtonText1}>Participer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </ImageBackground>
+</TouchableOpacity>
+
+              ))
+            ) : (
+              <Text>Aucun événement disponible</Text>
+            )}
           </ScrollView>
         </View>
       </ScrollView>
@@ -745,6 +788,94 @@ const styles = StyleSheet.create({
   closeButtonText3: {
     color: "white",
     fontWeight: "bold",
+  },
+  /////////// event //////
+
+  container1: {
+    height: 250,
+    width:330,
+    borderRadius: 15,
+    overflow: 'hidden',
+    margin: 2,
+  },
+  backgroundImage1: {
+    flex: 1,
+    resizeMode: 'cover',
+  },
+  backgroundImageStyle1: {
+    borderRadius: 15,
+  },
+  overlay1: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 20,
+  },
+  header1: {
+    // Alignement des éléments horizontalement
+   // Espace entre les éléments, cela mettra la date à droite
+   // Aligne verticalement les éléments
+  width: '100%',
+  },
+  logoContainer1: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    padding: 8,
+    borderRadius: 10,
+  },
+  logoText1: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dateContainer1: {
+    justifyContent: 'center',
+    alignItems: 'flex-end', 
+  },
+  dateNumber1: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#c5ff00',
+  },
+  dateMonth1: {
+    fontSize: 16,
+    color: '#c5ff00',
+    fontWeight: 'bold',
+  },
+  content1: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  title1: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+  },
+  location1: {
+    fontSize: 16,
+    color: 'white',
+    marginBottom: 4,
+  },
+  time1: {
+    fontSize: 16,
+    color: 'white',
+    marginBottom: 4,
+  },
+  price1: {
+    fontSize: 16,
+    color: 'white',
+    marginBottom: -30,
+  },
+  participateButton1: {
+    backgroundColor: '#c5ff00',
+    padding: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    width: '40%',
+    alignSelf: 'flex-end',
+  },
+  participateButtonText1: {
+    color: 'black',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
