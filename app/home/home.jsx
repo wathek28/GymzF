@@ -356,11 +356,12 @@ const FitnessApp = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Événements</Text>
-            <TouchableOpacity style={styles.seeMoreButton}>
-            onPress={() => navigation.navigate('(event)')}
-              <Feather name="chevron-right" size={24} color="#666" />
-              
-            </TouchableOpacity>
+            <TouchableOpacity
+      style={styles.seeMoreButton}
+      onPress={() => navigation.navigate('(event)')}
+    >
+      <Feather name="chevron-right" size={24} color="#666" />
+    </TouchableOpacity>
           </View>
           
           <ScrollView 
@@ -793,7 +794,7 @@ const styles = StyleSheet.create({
 
   container1: {
     height: 250,
-    width:330,
+    width:340,
     borderRadius: 15,
     overflow: 'hidden',
     margin: 2,
