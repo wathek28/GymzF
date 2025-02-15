@@ -28,7 +28,7 @@ const EventsScreen = () => {
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.1.194:8082/api/events');
+      const response = await fetch('http://192.168.0.5:8082/api/events');
       if (!response.ok) {
         throw new Error("Erreur lors de la récupération des événements");
       }
@@ -55,6 +55,39 @@ const EventsScreen = () => {
     };
   };
 
+  const renderPriceFilters = () => (
+    <View style={styles.filterSection}>
+      <Text style={styles.filterTitle}>Prix</Text>
+      <View style={styles.optionsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.optionButton,
+            selectedPriceType === 'payant' && styles.optionButtonSelected
+          ]}
+          onPress={() => setSelectedPriceType(selectedPriceType === 'payant' ? null : 'payant')}
+        >
+          <Text style={[
+            styles.optionText,
+            selectedPriceType === 'payant' && styles.optionTextSelected
+          ]}>Payant</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.optionButton,
+            selectedPriceType === 'gratuit' && styles.optionButtonSelected
+          ]}
+          onPress={() => setSelectedPriceType(selectedPriceType === 'gratuit' ? null : 'gratuit')}
+        >
+          <Text style={[
+            styles.optionText,
+            selectedPriceType === 'gratuit' && styles.optionTextSelected
+          ]}>Gratuit</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -73,12 +106,12 @@ const EventsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back Icon */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIconContainer}>
-        <Ionicons name="chevron-back" size={24} color="#000" />
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Événements</Text>
+      <View style={styles.headerContainer}>
+  <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+    <Ionicons name="chevron-back" size={24} color="#000" />
+  </TouchableOpacity>
+  <Text style={styles.title}>Événements</Text>
+</View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -93,31 +126,7 @@ const EventsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.filtersContainer}>
-        <Text style={styles.filterText}>Prix :</Text>
-        <TouchableOpacity
-          onPress={() => setSelectedPriceType(selectedPriceType === 'payant' ? null : 'payant')}
-          style={styles.filterOption}
-        >
-          <Ionicons
-            name={selectedPriceType === 'payant' ? 'ellipse' : 'ellipse-outline'}
-            size={20}
-            color="black"
-          />
-          <Text style={styles.filterLabel}>Payant</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setSelectedPriceType(selectedPriceType === 'gratuit' ? null : 'gratuit')}
-          style={styles.filterOption}
-        >
-          <Ionicons
-            name={selectedPriceType === 'gratuit' ? 'ellipse' : 'ellipse-outline'}
-            size={20}
-            color="limegreen"
-          />
-          <Text style={styles.filterLabel}>Gratuit</Text>
-        </TouchableOpacity>
-      </View>
+      {renderPriceFilters()}
 
       <FlatList
         data={filteredEvents}
@@ -151,8 +160,8 @@ const EventsScreen = () => {
                       </Text>
                     )}
                     <Text
-                      style={[ 
-                        styles.eventPrice, 
+                      style={[
+                        styles.eventPrice,
                         item.prix === 'Gratuit' && { color: 'green' },
                       ]}
                     >
@@ -160,10 +169,9 @@ const EventsScreen = () => {
                         ? item.prix.toFixed(2) + ' DT / Pers'
                         : item.prix}
                     </Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.participateButton}
                       onPress={() => {
-                        console.log('Navigation vers EventB avec:', item); // Pour le débogage
                         navigation.navigate('eventb', { eventData: item });
                       }}
                     >
@@ -185,31 +193,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9f9f9',
-    
-     // Adjusted to fit the back icon
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  backButton: {
+    padding: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  
+  // Supprimez ces styles qui ne sont plus nécessaires
   backIconContainer: {
     position: 'absolute',
     top: 50,
     left: 20,
     zIndex: 1,
   },
+  
   errorText: {
     color: 'red',
     fontSize: 16,
     textAlign: 'center',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    marginLeft: 60,
-  },
+ 
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    marginLeft: 20,
+    marginHorizontal: 20,
   },
   searchInput: {
     flex: 1,
@@ -217,29 +236,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     backgroundColor: '#fff',
+    borderColor: '#DDD',
   },
   searchButton: {
     backgroundColor: 'black',
     padding: 10,
     borderRadius: 10,
-    margin: 15,
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  filterText: {
-    fontSize: 16,
     marginLeft: 15,
   },
-  filterOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 5,
+  filterSection: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
-  filterLabel: {
-    marginLeft: 15,
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#DDD',
+  },
+  optionButtonSelected: {
+    backgroundColor: '#CBFF06',
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  optionTextSelected: {
+    color: 'black',
   },
   eventCard: {
     height: 200,

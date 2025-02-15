@@ -26,6 +26,9 @@ const EventBScreen = () => {
       day: 'numeric',
     });
   };
+  const handleConfirmParticipation = () => {
+    navigation.navigate('eventc', { eventData });
+  };
 
   return (
     <View style={styles.mainContainer}>
@@ -79,8 +82,9 @@ const EventBScreen = () => {
           </View>
 
           {/* The Confirm Button placed before the description */}
-          <TouchableOpacity style={styles.confirmButton}>
+          <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmParticipation}>
             <Text style={styles.confirmButtonText}>Confirmer la participation</Text>
+            
           </TouchableOpacity>
 
           <View style={styles.descriptionContainer}>

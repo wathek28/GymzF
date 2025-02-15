@@ -46,7 +46,8 @@ const CoachSearchScreen = () => {
 
   useEffect(() => {
     fetchCoaches();
-  }, []);
+  }, [location, level, selectedCompetences]);
+  
 
   const toggleCompetence = (id) => {
     setSelectedCompetences(prev => 
@@ -59,16 +60,25 @@ const CoachSearchScreen = () => {
   const fetchCoaches = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.1.194:8082/api/auth/coaches');
+      let query = '?';
+      if (location) query += `location=${location}&`;
+      if (level) query += `level=${level}&`;
+      if (selectedCompetences.length > 0) {
+        query += `competences=${selectedCompetences.join(',')}&`;
+      }
+      
+      query = query.slice(0, -1);
+  
+      const response = await fetch(`http://192.168.0.5:8082/api/auth/coaches${query}`);
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
       }
+      
       const data = await response.json();
-      console.log('Fetched coaches:', data); 
+      console.log("Data received:", data);
       setCoaches(data);
-      console.log('Fetched coaches:', data); 
-      setError(null);  
+      setError(null);
     } catch (err) {
       console.error('Fetch error:', err);
       setError(err.message);
@@ -76,21 +86,24 @@ const CoachSearchScreen = () => {
       setIsLoading(false);
     }
   };
-
+  
   const renderLocationOptions = () => (
     <View style={styles.optionsContainer}>
       {locationOptions.map((option) => (
         <TouchableOpacity 
           key={option.id}
-          style={[
-            styles.optionButton,
+          style={[ 
+            styles.optionButton, 
             location === option.id && styles.optionButtonSelected
           ]}
-          onPress={() => setLocation(option.id)}
+          onPress={() => {
+            const newLocation = location === option.id ? '' : option.id;
+            setLocation(newLocation);
+          }}
         >
-          <Text style={[
-            styles.optionText,
-            location === option.id && styles.optionTextSelected
+          <Text style={[ 
+            styles.optionText, 
+            location === option.id && styles.optionTextSelected 
           ]}>
             {option.label}
           </Text>
@@ -98,21 +111,22 @@ const CoachSearchScreen = () => {
       ))}
     </View>
   );
+  
 
   const renderLevelOptions = () => (
     <View style={styles.optionsContainer}>
       {levelOptions.map((option) => (
         <TouchableOpacity 
           key={option.id}
-          style={[
-            styles.optionButton,
+          style={[ 
+            styles.optionButton, 
             level === option.id && styles.optionButtonSelected
           ]}
-          onPress={() => setLevel(option.id)}
+          onPress={() => setLevel(level === option.id ? '' : option.id)}
         >
-          <Text style={[
-            styles.optionText,
-            level === option.id && styles.optionTextSelected
+          <Text style={[ 
+            styles.optionText, 
+            level === option.id && styles.optionTextSelected 
           ]}>
             {option.label}
           </Text>
@@ -126,14 +140,14 @@ const CoachSearchScreen = () => {
       {competences.map((comp) => (
         <TouchableOpacity
           key={comp.id}
-          style={[
-            styles.competenceButton,
+          style={[ 
+            styles.competenceButton, 
             selectedCompetences.includes(comp.id) && styles.competenceButtonSelected
           ]}
           onPress={() => toggleCompetence(comp.id)}
         >
-          <Text style={[
-            styles.competenceText,
+          <Text style={[ 
+            styles.competenceText, 
             selectedCompetences.includes(comp.id) && styles.competenceTextSelected
           ]}>
             {comp.label}
@@ -170,7 +184,13 @@ const CoachSearchScreen = () => {
         </View>
       );
     }
-
+    const toggleCompetence = (id) => {
+      const updatedCompetences = selectedCompetences.includes(id)
+        ? selectedCompetences.filter(c => c !== id)
+        : [...selectedCompetences, id];
+      setSelectedCompetences(updatedCompetences);
+    };
+    
     const pairs = [];
     for (let i = 0; i < coaches.length; i += 2) {
       pairs.push(coaches.slice(i, i + 2));
@@ -182,32 +202,17 @@ const CoachSearchScreen = () => {
           <View key={index} style={styles.coachRow}>
             {pair.map((coach) => (
               <TouchableOpacity
-                key={coach.id}
+                key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
                 style={styles.coachCard}
                 onPress={() => router.push({
                   pathname: "/Coachb",
-                  params: {
-                    id: coach.id,
-                    firstName:coach.firstName,
-                    dureeExperience : coach.dureeExperience,
-                    entrainementPhysique : coach.entrainementPhysique,
-                    niveauCours:coach.niveauCours,
-                    photo :coach.photo,
-                    typeCoaching:coach.typeCoaching,
-                    coursSpecifiques:coach.coursSpecifiques,
-                    disciplines:coach.disciplines,
-                    nom:coach.nom,
-                    duree_seance :coach.duree_seance,
-                    prix_seance : coach.prix_seance,
-                    poste: coach.poste
-                  }
+                  params: { ...coach },
                 })}
               >
                 <Image
-                  source={
-                    coach.photo 
-                      ? { uri: `data:image/jpeg;base64,${coach.photo}` }
-                      : require('../../assets/images/F.png')
+                  source={coach.photo 
+                    ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+                    : require('../../assets/images/F.png')
                   }
                   style={styles.coachImage}
                   resizeMode="cover"
@@ -238,13 +243,10 @@ const CoachSearchScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}> Coachs</Text>
+        <Text style={styles.headerTitle}>Coachs</Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -260,10 +262,7 @@ const CoachSearchScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.filterSection}>
           <Text style={styles.filterTitle}>Emplacement</Text>
           {renderLocationOptions()}
@@ -352,7 +351,6 @@ const styles = StyleSheet.create({
   },
   optionButtonSelected: {
     backgroundColor: '#CBFF06',
-    
   },
   optionText: {
     fontSize: 14,

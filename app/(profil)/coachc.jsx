@@ -1,227 +1,742 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { 
+  KeyboardAvoidingView, 
+  Platform, 
+  Alert,
+} from 'react-native';
+import { 
+  View, 
+  Text, 
+  Image, 
+  TouchableOpacity, 
+  ScrollView, 
+  StyleSheet, 
+  TextInput,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard
+} from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/FontAwesome5';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useRouter } from 'expo-router';
 
-const ProfileScreen = () => {
-  const SocialIcon = () => (
-    <View style={styles.iconWrapper}>
-      <View style={styles.iconSquare} />
-    </View>
-  );
+////////////////////////////////////////////////////////////
+// Composant ReviewModal extrait pour éviter sa recréation //
+////////////////////////////////////////////////////////////
+const ReviewModal = ({
+  isVisible,
+  onClose,
+  rating,
+  setRating,
+  comment,
+  setComment,
+  firstName,
+}) => {
+  const handleModalPress = (e) => {
+    e.stopPropagation();
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {/* Header avec l'icône personnalisée */}
-        <View style={styles.header}>
-          {/* Icône personnalisée verte */}
-          <View style={styles.customIcon}>
-            <View style={styles.iconEars} />
-            <View style={styles.iconFace}>
-              <View style={styles.iconEyes} />
-            </View>
+    <Modal
+      visible={isVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={handleModalPress}>
+              <View style={styles.modalContent}>
+                <ScrollView>
+                  <Text style={styles.modalTitle}>
+                    Vous avez récemment travaillé avec{'\n'}
+                    COACH {firstName?.toUpperCase()},{'\n'}
+                    Partagez votre expérience !
+                  </Text>
+
+                  <Text style={styles.fieldLabel}>Évaluation *</Text>
+                  <View style={styles.starsContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setRating(star)}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons
+                          name={star <= rating ? "star" : "star-border"}
+                          size={32}
+                          color="#D4FF00"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.fieldLabel}>Commentaire *</Text>
+                  <TextInput
+                    style={styles.commentInput}
+                    multiline
+                    placeholder="Partagez votre expérience"
+                    value={comment}
+                    onChangeText={setComment}
+                    textAlignVertical="top"
+                  />
+
+                  <Text style={styles.fieldLabel}>Images de la transformation</Text>
+                  <View style={styles.transformationImagesContainer}>
+                    <View style={styles.transformationImageWrapper}>
+                      <TouchableOpacity 
+                        style={styles.uploadImageButton}
+                        onPress={() => console.log("Upload before image")}
+                      >
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      </TouchableOpacity>
+                      <Text style={styles.imageLabel}>Avant</Text>
+                    </View>
+                    
+                    <View style={styles.transformationImageWrapper}>
+                      <TouchableOpacity 
+                        style={styles.uploadImageButton}
+                        onPress={() => console.log("Upload after image")}
+                      >
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      </TouchableOpacity>
+                      <Text style={styles.imageLabel}>Après</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.buttonContainer}>
+                    <TouchableOpacity 
+                      style={styles.cancelButton}
+                      onPress={() => {
+                        onClose();
+                        setRating(0);
+                        setComment('');
+                      }}
+                    >
+                      <Text style={styles.cancelButtonText}>Annuler</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.submitButton}
+                      onPress={() => {
+                        if (!rating) {
+                          Alert.alert("Erreur", "Veuillez donner une évaluation");
+                          return;
+                        }
+                        if (!comment.trim()) {
+                          Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+                          return;
+                        }
+                        console.log("Publishing review:", { rating, comment });
+                        onClose();
+                        setRating(0);
+                        setComment('');
+                      }}
+                    >
+                      <Text style={styles.submitButtonText}>Publier</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-
-          {/* Photo de profil avec bordure verte */}
-          <View style={styles.profileContainer}>
-            <Image
-              source={require('../../assets/images/b.png')}
-              style={styles.profileImage}
-            />
-          </View>
-
-          {/* Informations du profil */}
-          <Text style={styles.name}>Mohammed Mostafa Ben Ali</Text>
-          <Text style={styles.title}>Coach sportif</Text>
-          <Text style={styles.price}>Séance de 30min à partir de 30 DT</Text>
-          <Text style={styles.location}>En ligne, à domicile ou en extérieur sur «l'Ariana»</Text>
-
-          {/* Icônes sociales */}
-          <View style={styles.socialRow}>
-            <SocialIcon />
-            <SocialIcon />
-            <SocialIcon />
-          </View>
-
-          {/* Boutons */}
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Découvrez mes cours</Text>
-            <Feather name="chevron-right" size={20} color="black" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Contactez-moi</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section À propos */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>À propos :</Text>
-          <Text style={styles.aboutText}>
-            Étant moi-même une personne très sportive et ayant pratiqué toutes sortes de sports toute ma vie, je propose des séances de coaching à toute personne souhaitant perdre de la graisse corporelle, devenir plus athlétique ou simplement retrouver une meilleure forme physique.
-          </Text>
-        </View>
-
-        {/* Navigation du bas */}
-        <View style={styles.bottomNav}>
-          <View style={styles.navItem}>
-            <Feather name="home" size={24} color="#666" />
-          </View>
-          <View style={styles.navItem}>
-            <Feather name="search" size={24} color="#666" />
-          </View>
-          <View style={styles.navItem}>
-            <Feather name="user" size={24} color="#666" />
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 
+//////////////////////
+// Composant CoachProfile
+//////////////////////
+const CoachProfile = () => {
+  const route = useRoute();
+   const router = useRouter();
+  const navigation = useNavigation();
+  const [selectedTab, setSelectedTab] = useState('document');
+
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+
+  const galleryImages = [
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+    require('../../assets/images/b.png'),
+  ];
+
+  const {
+    competencesGenerales = [],
+    coursSpecifiques = [],
+    disciplines = [],
+    dureeExperience,
+    dureeSeance,
+    email,
+    entrainementPhysique = [],
+    fb,
+    firstName,
+    insta,
+    niveauCours,
+    phoneNumber,
+    photo,
+    poste,
+    prixSeance,
+    santeEtBienEtre = [],
+    tiktok,
+    typeCoaching,
+    bio,
+  } = route.params;
+
+  const renderStars = (selectedRating, interactive = false) => {
+    return (
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity
+            key={star}
+            onPress={() => interactive && setRating(star)}
+            disabled={!interactive}
+          >
+            <MaterialIcons
+              name={star <= selectedRating ? "star" : "star-border"}
+              size={24}
+              color="#FFD700"
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  const renderEmojiContent = () => (
+    <ScrollView style={styles.emojiScrollView}>
+      <TouchableOpacity 
+        style={styles.shareExperienceButton}
+        onPress={() => setIsReviewModalVisible(true)}
+      >
+        <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
+      </TouchableOpacity>
+
+      <View style={styles.existingReviews}>
+        <View style={styles.reviewCard}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewerName}>Malek Raouff</Text>
+            {renderStars(3)}
+          </View>
+          <Text style={styles.reviewText}>
+            J'ai suivi des séances de musculation avec Coach Ahmed pendant 3 mois et les résultats sont incroyables ! Il est très professionnel, toujours à l'écoute.
+          </Text>
+          <View style={styles.beforeAfterContainer}>
+            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
+            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
+          </View>
+        </View>
+
+        <View style={styles.reviewCard}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewerName}>Rami Herzi</Text>
+            {renderStars(4)}
+          </View>
+          <Text style={styles.reviewText}>
+            J'ai suivi des séances de musculation avec Coach Ahmed pendant 3 mois et les résultats sont incroyables ! Il est très professionnel, toujours à l'écoute.
+          </Text>
+          <View style={styles.beforeAfterContainer}>
+            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
+            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  const renderMainContent = () => {
+    switch (selectedTab) {
+      case 'document':
+        return (
+          <>
+            <Text style={styles.competencesTitle}>Compétences générales</Text>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tag}>
+                {competencesGenerales.length ? `${competencesGenerales}` : "Aucune compétence disponible"}
+              </Text>
+            </View>
+
+            <Text style={styles.competencesTitle}>Santé et bien-être</Text>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tag}>
+                {santeEtBienEtre.length ? `${santeEtBienEtre}` : "Aucune santé disponible"}
+              </Text>
+            </View>
+
+            <Text style={styles.competencesTitle}>Entraînement physique</Text>
+            <Text style={styles.tag}>
+              {entrainementPhysique.length ? `${entrainementPhysique}` : "Coach non spécifié"}
+            </Text>
+
+            <Text style={styles.competencesTitle}>Cours spécifiques</Text>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tag}>
+                {coursSpecifiques.length ? `${coursSpecifiques}` : "Aucun cours disponible"}
+              </Text>
+            </View>
+
+            <Text style={styles.competencesTitle}>Expériences :</Text>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tag}>
+                {dureeExperience ? `${dureeExperience} d'expérience` : "Expérience non spécifiée"}
+              </Text>
+            </View>
+          </>
+        );
+      case 'gallery':
+      case 'video':
+        return (
+          <View style={styles.galleryContainer}>
+            {galleryImages.map((image, index) => (
+              <Image key={index} source={image} style={styles.galleryImage} />
+            ))}
+          </View>
+        );
+      case 'emoji':
+        return renderEmojiContent();
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={styles.mainContainer}>
+      <ScrollView style={styles.container}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+
+        <View style={styles.coverImage}>
+          <Image source={require('../../assets/images/a.png')} style={styles.cover} />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <Image
+            source={
+              photo
+                ? { uri: `data:image/jpeg;base64,${photo}` }
+                : require('../../assets/images/b.png')
+            }
+            style={styles.profileImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.name}>{firstName}</Text>
+          <Text style={styles.title}>Coach sportif à {disciplines}</Text>
+          <Text style={styles.price}>Séance de {dureeSeance} min à partir de {prixSeance} DT</Text>
+          <Text style={styles.location}>
+            📍 En ligne - {email}
+          </Text>
+
+          <TouchableOpacity style={styles.buttonYellow}>
+            <Text style={styles.buttonText}>Découvrez mes cours</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.buttonBlack}
+            onPress={() => router.push('/Coachd')}
+            >
+          
+            <Text style={styles.buttonText1}>Contactez-moi</Text>
+          </TouchableOpacity>
+
+          <View style={styles.socialIcons}>
+            <Icon name="facebook" size={24} color="#1877F2" />
+            <Icon name="instagram" size={24} color="#E4405F" />
+            <Icon name="tiktok" size={24} color="black" />
+          </View>
+
+          <View style={styles.about}>
+            <Text style={styles.sectionTitle}>À propos :</Text>
+            <Text style={styles.description}>{bio || "Aucune description disponible"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.innerNavBar}>
+          <TouchableOpacity 
+            style={[styles.navItem, selectedTab === 'document' && styles.selectedNavItem]}
+            onPress={() => setSelectedTab('document')}
+          >
+            <MaterialCommunityIcons 
+              name="file-document-outline" 
+              size={24} 
+              color={selectedTab === 'document' ? "#000" : "#666"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navItem, selectedTab === 'gallery' && styles.selectedNavItem]}
+            onPress={() => setSelectedTab('gallery')}
+          >
+            <MaterialIcons 
+              name="photo-library" 
+              size={24} 
+              color={selectedTab === 'gallery' ? "#000" : "#666"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navItem, selectedTab === 'video' && styles.selectedNavItem]}
+            onPress={() => setSelectedTab('video')}
+          >
+            <MaterialIcons 
+              name="videocam" 
+              size={24} 
+              color={selectedTab === 'video' ? "#000" : "#666"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navItem, selectedTab === 'emoji' && styles.selectedNavItem]}
+            onPress={() => setSelectedTab('emoji')}
+          >
+            <MaterialIcons 
+              name="emoji-emotions" 
+              size={24} 
+              color={selectedTab === 'emoji' ? "#000" : "#666"} 
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tabContent}>
+          {renderMainContent()}
+        </View>
+      </ScrollView>
+      
+      {/* Le modal est rendu une seule fois */}
+      <ReviewModal 
+        isVisible={isReviewModalVisible}
+        onClose={() => setIsReviewModalVisible(false)}
+        rating={rating}
+        setRating={setRating}
+        comment={comment}
+        setComment={setComment}
+        firstName={firstName}
+      />
+    </View>
+  );
+};
+
+//////////////////////////////////////////////////
+// Styles (fusion des styles utilisés)          //
+//////////////////////////////////////////////////
 const styles = StyleSheet.create({
-  container: {
+  // Modal styles
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  header: {
-    backgroundColor: '#000',
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-  },
-  customIcon: {
-    width: 40,
-    height: 40,
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    alignItems: 'center',
-  },
-  iconEars: {
-    width: 30,
-    height: 15,
-    backgroundColor: '#9FE870',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  iconFace: {
-    width: 30,
-    height: 25,
-    backgroundColor: '#9FE870',
-    borderRadius: 8,
-    marginTop: -5,
-  },
-  iconEyes: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 5,
-  },
-  profileContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#9FE870',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 24,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#333',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    gap: 8,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 15,
+    padding: 15,
+    height: 120,
+    marginBottom: 20,
+    backgroundColor: '#F8F8F8',
+    textAlignVertical: 'top',
+  },
+  transformationImagesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  transformationImageWrapper: {
+    alignItems: 'center',
+    width: '45%',
+  },
+  uploadImageButton: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    marginBottom: 8,
+  },
+  imageLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F8F8F8',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#000',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  submitButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+
+  // Main styles
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  container: {
+    flex: 1,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 30,
+    left: 10,
+    padding: 10,
+    zIndex: 1,
+  },
+  coverImage: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#000',
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+  },
+  profileContainer: {
+    alignItems: 'center',
+    marginTop: -90,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    borderWidth: 3,
+    borderColor: '#fff',
   },
   name: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+    marginTop: 10,
   },
   title: {
-    fontSize: 16,
-    color: 'white',
+    fontSize: 14,
+    color: 'gray',
     marginBottom: 5,
   },
   price: {
     fontSize: 14,
-    color: 'white',
-    marginBottom: 5,
+    fontWeight: 'bold',
+    color: '#000',
   },
   location: {
     fontSize: 12,
-    color: 'white',
     textAlign: 'center',
+    color: 'gray',
+    marginVertical: 5,
+  },
+  buttonYellow: {
+    backgroundColor: '#CBFF06',
+    padding: 10,
+    width: '80%',
+    borderRadius: 8,
+    marginVertical: 5,
+    alignItems: 'center',
+  },
+  buttonBlack: {
+    backgroundColor: '#000',
+    padding: 10,
+    width: '80%',
+    borderRadius: 8,
+    marginVertical: 5,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'black',
+    fontWeight: 'bold',
+  },
+  buttonText1: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  socialIcons: {
+    flexDirection: 'row',
+    marginVertical: 10,
+    gap: 15,
+  },
+  about: {
+    width: '90%',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  emojiScrollView: {
+    flex: 1,
+  },
+  existingReviews: {
+    marginTop: 20,
+  },
+  reviewCard: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 15,
   },
-  socialRow: {
+  reviewHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  iconWrapper: {
-    marginHorizontal: 10,
-  },
-  iconSquare: {
-    width: 24,
-    height: 24,
-    backgroundColor: '#333',
-    marginHorizontal: 10,
-  },
-  primaryButton: {
-    backgroundColor: '#9FE870',
-    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    width: '100%',
     marginBottom: 10,
   },
-  primaryButtonText: {
-    color: 'black',
-    fontWeight: '600',
-    marginRight: 5,
+  reviewerName: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  secondaryButton: {
-    borderColor: 'white',
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    width: '100%',
-    marginBottom: 20,
+  reviewText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    lineHeight: 20,
   },
-  secondaryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '600',
+  beforeAfterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  section: {
+  beforeAfterImage: {
+    width: '48%',
+    height: 150,
+    borderRadius: 8,
+  },
+  innerNavBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 20,
+  },
+  navItem: {
+    flex: 1,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedNavItem: {
+    backgroundColor: '#f8f8f8',
+  },
+  tabContent: {
     padding: 20,
-    backgroundColor: 'white',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
+    textAlign: 'left',
+    width: '100%',
   },
-  aboutText: {
+  description: {
     fontSize: 14,
+    color: 'gray',
+    textAlign: 'left',
+  },
+  competencesTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 15,
+    marginBottom: 10,
     color: '#666',
-    lineHeight: 20,
+    textAlign: 'left',
   },
-  bottomNav: {
+  tagContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
   },
-  navItem: {
+  tag: {
+    backgroundColor: '#EAEAEA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    fontSize: 13,
+    color: '#666',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  galleryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     padding: 10,
+  },
+  galleryImage: {
+    width: '30%',
+    height: 100,
+    marginBottom: 10,
+    borderRadius: 10,
+  },
+  shareExperienceButton: {
+    backgroundColor: '#f5f5f5',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  shareExperienceText: {
+    color: '#666',
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
 
-export default ProfileScreen;
+export default CoachProfile;

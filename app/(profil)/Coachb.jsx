@@ -8,14 +8,17 @@ import {
   TouchableOpacity,
   ScrollView
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useNavigation, useLocalSearchParams, useRouter } from 'expo-router';
+
 import { Ionicons } from '@expo/vector-icons';
 
 const CoachDetailsScreen = () => {
-  const router = useRouter();
+  const navigation = useNavigation();
+  const router = useRouter(); 
   const params = useLocalSearchParams();
   const coach = params;
-  console.log('Coach Data:', coach); 
+  
+  
 
   const renderBadge = (icon, text, value) => (
     <View style={styles.badge}>
@@ -35,6 +38,33 @@ const CoachDetailsScreen = () => {
       </View>
     </View>
   );
+  const handleProfilePress = () => {
+    // Pass the coach data as params when navigating
+    router.push({
+      pathname: '/Coachc',
+      params: {
+        competencesGenerales: coach.competencesGenerales,
+      coursSpecifiques: coach.coursSpecifiques,
+      disciplines: coach.disciplines,
+      dureeExperience: coach.dureeExperience,
+      dureeSeance: coach.dureeSeance,
+      email: coach.email,
+      entrainementPhysique: coach.entrainementPhysique,
+      fb: coach.fb,
+      firstName: coach.firstName,
+      insta: coach.insta,
+      niveauCours: coach.niveauCours,
+      phoneNumber: coach.phoneNumber,
+      photo: coach.photo,
+      poste: coach.poste,
+      prixSeance: coach.prixSeance,
+      santeEtBienEtre: coach.santeEtBienEtre,
+      tiktok: coach.tiktok,
+      typeCoaching: coach.typeCoaching,
+      bio:coach.bio,
+      }
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -43,7 +73,7 @@ const CoachDetailsScreen = () => {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => router.back()} 
           >
             <Ionicons name="chevron-back" size={24} color="#FFF" />
           </TouchableOpacity>
@@ -69,12 +99,12 @@ const CoachDetailsScreen = () => {
                 <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
               </View>
             </View>
-            <TouchableOpacity style={styles.profileButton}>
+            <TouchableOpacity style={styles.profileButton } onPress={handleProfilePress} >
               <Text style={styles.profileButtonText}>Voir le profil</Text>
             </TouchableOpacity>
           </View>
           
-          <Text style={styles.title}>Coach sportif de {coach.disciplines}</Text>
+          <Text style={styles.title}>Coach sportif de {coach.entrainementPhysique}</Text>
 
 
           {/* Badges Section */}

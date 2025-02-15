@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
-const API_URL = 'http://192.168.1.194:8082/api/auth/register';
+const API_URL = 'http://192.168.0.5:8082/api/auth/register';
 
 const Inscription = () => {
  const [phoneNumber, setPhoneNumber] = useState('');

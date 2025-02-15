@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,14 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 const RegistrationForm = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const eventData = route?.params?.eventData || {};
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,39 +22,44 @@ const RegistrationForm = () => {
     acceptRules: false,
   });
 
-  const rules = [
-    'Une confirmation d\'inscription vous sera envoyée par email ou SMS',
-    'Conditions de Participation ✅',
-    'Avoir au moins 18 ans (ou être accompagné d\'un tuteur légal si mineur).',
-    'Équipement Requis ⚠️',
-    'Vêtements de sport confortables et respirants.',
-    'Baskets adaptées aux entraînements intenses.',
-    'Serviette et vêtements de rechange.',
-    'Apportez une gourde d\'eau pour rester hydraté.',
-    'Respect & Sécurité ⚡️',
-    'Respectez les consignes des coachs et du staff.',
-    'Récupérez vos affaires et laissez l\'espace propre.',
-    'Après l\'événement 🔥',
-    'Restez connectés pour les prochaines éditions et offres exclusives !',
-    'Prépare-toi à transpirer, t\'amuser et repousser tes limites ! On se retrouve au Workout Gang ! 💪'
-  ];
+  useEffect(() => {
+    if (eventData.titre) {
+      console.log('Event Data:', eventData);
+    }
+  }, [eventData]);
+
+  const parseRules = (reglement) => {
+    if (!reglement) return [];
+    // Diviser le texte par des points et nettoyer les espaces inutiles
+    return reglement.split('.').filter(rule => rule.trim().length > 0);
+  };
+  
 
   const handleSubmit = () => {
-    // Handle form submission logic here
     console.log('Form submitted:', formData);
   };
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Réservez votre place !</Text>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.header}>Réservez votre place !</Text>
+      </View>
       
+      <Text style={styles.eventTitle}>Événement: {eventData.titre || 'Non spécifié'}</Text>
+
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nom et Prénom</Text>
         <TextInput
           style={styles.input}
           value={formData.name}
           onChangeText={(text) => setFormData({...formData, name: text})}
-          placeholder="Ahmed Mahmoud"
+          placeholder="Votre Nom"
         />
       </View>
 
@@ -58,7 +69,7 @@ const RegistrationForm = () => {
           style={styles.input}
           value={formData.email}
           onChangeText={(text) => setFormData({...formData, email: text})}
-          placeholder="ahmed@gmail.com"
+          placeholder="exempl@gmail.com"
           keyboardType="email-address"
         />
       </View>
@@ -69,16 +80,20 @@ const RegistrationForm = () => {
           style={styles.input}
           value={formData.phone}
           onChangeText={(text) => setFormData({...formData, phone: text})}
-          placeholder="90306551"
+          placeholder="votre numero"
           keyboardType="phone-pad"
         />
       </View>
 
       <View style={styles.rulesContainer}>
         <Text style={styles.rulesHeader}>Règles de participation</Text>
-        {rules.map((rule, index) => (
-          <Text key={index} style={styles.ruleText}>• {rule}</Text>
-        ))}
+        {eventData.reglement ? (
+          parseRules(eventData.reglement).map((rule, index) => (
+            <Text key={index} style={styles.ruleText}>• {rule}</Text>
+          ))
+        ) : (
+          <Text style={styles.noRulesText}>Aucune règle spécifiée pour cet événement.</Text>
+        )}
       </View>
 
       <TouchableOpacity
@@ -90,7 +105,10 @@ const RegistrationForm = () => {
       </TouchableOpacity>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.cancelButton}>
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -111,10 +129,25 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 20,
+  },
+  backButton: {
+    padding: 5,
+  },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginLeft: 15,
+  },
+  eventTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#444',
   },
   inputContainer: {
     marginBottom: 15,
@@ -144,6 +177,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#444',
   },
+  noRulesText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#666',
+  },
   checkbox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,6 +206,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
+    marginBottom: 30,
   },
   cancelButton: {
     flex: 1,

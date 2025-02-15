@@ -13,6 +13,9 @@ export default function RootLayout() {
       <Stack.Screen name="(coach)" options={{ headerShown: false  }} />
        {/* Désactivation de l'en-tête pour l'écran coach */}
       <Stack.Screen name="(event)" options={{ headerShown: false  }} />
+      
+
+      
     </Stack>
   );
 }
