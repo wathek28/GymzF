@@ -22,7 +22,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
-
+import * as ImagePicker from 'expo-image-picker';
 ////////////////////////////////////////////////////////////
 // Composant ReviewModal extrait pour éviter sa recréation //
 ////////////////////////////////////////////////////////////
@@ -35,8 +35,47 @@ const ReviewModal = ({
   setComment,
   firstName,
 }) => {
+  const [beforeImage, setBeforeImage] = useState(null);
+  const [afterImage, setAfterImage] = useState(null);
+
   const handleModalPress = (e) => {
     e.stopPropagation();
+  };
+
+  // Fonction pour choisir l'image "Avant"
+  const pickBeforeImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+    if (!result.cancelled) {
+      setBeforeImage(result.uri);
+    }
+  };
+
+  // Fonction pour choisir l'image "Après"
+  const pickAfterImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+    if (!result.cancelled) {
+      setAfterImage(result.uri);
+    }
   };
 
   return (
@@ -93,9 +132,13 @@ const ReviewModal = ({
                     <View style={styles.transformationImageWrapper}>
                       <TouchableOpacity 
                         style={styles.uploadImageButton}
-                        onPress={() => console.log("Upload before image")}
+                        onPress={pickBeforeImage}
                       >
-                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                        {beforeImage ? (
+                          <Image source={{ uri: beforeImage }} style={styles.uploadedImage} />
+                        ) : (
+                          <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                        )}
                       </TouchableOpacity>
                       <Text style={styles.imageLabel}>Avant</Text>
                     </View>
@@ -103,9 +146,13 @@ const ReviewModal = ({
                     <View style={styles.transformationImageWrapper}>
                       <TouchableOpacity 
                         style={styles.uploadImageButton}
-                        onPress={() => console.log("Upload after image")}
+                        onPress={pickAfterImage}
                       >
-                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                        {afterImage ? (
+                          <Image source={{ uri: afterImage }} style={styles.uploadedImage} />
+                        ) : (
+                          <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                        )}
                       </TouchableOpacity>
                       <Text style={styles.imageLabel}>Après</Text>
                     </View>
@@ -118,6 +165,8 @@ const ReviewModal = ({
                         onClose();
                         setRating(0);
                         setComment('');
+                        setBeforeImage(null);
+                        setAfterImage(null);
                       }}
                     >
                       <Text style={styles.cancelButtonText}>Annuler</Text>
@@ -134,10 +183,12 @@ const ReviewModal = ({
                           Alert.alert("Erreur", "Veuillez ajouter un commentaire");
                           return;
                         }
-                        console.log("Publishing review:", { rating, comment });
+                        console.log("Publishing review:", { rating, comment, beforeImage, afterImage });
                         onClose();
                         setRating(0);
                         setComment('');
+                        setBeforeImage(null);
+                        setAfterImage(null);
                       }}
                     >
                       <Text style={styles.submitButtonText}>Publier</Text>
