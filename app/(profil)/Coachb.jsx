@@ -17,6 +17,11 @@ const CoachDetailsScreen = () => {
   const router = useRouter(); 
   const params = useLocalSearchParams();
   const coach = params;
+
+
+  console.log("Coach object:", coach);
+  console.log("User ID:", coach.id);
+  
   
   
 
@@ -43,7 +48,9 @@ const CoachDetailsScreen = () => {
     router.push({
       pathname: '/Coachc',
       params: {
-        competencesGenerales: coach.competencesGenerales,
+        
+        id: coach.id, 
+      competencesGenerales: coach.competencesGenerales,
       coursSpecifiques: coach.coursSpecifiques,
       disciplines: coach.disciplines,
       dureeExperience: coach.dureeExperience,

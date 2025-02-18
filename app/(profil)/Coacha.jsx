@@ -25,6 +25,10 @@ const CoachSearchScreen = () => {
   const [coaches, setCoaches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Cela affiche l'ID utilisateur
+   // Valeur par défaut vide si params est undefined
+console.log("User ID:", id); // Cela devrait afficher l'ID si c'est passé correctement
+const { id } = useRouter().params || {}; // Valeur par défaut vide si params est undefined
 
   const competences = [
     { id: '1', label: "Coaching individuel" },
@@ -48,7 +52,6 @@ const CoachSearchScreen = () => {
     fetchCoaches();
   }, [location, level, selectedCompetences]);
   
-
   const toggleCompetence = (id) => {
     setSelectedCompetences(prev => 
       prev.includes(id) 
@@ -111,7 +114,6 @@ const CoachSearchScreen = () => {
       ))}
     </View>
   );
-  
 
   const renderLevelOptions = () => (
     <View style={styles.optionsContainer}>
@@ -184,13 +186,7 @@ const CoachSearchScreen = () => {
         </View>
       );
     }
-    const toggleCompetence = (id) => {
-      const updatedCompetences = selectedCompetences.includes(id)
-        ? selectedCompetences.filter(c => c !== id)
-        : [...selectedCompetences, id];
-      setSelectedCompetences(updatedCompetences);
-    };
-    
+
     const pairs = [];
     for (let i = 0; i < coaches.length; i += 2) {
       pairs.push(coaches.slice(i, i + 2));
@@ -204,10 +200,18 @@ const CoachSearchScreen = () => {
               <TouchableOpacity
                 key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
                 style={styles.coachCard}
-                onPress={() => router.push({
-                  pathname: "/Coachb",
-                  params: { ...coach },
-                })}
+                onPress={() => {
+                  const userId = "some-user-id"; // Remplacer par l'ID utilisateur réel
+                  if (!userId) {
+                    console.log('User ID est manquant');
+                    return; // Arrêter la navigation si l'ID n'est pas disponible
+                  }
+                
+                  router.push({
+                    pathname: "/Coachb",
+                    params: { ...coach, userId },
+                  });
+                }}
               >
                 <Image
                   source={coach.photo 
@@ -283,6 +287,9 @@ const CoachSearchScreen = () => {
     </SafeAreaView>
   );
 };
+
+
+
 
 const styles = StyleSheet.create({
   container: {

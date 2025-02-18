@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   KeyboardAvoidingView, 
   Platform, 
   Alert,
-} from 'react-native';
-import { 
+  ActivityIndicator,
   View, 
   Text, 
   Image, 
   TouchableOpacity, 
   ScrollView, 
-  StyleSheet, 
+  StyleSheet,
   TextInput,
   Modal,
   TouchableWithoutFeedback,
@@ -23,58 +22,180 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-////////////////////////////////////////////////////////////
-// Composant ReviewModal extrait pour éviter sa recréation //
-////////////////////////////////////////////////////////////
-const ReviewModal = ({
-  isVisible,
-  onClose,
-  rating,
-  setRating,
-  comment,
-  setComment,
-  firstName,
-}) => {
+
+//
+// Cette fonction sanitizeResponse supprime le champ "content" 
+// (qui est très volumineux) de la réponse JSON brute.
+
+
+const useGalleryImages = (id, selectedTab) => {
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const API_BASE_URL = 'http://192.168.0.5:8082/api';
+  const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
+
+  useEffect(() => {
+    if (selectedTab === 'gallery' ) {
+      loadGalleryImages(id);
+    }
+  }, [selectedTab, id]);
+
+  const extractBase64Content = (text) => {
+    const images = new Map(); // Utiliser une Map pour dédupliquer
+    let position = 0;
+
+    while (position < text.length) {
+      const contentKey = '"content"';
+      const startContent = text.indexOf(contentKey, position);
+      if (startContent === -1) break;
+
+      const startQuote = text.indexOf('"', startContent + contentKey.length);
+      if (startQuote === -1) break;
+
+      let endQuote = startQuote + 1;
+      let escape = false;
+
+      while (endQuote < text.length) {
+        const char = text[endQuote];
+        if (escape) {
+          escape = false;
+        } else if (char === '\\') {
+          escape = true;
+        } else if (char === '"' && !escape) {
+          break;
+        }
+        endQuote++;
+      }
+
+      if (endQuote < text.length) {
+        const base64Content = text.slice(startQuote + 1, endQuote);
+
+        // Chercher l'ID associé
+        const idSearch = text.slice(Math.max(0, startContent - 200), startContent);
+        const idMatch = idSearch.match(/"id"\s*:\s*(\d+)/);
+        let imageId;
+
+        if (idMatch) {
+          imageId = parseInt(idMatch[1]);
+        } else {
+          imageId = `generated_${Date.now()}_${Math.random()}`;
+        }
+
+        // Vérifier si le contenu ressemble à du base64 et n'est pas déjà présent
+        if (/^[A-Za-z0-9+/=]+$/.test(base64Content) && !images.has(base64Content)) {
+          images.set(base64Content, {
+            id: imageId,
+            content: base64Content
+          });
+        }
+      }
+
+      position = endQuote + 1;
+    }
+
+    return Array.from(images.values());
+  };
+
+  const processImages = (photos) => {
+    const seen = new Set(); // Pour suivre les URIs déjà vues
+
+    return photos.map(photo => {
+      const uri = photo.url || (photo.content ? `data:image/jpeg;base64,${photo.content}` : DEFAULT_IMAGE);
+
+      // Si l'URI existe déjà, générer un nouvel ID
+      if (seen.has(uri)) {
+        photo.id = `${photo.id}_${Date.now()}_${Math.random()}`;
+      }
+      seen.add(uri);
+
+      return {
+        id: photo.id,
+        uri
+      };
+    }).filter(img => img.uri !== DEFAULT_IMAGE); // Filtrer les images par défaut
+  };
+
+  const loadGalleryImages = async (coachId) => {
+    try {
+      setIsLoading(true);  // Lancer le chargement
+      setError(null);
+      setGalleryImages([]);
+  
+      const response = await fetch(`${API_BASE_URL}/photos/user/${coachId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      const foundImages = extractBase64Content(JSON.stringify(data));
+  
+      if (foundImages.length === 0) {
+        throw new Error('Aucune image trouvée dans la réponse');
+      }
+  
+      const processedImages = processImages(foundImages);
+      setGalleryImages(processedImages);
+  
+    } catch (err) {
+      setError(err.message || "Impossible de charger les images.");
+    } finally {
+      setIsLoading(false);  // Fin du chargement
+    }
+  };
+  
+
+  return {
+    galleryImages,
+    isLoading,
+    error,
+  };
+};
+
+
+
+
+
+
+//
+// Hook personnalisé pour la gestion des images de la galerie avec pagination
+//
+
+
+
+///////////////////////////////////////////////////////////////////////////
+// Le reste de votre code (ReviewModal, CoachProfile, styles, etc.) reste inchangé
+///////////////////////////////////////////////////////////////////////////
+
+const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setComment, firstName }) => {
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
 
-  const handleModalPress = (e) => {
-    e.stopPropagation();
-  };
-
-  // Fonction pour choisir l'image "Avant"
-  const pickBeforeImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.cancelled) {
-      setBeforeImage(result.uri);
-    }
-  };
-
-  // Fonction pour choisir l'image "Après"
-  const pickAfterImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.cancelled) {
-      setAfterImage(result.uri);
+  const pickImage = async (setImage) => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+      if (!result.canceled) {
+        setImage(result.uri);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sélection de l\'image:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
     }
   };
 
@@ -91,112 +212,104 @@ const ReviewModal = ({
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={handleModalPress}>
-              <View style={styles.modalContent}>
-                <ScrollView>
-                  <Text style={styles.modalTitle}>
-                    Vous avez récemment travaillé avec{'\n'}
-                    COACH {firstName?.toUpperCase()},{'\n'}
-                    Partagez votre expérience !
-                  </Text>
-
-                  <Text style={styles.fieldLabel}>Évaluation *</Text>
-                  <View style={styles.starsContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity
-                        key={star}
-                        onPress={() => setRating(star)}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons
-                          name={star <= rating ? "star" : "star-border"}
-                          size={32}
-                          color="#D4FF00"
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Text style={styles.fieldLabel}>Commentaire *</Text>
-                  <TextInput
-                    style={styles.commentInput}
-                    multiline
-                    placeholder="Partagez votre expérience"
-                    value={comment}
-                    onChangeText={setComment}
-                    textAlignVertical="top"
-                  />
-
-                  <Text style={styles.fieldLabel}>Images de la transformation</Text>
-                  <View style={styles.transformationImagesContainer}>
-                    <View style={styles.transformationImageWrapper}>
-                      <TouchableOpacity 
-                        style={styles.uploadImageButton}
-                        onPress={pickBeforeImage}
-                      >
-                        {beforeImage ? (
-                          <Image source={{ uri: beforeImage }} style={styles.uploadedImage} />
-                        ) : (
-                          <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.imageLabel}>Avant</Text>
-                    </View>
-                    
-                    <View style={styles.transformationImageWrapper}>
-                      <TouchableOpacity 
-                        style={styles.uploadImageButton}
-                        onPress={pickAfterImage}
-                      >
-                        {afterImage ? (
-                          <Image source={{ uri: afterImage }} style={styles.uploadedImage} />
-                        ) : (
-                          <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.imageLabel}>Après</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.buttonContainer}>
-                    <TouchableOpacity 
-                      style={styles.cancelButton}
-                      onPress={() => {
-                        onClose();
-                        setRating(0);
-                        setComment('');
-                        setBeforeImage(null);
-                        setAfterImage(null);
-                      }}
+            <View style={styles.modalContent}>
+              <ScrollView>
+                <Text style={styles.modalTitle}>
+                  Vous avez récemment travaillé avec{'\n'}
+                  COACH {firstName?.toUpperCase()},{'\n'}
+                  Partagez votre expérience !
+                </Text>
+                <Text style={styles.fieldLabel}>Évaluation *</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setRating(star)}
+                      activeOpacity={0.7}
                     >
-                      <Text style={styles.cancelButtonText}>Annuler</Text>
+                      <MaterialIcons
+                        name={star <= rating ? "star" : "star-border"}
+                        size={32}
+                        color="#D4FF00"
+                      />
                     </TouchableOpacity>
-                    
+                  ))}
+                </View>
+                <Text style={styles.fieldLabel}>Commentaire *</Text>
+                <TextInput
+                  style={styles.commentInput}
+                  multiline
+                  placeholder="Partagez votre expérience"
+                  value={comment}
+                  onChangeText={setComment}
+                  textAlignVertical="top"
+                />
+                <Text style={styles.fieldLabel}>Images de la transformation</Text>
+                <View style={styles.transformationImagesContainer}>
+                  <View style={styles.transformationImageWrapper}>
                     <TouchableOpacity 
-                      style={styles.submitButton}
-                      onPress={() => {
-                        if (!rating) {
-                          Alert.alert("Erreur", "Veuillez donner une évaluation");
-                          return;
-                        }
-                        if (!comment.trim()) {
-                          Alert.alert("Erreur", "Veuillez ajouter un commentaire");
-                          return;
-                        }
-                        console.log("Publishing review:", { rating, comment, beforeImage, afterImage });
-                        onClose();
-                        setRating(0);
-                        setComment('');
-                        setBeforeImage(null);
-                        setAfterImage(null);
-                      }}
+                      style={styles.uploadImageButton}
+                      onPress={() => pickImage(setBeforeImage)}
                     >
-                      <Text style={styles.submitButtonText}>Publier</Text>
+                      {beforeImage ? (
+                        <Image source={{ uri: beforeImage }} style={styles.uploadedImage} />
+                      ) : (
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      )}
                     </TouchableOpacity>
+                    <Text style={styles.imageLabel}>Avant</Text>
                   </View>
-                </ScrollView>
-              </View>
-            </TouchableWithoutFeedback>
+                  <View style={styles.transformationImageWrapper}>
+                    <TouchableOpacity 
+                      style={styles.uploadImageButton}
+                      onPress={() => pickImage(setAfterImage)}
+                    >
+                      {afterImage ? (
+                        <Image source={{ uri: afterImage }} style={styles.uploadedImage} />
+                      ) : (
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.imageLabel}>Après</Text>
+                  </View>
+                </View>
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity 
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      onClose();
+                      setRating(0);
+                      setComment('');
+                      setBeforeImage(null);
+                      setAfterImage(null);
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submitButton}
+                    onPress={() => {
+                      if (!rating) {
+                        Alert.alert("Erreur", "Veuillez donner une évaluation");
+                        return;
+                      }
+                      if (!comment.trim()) {
+                        Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+                        return;
+                      }
+                      console.log("Publication de l'avis:", { rating, comment, beforeImage, afterImage });
+                      onClose();
+                      setRating(0);
+                      setComment('');
+                      setBeforeImage(null);
+                      setAfterImage(null);
+                    }}
+                  >
+                    <Text style={styles.submitButtonText}>Publier</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -204,30 +317,16 @@ const ReviewModal = ({
   );
 };
 
-//////////////////////
-// Composant CoachProfile
-//////////////////////
 const CoachProfile = () => {
   const route = useRoute();
-   const router = useRouter();
+  const router = useRouter();
   const navigation = useNavigation();
   const [selectedTab, setSelectedTab] = useState('document');
-
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
 
-  const galleryImages = [
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-    require('../../assets/images/b.png'),
-  ];
+  const { galleryImages, isLoading, error, loadMoreImages } = useGalleryImages(route.params?.id, selectedTab);
 
   const {
     competencesGenerales = [],
@@ -237,36 +336,46 @@ const CoachProfile = () => {
     dureeSeance,
     email,
     entrainementPhysique = [],
-    fb,
     firstName,
-    insta,
-    niveauCours,
-    phoneNumber,
     photo,
-    poste,
     prixSeance,
     santeEtBienEtre = [],
-    tiktok,
-    typeCoaching,
     bio,
-  } = route.params;
+  } = route.params || {};
 
-  const renderStars = (selectedRating, interactive = false) => {
+  const renderStars = (selectedRating, interactive = false) => (
+    <View style={styles.starsContainer}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <TouchableOpacity
+          key={star}
+          onPress={() => interactive && setRating(star)}
+          disabled={!interactive}
+        >
+          <MaterialIcons
+            name={star <= selectedRating ? "star" : "star-border"}
+            size={24}
+            color="#FFD700"
+          />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderGalleryContent = () => {
+    if (isLoading) return <ActivityIndicator size="large" color="#000" />;
+    if (error) return <Text style={styles.errorText}>{error}</Text>;
+    if (!galleryImages || galleryImages.length === 0) return <Text style={styles.noImagesText}>Aucune image disponible</Text>;
     return (
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => interactive && setRating(star)}
-            disabled={!interactive}
-          >
-            <MaterialIcons
-              name={star <= selectedRating ? "star" : "star-border"}
-              size={24}
-              color="#FFD700"
-            />
-          </TouchableOpacity>
+      <View style={styles.galleryContainer}>
+        {galleryImages.map((image) => (
+          <Image 
+            key={image.id} 
+            source={{ uri: image.uri }} 
+            style={styles.galleryImage}
+            resizeMode="cover"
+          />
         ))}
+       
       </View>
     );
   };
@@ -279,26 +388,11 @@ const CoachProfile = () => {
       >
         <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
       </TouchableOpacity>
-
       <View style={styles.existingReviews}>
         <View style={styles.reviewCard}>
           <View style={styles.reviewHeader}>
             <Text style={styles.reviewerName}>Malek Raouff</Text>
             {renderStars(3)}
-          </View>
-          <Text style={styles.reviewText}>
-            J'ai suivi des séances de musculation avec Coach Ahmed pendant 3 mois et les résultats sont incroyables ! Il est très professionnel, toujours à l'écoute.
-          </Text>
-          <View style={styles.beforeAfterContainer}>
-            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
-            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
-          </View>
-        </View>
-
-        <View style={styles.reviewCard}>
-          <View style={styles.reviewHeader}>
-            <Text style={styles.reviewerName}>Rami Herzi</Text>
-            {renderStars(4)}
           </View>
           <Text style={styles.reviewText}>
             J'ai suivi des séances de musculation avec Coach Ahmed pendant 3 mois et les résultats sont incroyables ! Il est très professionnel, toujours à l'écoute.
@@ -323,26 +417,22 @@ const CoachProfile = () => {
                 {competencesGenerales.length ? `${competencesGenerales}` : "Aucune compétence disponible"}
               </Text>
             </View>
-
             <Text style={styles.competencesTitle}>Santé et bien-être</Text>
             <View style={styles.tagContainer}>
               <Text style={styles.tag}>
                 {santeEtBienEtre.length ? `${santeEtBienEtre}` : "Aucune santé disponible"}
               </Text>
             </View>
-
             <Text style={styles.competencesTitle}>Entraînement physique</Text>
             <Text style={styles.tag}>
               {entrainementPhysique.length ? `${entrainementPhysique}` : "Coach non spécifié"}
             </Text>
-
             <Text style={styles.competencesTitle}>Cours spécifiques</Text>
             <View style={styles.tagContainer}>
               <Text style={styles.tag}>
                 {coursSpecifiques.length ? `${coursSpecifiques}` : "Aucun cours disponible"}
               </Text>
             </View>
-
             <Text style={styles.competencesTitle}>Expériences :</Text>
             <View style={styles.tagContainer}>
               <Text style={styles.tag}>
@@ -352,19 +442,47 @@ const CoachProfile = () => {
           </>
         );
       case 'gallery':
+        return renderGalleryContent();
       case 'video':
-        return (
-          <View style={styles.galleryContainer}>
-            {galleryImages.map((image, index) => (
-              <Image key={index} source={image} style={styles.galleryImage} />
-            ))}
-          </View>
-        );
+        return renderVideoContent();
       case 'emoji':
         return renderEmojiContent();
       default:
         return null;
     }
+  };
+  const renderVideoContent = () => {
+    const videoThumbnails = [
+      { id: 1, thumbnail: require('../../assets/images/b.png'), title: 'Séance de musculation' },
+      { id: 2, thumbnail: require('../../assets/images/b.png'), title: 'Exercices de cardio' },
+      { id: 3, thumbnail: require('../../assets/images/b.png'), title: 'Yoga débutant' },
+      { id: 4, thumbnail: require('../../assets/images/b.png'), title: 'Stretching' },
+    ];
+
+    return (
+      <View style={styles.videoContainer}>
+        {videoThumbnails.map((video) => (
+          <TouchableOpacity 
+            key={video.id}
+            style={styles.videoCard}
+            onPress={() => Alert.alert('Vidéo', 'Lecture de la vidéo...')}
+          >
+            <Image 
+              source={video.thumbnail}
+              style={styles.videoThumbnail}
+              resizeMode="cover"
+            />
+            <View style={styles.playIconContainer}>
+              <MaterialIcons name="play-circle-filled" size={40} color="#FFF" />
+            </View>
+            <View style={styles.videoInfoContainer}>
+              <Text style={styles.videoTitle}>{video.title}</Text>
+              <Text style={styles.videoDuration}>10:30</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -376,11 +494,9 @@ const CoachProfile = () => {
         >
           <Ionicons name="chevron-back" size={24} color="#FFF" />
         </TouchableOpacity>
-
         <View style={styles.coverImage}>
           <Image source={require('../../assets/images/a.png')} style={styles.cover} />
         </View>
-
         <View style={styles.profileContainer}>
           <Image
             source={
@@ -397,29 +513,24 @@ const CoachProfile = () => {
           <Text style={styles.location}>
             📍 En ligne - {email}
           </Text>
-
           <TouchableOpacity style={styles.buttonYellow}>
             <Text style={styles.buttonText}>Découvrez mes cours</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.buttonBlack}
             onPress={() => router.push('/Coachd')}
-            >
-          
+          >
             <Text style={styles.buttonText1}>Contactez-moi</Text>
           </TouchableOpacity>
-
           <View style={styles.socialIcons}>
             <Icon name="facebook" size={24} color="#1877F2" />
             <Icon name="instagram" size={24} color="#E4405F" />
             <Icon name="tiktok" size={24} color="black" />
           </View>
-
           <View style={styles.about}>
             <Text style={styles.sectionTitle}>À propos :</Text>
             <Text style={styles.description}>{bio || "Aucune description disponible"}</Text>
           </View>
         </View>
-
         <View style={styles.innerNavBar}>
           <TouchableOpacity 
             style={[styles.navItem, selectedTab === 'document' && styles.selectedNavItem]}
@@ -462,13 +573,10 @@ const CoachProfile = () => {
             />
           </TouchableOpacity>
         </View>
-
         <View style={styles.tabContent}>
           {renderMainContent()}
         </View>
       </ScrollView>
-      
-      {/* Le modal est rendu une seule fois */}
       <ReviewModal 
         isVisible={isReviewModalVisible}
         onClose={() => setIsReviewModalVisible(false)}
@@ -483,9 +591,47 @@ const CoachProfile = () => {
 };
 
 //////////////////////////////////////////////////
-// Styles (fusion des styles utilisés)          //
+// Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  retryButton: {
+    backgroundColor: '#D4FF00',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: 'black',
+    fontWeight: 'bold',
+  },
+  noImagesText: {
+    color: '#666',
+    textAlign: 'center',
+  },
+  galleryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginright: 5,
+  
+  },
+  galleryImage: {
+    width: '30%',
+    height: 100,
+    marginBottom: 5,
+    borderRadius: 10,
+  },
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -581,7 +727,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-
   // Main styles
   mainContainer: {
     flex: 1,
@@ -765,18 +910,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  galleryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  galleryImage: {
-    width: '30%',
-    height: 100,
-    marginBottom: 10,
-    borderRadius: 10,
-  },
   shareExperienceButton: {
     backgroundColor: '#f5f5f5',
     padding: 15,
@@ -788,6 +921,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
   },
+  // Ajoutez ici d'autres styles si nécessaire
 });
 
 export default CoachProfile;
