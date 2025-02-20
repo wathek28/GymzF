@@ -35,11 +35,12 @@ const CoachDetailsScreen = () => {
 
   const renderLocationInfo = () => (
     <View style={styles.locationContainer}>
-      <Text style={styles.locationHeader}>Je donne des cours :</Text>
+      
       <View style={styles.locationBox}>
-      <Text style={styles.locationText}>En ligne, à domicile aux alentours de {coach.typeCoaching},</Text>
+      
+      <Text style={styles.locationText}>Des Cours : En ligne, à domicile aux alentours de {coach.typeCoaching}, ou à {coach.disciplines}</Text>
 
-        <Text style={styles.locationText}>ou à {coach.disciplines}</Text>
+        
       </View>
     </View>
   );
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   },
   profileImage: {
     width: '100%',
-    height: 500,
+    height: 450,
     backgroundColor: '#2C2C2C',
   },
   infoOverlay: {
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
-    flex: 1,
+ 
   },
   experienceBadge: {
     flex: 1,

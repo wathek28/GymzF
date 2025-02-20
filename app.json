@@ -13,7 +13,9 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Cette application nécessite l'accès à votre localisation pour trouver les salles de sport à proximité.",
         "NSLocationAlwaysUsageDescription": "Cette application nécessite l'accès à votre localisation pour trouver les salles de sport à proximité.",
-
+        "NSCameraUsageDescription": "Cette application nécessite l'accès à la caméra pour la capture vidéo.",
+        "NSMicrophoneUsageDescription": "Cette application nécessite l'accès au microphone pour l'enregistrement audio des vidéos.",
+        "NSPhotoLibraryUsageDescription": "Cette application nécessite l'accès à votre galerie pour sélectionner des vidéos."
       }
     },
     "android": {
@@ -23,8 +25,21 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.wathekmth.myapp"
     },
     "web": {
       "bundler": "metro",
@@ -48,7 +63,15 @@
           "locationAlwaysAndWhenInUsePermission": "Nous avons besoin de votre position pour trouver les salles de sport près de chez vous.",
           "locationWhenInUsePermission": "Nous avons besoin de votre position pour trouver les salles de sport près de chez vous."
         }
-      ]
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Cette application nécessite l'accès au microphone pour l'enregistrement audio des vidéos.",
+          "photosPermission": "Cette application nécessite l'accès à votre galerie pour sélectionner des vidéos."
+        }
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
