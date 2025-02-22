@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   KeyboardAvoidingView, 
   Platform, 
@@ -11,8 +11,8 @@ import {
   ScrollView, 
   StyleSheet,
   TextInput,
-  Modal,
   TouchableWithoutFeedback,
+  Modal, 
   Keyboard
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -22,12 +22,10 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
 
-
-
-
-// ... rest of your app code
+// Pour l'instant, nous utilisons expo-av pour le composant Video
+import { Video } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 
 //
 // Hook pour charger les images de la galerie
@@ -36,11 +34,11 @@ const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.0.5:8082/api';
+  const API_BASE_URL = 'http://192.168.0.6:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
-    if (selectedTab === 'gallery' ) {
+    if (selectedTab === 'gallery') {
       loadGalleryImages(id);
     }
   }, [selectedTab, id]);
@@ -117,28 +115,28 @@ const useGalleryImages = (id, selectedTab) => {
       setIsLoading(true);
       setError(null);
       setGalleryImages([]);
-  
+
       const response = await fetch(`${API_BASE_URL}/photos/user/${coachId}`, {
         headers: {
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
         },
       });
-  
+
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
-  
+
       const data = await response.json();
       const foundImages = extractBase64Content(JSON.stringify(data));
-  
+
       if (foundImages.length === 0) {
         throw new Error('Aucune image trouvée dans la réponse');
       }
-  
+
       const processedImages = processImages(foundImages);
       setGalleryImages(processedImages);
-  
+
     } catch (err) {
       setError(err.message || "Impossible de charger les images.");
     } finally {
@@ -297,146 +295,9 @@ const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setCommen
 };
 
 //
-// Modal pour la lecture de vidéo via expo-av
-//
-const VideoModal = ({ visible, onClose, videoUri }) => {
-  const videoRef = React.useRef(null);
-  const [status, setStatus] = React.useState({});
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-
-  React.useEffect(() => {
-    let isMounted = true;
-
-    const loadVideo = async () => {
-      if (!visible || !videoUri) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Validate video URI format
-        if (!videoUri.startsWith('data:video/') && 
-            !videoUri.startsWith('file://') && 
-            !videoUri.startsWith('http')) {
-          throw new Error('Format vidéo non supporté');
-        }
-
-        // Unload any existing video
-        if (videoRef.current) {
-          await videoRef.current.unloadAsync();
-        }
-
-        // Load the new video
-        if (isMounted) {
-          await videoRef.current?.loadAsync(
-            { uri: videoUri },
-            { shouldPlay: false, isLooping: true },
-            false
-          );
-        }
-      } catch (err) {
-        console.error('Erreur de chargement vidéo:', err);
-        if (isMounted) {
-          setError(`Impossible de charger la vidéo: ${err.message}`);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadVideo();
-
-    return () => {
-      isMounted = false;
-      if (videoRef.current) {
-        videoRef.current.unloadAsync();
-      }
-    };
-  }, [visible, videoUri]);
-
-  // Handle video playback status updates
-  const handlePlaybackStatusUpdate = (playbackStatus) => {
-    if (playbackStatus.isLoaded) {
-      setStatus(playbackStatus);
-      setIsLoading(false);
-    } else if (playbackStatus.error) {
-      console.error('Erreur de lecture:', playbackStatus.error);
-      setError(`Erreur de lecture: ${playbackStatus.error}`);
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.videoModalContainer}>
-        <TouchableOpacity 
-          style={styles.videoModalCloseButton}
-          onPress={onClose}
-        >
-          <Text style={styles.videoModalCloseText}>Fermer</Text>
-        </TouchableOpacity>
-
-        {isLoading && (
-          <View style={styles.videoLoadingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.videoLoadingText}>Chargement...</Text>
-          </View>
-        )}
-
-        {error ? (
-          <View style={styles.videoErrorContainer}>
-            <Text style={styles.videoErrorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => {
-                setError(null);
-                setIsLoading(true);
-                // Attempt to reload the video
-                if (videoRef.current) {
-                  videoRef.current.loadAsync(
-                    { uri: videoUri },
-                    { shouldPlay: true },
-                    false
-                  );
-                }
-              }}
-            >
-              <Text style={styles.retryButtonText}>Réessayer</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Video
-            ref={videoRef}
-            style={styles.videoPlayer}
-            resizeMode={ResizeMode.CONTAIN}
-            useNativeControls
-            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-            onError={(error) => {
-              console.error('Erreur vidéo:', error);
-              setError('Échec de la lecture vidéo');
-              setIsLoading(false);
-            }}
-          />
-        )}
-      </View>
-    </Modal>
-  );
-};
-
-//
 // Composant principal CoachProfile
 //
-const CoachProfile = () => {
+const CoachProfile1 = () => {
   const route = useRoute();
   const router = useRouter();
   const navigation = useNavigation();
@@ -471,408 +332,376 @@ const CoachProfile = () => {
     bio,
   } = route.params || {};
 
-  // Fonction pour récupérer les reels depuis l'API
- 
-  
-  // Fonction optimisée pour récupérer et convertir les vidéos avec des logs détaillés
-  // Helper function to convert blob or base64 to video URI
-// Helper function to convert blob or base64 to video URI
-// Helper function to convert blob to base64
-const blobToBase64 = (blob) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result
-        .replace('data:application/octet-stream;base64,', '')
-        .replace('data:video/mp4;base64,', '');
-      resolve(base64String);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-// Updated processVideoData function
-const processVideoData = async (videoData) => {
-  if (!videoData) return null;
-  
-  try {
-    // Case 1: URI string
-    if (typeof videoData === 'string') {
-      if (videoData.startsWith('http') || videoData.startsWith('file://')) {
-        return videoData;
-      }
-      // Case 2: Base64 string
-      if (videoData.match(/^[A-Za-z0-9+/=]+$/)) {
-        return `data:video/mp4;base64,${videoData}`;
-      }
-    }
-    
-    // Case 3: Blob/Buffer data
-    if (videoData instanceof Blob || (videoData.data && Array.isArray(videoData.data))) {
-      const bytes = new Uint8Array(videoData.data || await videoData.arrayBuffer());
-      const base64 = btoa(String.fromCharCode.apply(null, bytes));
-      return `data:video/mp4;base64,${base64}`;
-    }
-    
-    console.warn('Unsupported video data format:', typeof videoData);
-    return null;
-  } catch (error) {
-    console.error('Error processing video data:', error);
-    return null;
-  }
-};
-
-// Updated fetchReels function
-const fetchReels = async (coachId) => {
-  if (!coachId) {
-    console.error('🚨 coachId is required');
-    return [];
-  }
-
-  try {
-    console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-    const response = await fetch(`http://192.168.0.5:8082/api/reels/user/${coachId}`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+  // Fonction helper pour convertir blob/base64 en URI vidéo
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result
+          .replace('data:application/octet-stream;base64,', '')
+          .replace('data:video/mp4;base64,', '');
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     });
+  };
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  // Fonction pour traiter les données vidéo
+  const processVideoData = async (videoData) => {
+    if (!videoData) return null;
+    
+    try {
+      // Si c'est une URL directe
+      if (typeof videoData === 'string' && (videoData.startsWith('http') || videoData.startsWith('file://'))) {
+        const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
+        await FileSystem.downloadAsync(videoData, filename);
+        return filename;
+      }
+      
+      // Si c'est une data URI (ex: "data:video/mp4;base64,...")
+      if (typeof videoData === 'string' && videoData.startsWith('data:')) {
+        const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
+        const base64Data = videoData.replace(/^data:video\/mp4;base64,/, '');
+        await FileSystem.writeAsStringAsync(filename, base64Data, {
+          encoding: FileSystem.EncodingType.Base64
+        });
+        return filename;
+      }
+      
+      // Si ce sont des données en base64 pures
+      if (typeof videoData === 'string' && videoData.match(/^[A-Za-z0-9+/=]+$/)) {
+        const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
+        await FileSystem.writeAsStringAsync(filename, videoData, {
+          encoding: FileSystem.EncodingType.Base64
+        });
+        return filename;
+      }
+      
+      // Pour les blobs ou buffers
+      if (videoData instanceof Blob || (videoData.data && Array.isArray(videoData.data))) {
+        const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
+        const bytes = new Uint8Array(videoData.data || await videoData.arrayBuffer());
+        const base64 = btoa(String.fromCharCode.apply(null, bytes));
+        
+        await FileSystem.writeAsStringAsync(filename, base64, {
+          encoding: FileSystem.EncodingType.Base64
+        });
+        
+        return filename;
+      }
+      
+      console.warn('Unsupported video data format:', typeof videoData);
+      return null;
+    } catch (error) {
+      console.error('Error processing video data:', error);
+      return null;
     }
+  };
 
-    const reels = await response.json();
-    console.log('Response data structure:', JSON.stringify(reels[0], null, 2));
-
-    if (!Array.isArray(reels)) {
-      console.error('⚠️ Invalid response format - expected array');
+  // Fonction pour récupérer et traiter les reels
+  const fetchReels = async (coachId) => {
+    if (!coachId) {
+      console.error('🚨 coachId is required');
       return [];
     }
 
-    const processedReels = reels.map(reel => {
-      try {
-        // Vérifier les différentes possibilités de stockage des données vidéo
-        const videoData = reel.videoData || reel.video_data || reel.video;
-        let videoUri = null;
+    try {
+      console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
+      const response = await fetch(`http://192.168.0.6:8082/api/reels/user/${coachId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
 
-        if (videoData) {
-          // Si les données vidéo sont en base64
-          if (typeof videoData === 'string' && videoData.match(/^[A-Za-z0-9+/=]+$/)) {
-            videoUri = `data:video/mp4;base64,${videoData}`;
-          }
-          // Si les données vidéo sont un objet avec une propriété data
-          else if (videoData.data) {
-            if (Array.isArray(videoData.data)) {
-              // Convertir le tableau de bytes en base64
-              const bytes = new Uint8Array(videoData.data);
-              const binary = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
-              const base64 = btoa(binary);
-              videoUri = `data:video/mp4;base64,${base64}`;
-            } else if (typeof videoData.data === 'string') {
-              videoUri = `data:video/mp4;base64,${videoData.data}`;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reels = await response.json();
+      console.log('Response data structure:', JSON.stringify(reels[0], null, 2));
+
+      if (!Array.isArray(reels)) {
+        console.error('⚠️ Invalid response format - expected array');
+        return [];
+      }
+
+      const processedReels = reels.map(reel => {
+        try {
+          // Vérifier les différentes possibilités de stockage des données vidéo
+          const videoData = reel.videoData || reel.video_data || reel.video;
+          let videoUri = null;
+
+          if (videoData) {
+            // Si les données vidéo sont en base64
+            if (typeof videoData === 'string' && videoData.match(/^[A-Za-z0-9+/=]+$/)) {
+              videoUri = `data:video/mp4;base64,${videoData}`;
+            }
+            // Si les données vidéo sont un objet avec une propriété data
+            else if (videoData.data) {
+              if (Array.isArray(videoData.data)) {
+                // Convertir le tableau de bytes en base64
+                const bytes = new Uint8Array(videoData.data);
+                const binary = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
+                const base64 = btoa(binary);
+                videoUri = `data:video/mp4;base64,${base64}`;
+              } else if (typeof videoData.data === 'string') {
+                videoUri = `data:video/mp4;base64,${videoData.data}`;
+              }
             }
           }
+
+          // Traitement de la miniature
+          let thumbnailUri;
+          try {
+            thumbnailUri = reel.thumbnail 
+              ? `data:image/jpeg;base64,${reel.thumbnail}`
+              : require('../../assets/images/b.png');
+          } catch (thumbnailError) {
+            console.warn(`Cannot load thumbnail for reel ${reel.id}:`, thumbnailError);
+            thumbnailUri = require('../../assets/images/b.png');
+          }
+
+          const processedReel = {
+            ...reel,
+            videoUri,
+            thumbnailUri,
+            title: reel.title || 'Vidéo sans titre',
+            duration: reel.duration || ''
+          };
+
+          console.log(`Processed reel ${reel.id}:`, {
+            hasVideo: !!videoUri,
+            hasThumb: !!thumbnailUri
+          });
+
+          return processedReel;
+
+        } catch (error) {
+          console.error(`❌ Error processing reel ${reel.id}:`, error);
+          return {
+            ...reel,
+            videoUri: null,
+            error: true,
+            errorMessage: error.message,
+            thumbnailUri: require('../../assets/images/b.png'),
+            title: reel.title || 'Vidéo sans titre',
+            duration: reel.duration || ''
+          };
         }
+      });
 
-        // Traitement de la miniature
-        let thumbnailUri;
-        try {
-          thumbnailUri = reel.thumbnail 
-            ? `data:image/jpeg;base64,${reel.thumbnail}`
-            : require('../../assets/images/b.png');
-        } catch (thumbnailError) {
-          console.warn(`Cannot load thumbnail for reel ${reel.id}:`, thumbnailError);
-          thumbnailUri = require('../../assets/images/b.png');
-        }
+      console.log(`✅ Processed ${processedReels.length} reels successfully`);
+      return processedReels;
 
-        const processedReel = {
-          ...reel,
-          videoUri,
-          thumbnailUri,
-          title: reel.title || 'Vidéo sans titre',
-          duration: reel.duration || ''
-        };
-
-        console.log(`Processed reel ${reel.id}:`, {
-          hasVideo: !!videoUri,
-          hasThumb: !!thumbnailUri
-        });
-
-        return processedReel;
-
-      } catch (error) {
-        console.error(`❌ Error processing reel ${reel.id}:`, error);
-        return {
-          ...reel,
-          videoUri: null,
-          error: true,
-          errorMessage: error.message,
-          thumbnailUri: require('../../assets/images/b.png'),
-          title: reel.title || 'Vidéo sans titre',
-          duration: reel.duration || ''
-        };
-      }
-    });
-
-    console.log(`✅ Processed ${processedReels.length} reels successfully`);
-    return processedReels;
-
-  } catch (error) {
-    console.error('❌ Error fetching reels:', error);
-    throw error;
-  }
-};
-
-// Mise à jour du composant VideoModal pour gérer différents formats de vidéo
-const VideoModal = ({ visible, onClose, videoUri }) => {
-  const videoRef = React.useRef(null);
-  const [status, setStatus] = React.useState({});
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-
-  React.useEffect(() => {
-    if (!visible || !videoUri) {
-      // Reset state when modal closes
-      setError(null);
-      setIsLoading(true);
-      if (videoRef.current) {
-        videoRef.current.unloadAsync();
-      }
-      return;
+    } catch (error) {
+      console.error('❌ Error fetching reels:', error);
+      throw error;
     }
+  };
 
-    let isMounted = true;
+  // Composant VideoModal mis à jour pour utiliser expo-av Video
+  const VideoModal = ({ visible, onClose, videoUri }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [localVideoUri, setLocalVideoUri] = useState(null);
+    const videoRef = useRef(null);
 
-    const loadVideo = async () => {
+    // Définition de prepareVideo accessible depuis le retry
+    const prepareVideo = useCallback(async () => {
+      if (!videoUri) return;
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true);
-        setError(null);
-
-        // Validate video URI
-        if (!videoUri.startsWith('data:video/') && !videoUri.startsWith('file://') && !videoUri.startsWith('http')) {
-          throw new Error('Invalid video format');
-        }
-
-        // Prepare video for playback
-        await videoRef.current?.unloadAsync();
-        await videoRef.current?.loadAsync(
-          { uri: videoUri },
-          { shouldPlay: true },
-          false
-        );
-
-        if (isMounted) {
-          setIsLoading(false);
+        const processedUri = await processVideoData(videoUri);
+        if (processedUri) {
+          setLocalVideoUri(processedUri);
+        } else {
+          setError('Format vidéo non supporté');
         }
       } catch (err) {
-        console.error('Video loading error:', err);
-        if (isMounted) {
-          setError('Cannot load video. Please try again.');
-          setIsLoading(false);
+        console.error('Error preparing video:', err);
+        setError('Erreur lors de la préparation de la vidéo');
+      } finally {
+        setIsLoading(false);
+      }
+    }, [videoUri]);
+
+    useEffect(() => {
+      prepareVideo();
+      return () => {
+        // Cleanup des fichiers temporaires
+        if (localVideoUri?.startsWith(FileSystem.cacheDirectory)) {
+          FileSystem.deleteAsync(localVideoUri, { idempotent: true })
+            .catch(console.error);
+        }
+      };
+    }, [videoUri, prepareVideo]);
+
+    if (!visible) return null;
+
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        onRequestClose={onClose}
+        transparent={false}
+      >
+        <View style={styles.videoModalContainer}>
+          <TouchableOpacity 
+            style={styles.videoModalCloseButton}
+            onPress={onClose}
+          >
+            <Text style={styles.videoModalCloseText}>Fermer</Text>
+          </TouchableOpacity>
+
+          {localVideoUri && !error && (
+            <Video
+              ref={videoRef}
+              style={styles.videoPlayer}
+              source={{ uri: localVideoUri }}
+              resizeMode="contain"
+              useNativeControls
+              shouldPlay
+              isLooping
+              onLoadStart={() => setIsLoading(true)}
+              onLoad={() => setIsLoading(false)}
+              onError={(error) => {
+                console.error('Video playback error:', error);
+                setError('Erreur de lecture de la vidéo');
+                setIsLoading(false);
+              }}
+            />
+          )}
+
+          {isLoading && (
+            <View style={styles.videoLoadingContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.videoLoadingText}>Chargement de la vidéo...</Text>
+            </View>
+          )}
+
+          {error && (
+            <View style={styles.videoErrorContainer}>
+              <Text style={styles.videoErrorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={prepareVideo}
+              >
+                <Text style={styles.retryButtonText}>Réessayer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
+    );
+  };
+
+  // useEffect pour charger les reels
+  useEffect(() => {
+    let isActive = true;
+
+    const loadReels = async () => {
+      if (!route.params?.id) return;
+      
+      setReelsLoading(true);
+      setReelsError(null);
+      
+      try {
+        const processedReels = await fetchReels(route.params.id);
+        if (isActive) {
+          setReels(processedReels);
+        }
+      } catch (error) {
+        if (isActive) {
+          setReelsError(error.message);
+        }
+      } finally {
+        if (isActive) {
+          setReelsLoading(false);
         }
       }
     };
 
-    loadVideo();
-
+    loadReels();
+    
     return () => {
-      isMounted = false;
-      if (videoRef.current) {
-        videoRef.current.unloadAsync();
-      }
+      isActive = false;
     };
-  }, [visible, videoUri]);
+  }, [route.params?.id]);
 
-  const onPlaybackStatusUpdate = (playbackStatus) => {
-    if (playbackStatus.isLoaded) {
-      setStatus(playbackStatus);
-    } else if (playbackStatus.error) {
-      console.error('Playback error:', playbackStatus.error);
-      setError(`Playback error: ${playbackStatus.error}`);
+  // Rendu du contenu vidéo
+  const renderVideoContent = () => {
+    if (reelsLoading) {
+      return (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#D4FF00" />
+          <Text style={styles.loaderText}>Chargement des vidéos...</Text>
+        </View>
+      );
     }
-  };
 
-  // Handle video errors gracefully
-  const handleVideoError = (error) => {
-    console.error('Video error:', error);
-    setError('Failed to play video. Please try again.');
-    setIsLoading(false);
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.videoModalContainer}>
-        <TouchableOpacity 
-          style={styles.videoModalCloseButton}
-          onPress={onClose}
-        >
-          <Text style={styles.videoModalCloseText}>Close</Text>
-        </TouchableOpacity>
-
-        {isLoading && (
-          <View style={styles.videoLoadingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.videoLoadingText}>Loading video...</Text>
-          </View>
-        )}
-
-        {error ? (
-          <View style={styles.videoErrorContainer}>
-            <Text style={styles.videoErrorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => {
-                setError(null);
-                setIsLoading(true);
-                // Attempt to reload the video
-                if (videoRef.current) {
-                  videoRef.current.loadAsync(
-                    { uri: videoUri },
-                    { shouldPlay: true },
-                    false
-                  );
-                }
-              }}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Video
-            ref={videoRef}
-            style={styles.videoPlayer}
-            resizeMode="contain"
-            useNativeControls
-            shouldPlay={visible}
-            isLooping
-            onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-            onError={handleVideoError}
-          />
-        )}
-      </View>
-    </Modal>
-  );
-};
-
-// Updated useEffect hook for fetching reels
-useEffect(() => {
-  let isActive = true;
-
-  const loadReels = async () => {
-    if (!route.params?.id) return;
-    
-    setReelsLoading(true);
-    setReelsError(null);
-    
-    try {
-      const processedReels = await fetchReels(route.params.id);
-      if (isActive) {
-        setReels(processedReels);
-      }
-    } catch (error) {
-      if (isActive) {
-        setReelsError(error.message);
-      }
-    } finally {
-      if (isActive) {
-        setReelsLoading(false);
-      }
+    if (reelsError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{reelsError}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => {
+              setReelsLoading(true);
+              setReelsError(null);
+              fetchReels(route.params?.id);
+            }}
+          >
+            <Text style={styles.retryButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
+
+    if (!reels || reels.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.noVideosText}>Aucune vidéo disponible</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.galleryContainer}>
+        {reels.map((reel) => (
+          <TouchableOpacity
+            key={reel.id}
+            style={styles.videoContainer}
+            onPress={() => {
+              if (reel.videoUri) {
+                setSelectedVideoUri(reel.videoUri);
+                setVideoModalVisible(true);
+              } else {
+                Alert.alert('Erreur', 'Vidéo non disponible');
+              }
+            }}
+          >
+            <Image 
+              source={{ uri: reel.thumbnailUri }} 
+              style={styles.videoThumbnail} 
+              resizeMode="cover"
+            />
+            <View style={styles.playIconContainer}>
+              <MaterialIcons name="play-circle-filled" size={40} color="white" />
+            </View>
+            <View style={styles.videoInfoContainer}>
+              <Text style={styles.videoTitle}>{reel.title}</Text>
+              {reel.duration && (
+                <Text style={styles.videoDuration}>{reel.duration}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
-
-  loadReels();
-  
-  return () => {
-    isActive = false;
-  };
-}, [route.params?.id]);
-
-// Updated renderVideoContent with better error handling
-const renderVideoContent = () => {
-  if (reelsLoading) {
-    return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#D4FF00" />
-        <Text style={styles.loaderText}>Chargement des vidéos...</Text>
-      </View>
-    );
-  }
-
-  if (reelsError) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{reelsError}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => {
-            setReelsLoading(true);
-            setReelsError(null);
-            fetchReels(route.params?.id);
-          }}
-        >
-          <Text style={styles.retryButtonText}>Réessayer</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!reels || reels.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.noVideosText}>Aucune vidéo disponible</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.galleryContainer}>
-      {reels.map((reel) => (
-        <TouchableOpacity
-          key={reel.id}
-          style={styles.videoContainer}
-          onPress={() => {
-            console.log('Video data for reel', reel.id, ':', reel.videoUri ? 'Available' : 'Not available');
-            if (reel.videoUri) {
-              setSelectedVideoUri(reel.videoUri);
-              setVideoModalVisible(true);
-            } else {
-              Alert.alert('Erreur', 'Vidéo non disponible');
-            }
-          }}
-        >
-          <Image 
-            source={{ uri: reel.thumbnailUri }} 
-            style={styles.videoThumbnail} 
-            resizeMode="cover"
-          />
-          <View style={styles.playIconContainer}>
-            <MaterialIcons name="play-circle-filled" size={40} color="white" />
-          </View>
-          <View style={styles.videoInfoContainer}>
-            <Text style={styles.videoTitle}>{reel.title}</Text>
-            {reel.duration && (
-              <Text style={styles.videoDuration}>{reel.duration}</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-};
-  
-  
-  
-  
-   
-  // Dans le renderVideoContent, assurez-vous que la vérification se fait sur videoUri
-  
 
   const renderStars = (selectedRating, interactive = false) => (
     <View style={styles.starsContainer}>
@@ -935,15 +764,6 @@ const renderVideoContent = () => {
       </View>
     </ScrollView>
   );
-
-  // Rendu du contenu vidéo avec ouverture de la modal de lecture
- 
-  
-  // Dans le renderVideoContent, modifiez la vérification du video_data
- 
-  
-  // Modification du renderVideoContent pour utiliser videoUri
-  
 
   const renderMainContent = () => {
     switch (selectedTab) {
@@ -1104,6 +924,10 @@ const renderVideoContent = () => {
   );
 };
 
+
+
+
+
 //////////////////////////////////////////////////
 // Styles                                         //
 //////////////////////////////////////////////////
@@ -1112,57 +936,73 @@ const styles = StyleSheet.create({
   ///// Styles pour la lecture vidéo
   videoModalContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',  // Fond sombre avec opacité
     justifyContent: 'center',
-  },
-  videoPlayer: {
-    flex: 1,
-    backgroundColor: '#000',
+    alignItems: 'center',
   },
   videoModalCloseButton: {
     position: 'absolute',
     top: 40,
     right: 20,
-    zIndex: 2,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 50,
     padding: 10,
   },
   videoModalCloseText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 22,
     fontWeight: 'bold',
   },
-  videoLoadingContainer: {
-    ...StyleSheet.absoluteFillObject,
+  videoPlayerContainer: {
+    width: '80%',  // Taille initiale plus petite (80% de l'écran)
+    height: 300,   // Hauteur initiale
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+    aspectRatio: 9 / 16,  // Ratio vertical comme un Reel
+  },
+  videoLoadingContainer: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -50 }, { translateY: -50 }],
   },
   videoLoadingText: {
-    color: '#FFFFFF',
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
     marginTop: 10,
-    fontSize: 14,
   },
   videoErrorContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 0, 0, 0.7)',  // Fond rouge pour signaler l'erreur
+    borderRadius: 10,
     padding: 20,
   },
   videoErrorText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#D4FF00',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    backgroundColor: '#ff6347', // Couleur orange
+    borderRadius: 30,
   },
   retryButtonText: {
-    color: '#000000',
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   // Autres styles
@@ -1492,4 +1332,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CoachProfile;
+export default CoachProfile1;

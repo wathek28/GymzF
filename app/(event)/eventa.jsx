@@ -28,7 +28,7 @@ const EventsScreen = () => {
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.5:8082/api/events');
+      const response = await fetch('http://192.168.0.6:8082/api/events');
       if (!response.ok) {
         throw new Error("Erreur lors de la récupération des événements");
       }

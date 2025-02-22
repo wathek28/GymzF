@@ -48,7 +48,7 @@ const CodeC = () => {
       console.log('Verification Code:', verificationCode);
       console.log('Role:', role?.toUpperCase() || 'USER');
 
-      const response = await fetch('http://192.168.0.5:8082/api/auth/verify-login', {
+      const response = await fetch('http://192.168.0.6:8082/api/auth/verify-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ const CodeC = () => {
       const formattedPhoneNumber = fullPhoneNumber || 
         (phoneNumber.startsWith('+') ? phoneNumber : `+216${phoneNumber}`);
 
-      const response = await fetch('http://192.168.0.5:8082/api/auth/login', {
+      const response = await fetch('http://192.168.0.6:8082/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

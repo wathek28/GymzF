@@ -77,10 +77,10 @@ const FitnessApp = () => {
     setIsLoading(true);
     try {
       const [offersRes, coachesRes, gymsRes, eventsRes] = await Promise.all([
-        fetch("http://192.168.0.5:8082/api/offres"),
-        fetch("http://192.168.0.5:8082/api/auth/coaches"),
-        fetch("http://192.168.0.5:8082/api/auth/gyms"),
-        fetch("http://192.168.0.5:8082/api/events")
+        fetch("http://192.168.0.6:8082/api/offres"),
+        fetch("http://192.168.0.6:8082/api/auth/coaches"),
+        fetch("http://192.168.0.6:8082/api/auth/gyms"),
+        fetch("http://192.168.0.6:8082/api/events")
       ]);
 
       if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok || !eventsRes.ok) {

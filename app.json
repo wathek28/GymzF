@@ -64,13 +64,7 @@
           "locationWhenInUsePermission": "Nous avons besoin de votre position pour trouver les salles de sport près de chez vous."
         }
       ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Cette application nécessite l'accès au microphone pour l'enregistrement audio des vidéos.",
-          "photosPermission": "Cette application nécessite l'accès à votre galerie pour sélectionner des vidéos."
-        }
-      ],
+     
       "expo-video"
     ],
     "experiments": {
