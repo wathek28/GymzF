@@ -632,6 +632,7 @@ const CoachProfile1 = () => {
   }, [route.params?.id]);
 
   // Rendu du contenu vidéo
+ 
   const renderVideoContent = () => {
     if (reelsLoading) {
       return (
@@ -641,7 +642,7 @@ const CoachProfile1 = () => {
         </View>
       );
     }
-
+  
     if (reelsError) {
       return (
         <View style={styles.errorContainer}>
@@ -659,7 +660,7 @@ const CoachProfile1 = () => {
         </View>
       );
     }
-
+  
     if (!reels || reels.length === 0) {
       return (
         <View style={styles.centerContainer}>
@@ -667,35 +668,34 @@ const CoachProfile1 = () => {
         </View>
       );
     }
-
+  
     return (
-      <View style={styles.galleryContainer}>
+      <View style={styles.videoGridContainer}>
         {reels.map((reel) => (
           <TouchableOpacity
             key={reel.id}
-            style={styles.videoContainer}
+            style={styles.videoGridItem}
             onPress={() => {
               if (reel.videoUri) {
                 setSelectedVideoUri(reel.videoUri);
                 setVideoModalVisible(true);
-              } else {
-                Alert.alert('Erreur', 'Vidéo non disponible');
               }
             }}
           >
             <Image 
               source={{ uri: reel.thumbnailUri }} 
-              style={styles.videoThumbnail} 
+              style={styles.videoGridThumbnail}
               resizeMode="cover"
             />
+            {/* Overlay sombre */}
+            <View style={styles.videoOverlay} />
+            {/* Bouton play */}
             <View style={styles.playIconContainer}>
-              <MaterialIcons name="play-circle-filled" size={40} color="white" />
-            </View>
-            <View style={styles.videoInfoContainer}>
-              <Text style={styles.videoTitle}>{reel.title}</Text>
-              {reel.duration && (
-                <Text style={styles.videoDuration}>{reel.duration}</Text>
-              )}
+              <MaterialIcons 
+                name="play-circle-outline" 
+                size={40} 
+                color="#fff" 
+              />
             </View>
           </TouchableOpacity>
         ))}
@@ -932,6 +932,37 @@ const CoachProfile1 = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  // Dans StyleSheet.create, ajoutez/modifiez ces styles :
+videoGridContainer: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  padding: 1,
+},
+videoGridItem: {
+  width: '33%', // Pour une grille 3x3
+  aspectRatio: 1, // Pour des carrés parfaits
+  padding: 1,
+  position: 'relative',
+},
+videoGridThumbnail: {
+  width: '100%',
+  height: '100%',
+},
+videoOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  backgroundColor: 'rgba(0, 0, 0, 0.2)', // Overlay sombre
+},
+playIconContainer: {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: [
+    { translateX: -20 },
+    { translateY: -20 }
+  ],
+  zIndex: 2,
+},
   
   ///// Styles pour la lecture vidéo
   
@@ -1136,6 +1167,64 @@ const styles = StyleSheet.create({
     videoDuration: {
       color: '#FFFFFF',
       fontSize: 8,
+    },
+
+    /////
+    videoItemContainer: {
+      width: '32%',
+      aspectRatio: 16/9,
+      marginBottom: 8,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    thumbnailContainer: {
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+    },
+    videoThumbnail: {
+      width: '100%',
+      height: '100%',
+    },
+    playButtonOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#fff',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    videoDurationBadge: {
+      position: 'absolute',
+      right: 8,
+      bottom: 24,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    videoDurationText: {
+      color: '#fff',
+      fontSize: 10,
+    },
+    videoTitleOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: 8,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    videoTitleText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '500',
     },
   
     // ==============================
