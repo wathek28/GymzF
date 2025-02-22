@@ -934,402 +934,472 @@ const CoachProfile1 = () => {
 const styles = StyleSheet.create({
   
   ///// Styles pour la lecture vidéo
-  videoModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',  // Fond sombre avec opacité
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoModalCloseButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 50,
-    padding: 10,
-  },
-  videoModalCloseText: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  videoPlayerContainer: {
-    width: '80%',  // Taille initiale plus petite (80% de l'écran)
-    height: 300,   // Hauteur initiale
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 15,
-    overflow: 'hidden',
-  },
-  videoPlayer: {
-    width: '100%',
-    height: '100%',
-    aspectRatio: 9 / 16,  // Ratio vertical comme un Reel
-  },
-  videoLoadingContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -50 }, { translateY: -50 }],
-  },
-  videoLoadingText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 10,
-  },
-  videoErrorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 0, 0, 0.7)',  // Fond rouge pour signaler l'erreur
-    borderRadius: 10,
-    padding: 20,
-  },
-  videoErrorText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    backgroundColor: '#ff6347', // Couleur orange
-    borderRadius: 30,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  // Autres styles
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  retryButton: {
-    backgroundColor: '#D4FF00',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  retryButtonText: {
-    color: 'black',
-    fontWeight: 'bold',
-  },
-  noImagesText: {
-    color: '#666',
-    textAlign: 'center',
-  },
-  galleryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 2,
-  },
-  galleryImage: {
-    width: '33%',
-    height: 110,
-    marginBottom: 2,
-    borderRadius: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 25,
-    lineHeight: 24,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#333',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-    gap: 8,
-  },
-  commentInput: {
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 15,
-    padding: 15,
-    height: 120,
-    marginBottom: 20,
-    backgroundColor: '#F8F8F8',
-    textAlignVertical: 'top',
-  },
-  transformationImagesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  transformationImageWrapper: {
-    alignItems: 'center',
-    width: '45%',
-  },
-  uploadImageButton: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    marginBottom: 8,
-  },
-  imageLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    padding: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: '#000',
-    padding: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  submitButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  mainContainer: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  container: {
-    flex: 1,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 30,
-    left: 10,
-    padding: 10,
-    zIndex: 1,
-  },
-  coverImage: {
-    width: '100%',
-    height: 250,
-    backgroundColor: '#000',
-  },
-  cover: {
-    width: '100%',
-    height: '100%',
-  },
-  profileContainer: {
-    alignItems: 'center',
-    marginTop: -90,
-  },
-  profileImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 120,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 10,
-  },
-  title: {
-    fontSize: 14,
-    color: 'gray',
-    marginBottom: 5,
-  },
-  price: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  location: {
-    fontSize: 12,
-    textAlign: 'center',
-    color: 'gray',
-    marginVertical: 5,
-  },
-  buttonYellow: {
-    backgroundColor: '#CBFF06',
-    padding: 10,
-    width: '80%',
-    borderRadius: 8,
-    marginVertical: 5,
-    alignItems: 'center',
-  },
-  buttonBlack: {
-    backgroundColor: '#000',
-    padding: 10,
-    width: '80%',
-    borderRadius: 8,
-    marginVertical: 5,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: 'black',
-    fontWeight: 'bold',
-  },
-  buttonText1: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  socialIcons: {
-    flexDirection: 'row',
-    marginVertical: 10,
-    gap: 15,
-  },
-  about: {
-    width: '90%',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  emojiScrollView: {
-    flex: 1,
-  },
-  existingReviews: {
-    marginTop: 20,
-  },
-  reviewCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  reviewerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  reviewText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
-    lineHeight: 20,
-  },
-  beforeAfterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  beforeAfterImage: {
-    width: '48%',
-    height: 150,
-    borderRadius: 8,
-  },
-  innerNavBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderColor: '#ddd',
-    marginTop: 20,
-  },
-  navItem: {
-    flex: 1,
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedNavItem: {
-    backgroundColor: '#f8f8f8',
-  },
-  tabContent: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'left',
-    width: '100%',
-  },
-  description: {
-    fontSize: 14,
-    color: 'gray',
-    textAlign: 'left',
-  },
-  competencesTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 10,
-    color: '#666',
-    textAlign: 'left',
-  },
-  tagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  tag: {
-    backgroundColor: '#EAEAEA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    fontSize: 13,
-    color: '#666',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  shareExperienceButton: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  shareExperienceText: {
-    color: '#666',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-});
+  
+    // ==============================
+    // Styles de base et conteneurs
+    // ==============================
+    mainContainer: {
+      flex: 1,
+      backgroundColor: '#f5f5f5',
+    },
+    container: {
+      flex: 1,
+    },
+    tabContent: {
+      padding: 20,
+    },
+  
+    // ==============================
+    // Styles de l'en-tête du profil
+    // ==============================
+    backButton: {
+      position: 'absolute',
+      top: 30,
+      left: 10,
+      padding: 10,
+      zIndex: 1,
+    },
+    coverImage: {
+      width: '100%',
+      height: 250,
+      backgroundColor: '#000',
+    },
+    cover: {
+      width: '100%',
+      height: '100%',
+    },
+    profileContainer: {
+      alignItems: 'center',
+      marginTop: -90,
+    },
+    profileImage: {
+      width: 200,
+      height: 200,
+      borderRadius: 120,
+      borderWidth: 3,
+      borderColor: '#fff',
+    },
+    name: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginTop: 10,
+    },
+    title: {
+      fontSize: 14,
+      color: 'gray',
+      marginBottom: 5,
+    },
+    price: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#000',
+    },
+    location: {
+      fontSize: 12,
+      textAlign: 'center',
+      color: 'gray',
+      marginVertical: 5,
+    },
+  
+    // ==============================
+    // Styles des boutons
+    // ==============================
+    buttonYellow: {
+      backgroundColor: '#CBFF06',
+      padding: 10,
+      width: '80%',
+      borderRadius: 8,
+      marginVertical: 5,
+      alignItems: 'center',
+    },
+    buttonBlack: {
+      backgroundColor: '#000',
+      padding: 10,
+      width: '80%',
+      borderRadius: 8,
+      marginVertical: 5,
+      alignItems: 'center',
+    },
+    buttonText: {
+      color: 'black',
+      fontWeight: 'bold',
+    },
+    buttonText1: {
+      color: '#fff',
+      fontWeight: 'bold',
+    },
+  
+    // ==============================
+    // Styles des réseaux sociaux
+    // ==============================
+    socialIcons: {
+      flexDirection: 'row',
+      marginVertical: 10,
+      gap: 15,
+    },
+  
+    // ==============================
+    // Styles de la section À propos
+    // ==============================
+    about: {
+      width: '90%',
+      marginTop: 10,
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 10,
+      textAlign: 'left',
+      width: '100%',
+    },
+    description: {
+      fontSize: 14,
+      color: 'gray',
+      textAlign: 'left',
+    },
+  
+    // ==============================
+    // Styles de la barre de navigation
+    // ==============================
+    innerNavBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderColor: '#ddd',
+      marginTop: 20,
+    },
+    navItem: {
+      flex: 1,
+      padding: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selectedNavItem: {
+      backgroundColor: '#f8f8f8',
+    },
+  
+    // ==============================
+    // Styles de la galerie et vidéos
+    // ==============================
+    galleryContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      paddingHorizontal: 2,
+    },
+    galleryImage: {
+      width: '32.5%',
+      height: 110,
+      marginBottom: 2,
+      borderRadius: 10,
+    },
+    videoContainer: {
+      width: '32.5%',
+      height: 110,
+      marginBottom: 2,
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    videoThumbnail: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 10,
+    },
+    playIconContainer: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: [
+        { translateX: -20 },
+        { translateY: -20 }
+      ],
+      zIndex: 2,
+    },
+    videoInfoContainer: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      padding: 4,
+      borderBottomLeftRadius: 10,
+      borderBottomRightRadius: 10,
+    },
+    videoTitle: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '500',
+    },
+    videoDuration: {
+      color: '#FFFFFF',
+      fontSize: 8,
+    },
+  
+    // ==============================
+    // Styles du modal vidéo
+    // ==============================
+    videoModalContainer: {
+      flex: 1,
+      backgroundColor: '#000',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    videoPlayer: {
+      width: '100%',
+      height: '100%',
+    },
+    videoModalCloseButton: {
+      position: 'absolute',
+      top: 40,
+      right: 20,
+      zIndex: 2,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      borderRadius: 25,
+      padding: 10,
+    },
+    videoModalCloseText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+  
+    // ==============================
+    // Styles des états de chargement et d'erreur
+    // ==============================
+    loaderContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loaderText: {
+      color: '#666',
+      fontSize: 14,
+      marginTop: 10,
+    },
+    errorContainer: {
+      padding: 20,
+      alignItems: 'center',
+    },
+    errorText: {
+      color: 'red',
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    centerContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    noVideosText: {
+      color: '#666',
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    noImagesText: {
+      color: '#666',
+      textAlign: 'center',
+    },
+    retryButton: {
+      backgroundColor: '#D4FF00',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      marginTop: 10,
+    },
+    retryButtonText: {
+      color: '#000',
+      fontWeight: 'bold',
+    },
+  
+    // ==============================
+    // Styles des compétences et tags
+    // ==============================
+    competencesTitle: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      marginTop: 15,
+      marginBottom: 10,
+      color: '#666',
+      textAlign: 'left',
+    },
+    tagContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 10,
+    },
+    tag: {
+      backgroundColor: '#EAEAEA',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      fontSize: 13,
+      color: '#666',
+      marginRight: 8,
+      marginBottom: 8,
+    },
+  
+    // ==============================
+    // Styles du modal des avis
+    // ==============================
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: 'white',
+      borderRadius: 15,
+      padding: 20,
+      width: '90%',
+      maxHeight: '80%',
+    },
+    modalTitle: {
+      fontSize: 18,
+      textAlign: 'center',
+      marginBottom: 25,
+      lineHeight: 24,
+    },
+    fieldLabel: {
+      fontSize: 16,
+      marginBottom: 10,
+      color: '#333',
+    },
+    starsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginBottom: 20,
+      gap: 8,
+    },
+    commentInput: {
+      borderWidth: 1,
+      borderColor: '#E5E5E5',
+      borderRadius: 15,
+      padding: 15,
+      height: 120,
+      marginBottom: 20,
+      backgroundColor: '#F8F8F8',
+      textAlignVertical: 'top',
+    },
+  
+    // ==============================
+    // Styles des transformations d'images
+    // ==============================
+    transformationImagesContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 10,
+      marginBottom: 30,
+    },
+    transformationImageWrapper: {
+      alignItems: 'center',
+      width: '45%',
+    },
+    uploadImageButton: {
+      width: '100%',
+      aspectRatio: 1,
+      backgroundColor: '#F8F8F8',
+      borderRadius: 15,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E5E5E5',
+      marginBottom: 8,
+    },
+    imageLabel: {
+      fontSize: 14,
+      color: '#666',
+    },
+  
+    // ==============================
+    // Styles de la section des avis
+    // ==============================
+    emojiScrollView: {
+      flex: 1,
+    },
+    shareExperienceButton: {
+      backgroundColor: '#f5f5f5',
+      padding: 15,
+      borderRadius: 8,
+      marginBottom: 20,
+    },
+    shareExperienceText: {
+      color: '#666',
+      textAlign: 'center',
+      fontSize: 16,
+    },
+    existingReviews: {
+      marginTop: 20,
+    },
+    reviewCard: {
+      backgroundColor: '#fff',
+      padding: 15,
+      borderRadius: 10,
+      marginBottom: 15,
+    },
+    reviewHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    reviewerName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    reviewText: {
+      fontSize: 14,
+      color: '#666',
+      marginBottom: 15,
+      lineHeight: 20,
+    },
+    beforeAfterContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    beforeAfterImage: {
+      width: '48%',
+      height: 150,
+      borderRadius: 8,
+    },
+  
+    // ==============================
+    // Styles des boutons du modal
+    // ==============================
+    buttonContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 15,
+    },
+    cancelButton: {
+      flex: 1,
+      backgroundColor: '#F8F8F8',
+      padding: 15,
+      borderRadius: 25,
+      alignItems: 'center',
+    },
+    submitButton: {
+      flex: 1,
+      backgroundColor: '#000',
+      padding: 15,
+      borderRadius: 25,
+      alignItems: 'center',
+    },
+    cancelButtonText: {
+      color: '#000',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    submitButtonText: {
+      color: '#FFF',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+  });
+
 
 export default CoachProfile1;
