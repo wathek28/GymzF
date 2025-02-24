@@ -34,7 +34,7 @@ const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.0.6:8082/api';
+  const API_BASE_URL = 'http://192.168.1.194:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
@@ -408,7 +408,7 @@ const CoachProfile1 = () => {
 
     try {
       console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-      const response = await fetch(`http://192.168.0.6:8082/api/reels/user/${coachId}`, {
+      const response = await fetch(`http://192.168.1.194:8082/api/reels/user/${coachId}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -938,16 +938,20 @@ videoGridContainer: {
   flexWrap: 'wrap',
   justifyContent: 'space-between',
   padding: 1,
+  backgroundColor: 'transparent'   
 },
 videoGridItem: {
   width: '33%', // Pour une grille 3x3
   aspectRatio: 1, // Pour des carrés parfaits
   padding: 1,
   position: 'relative',
+  marginBottom: 2,
+  backgroundColor: 'transparent'   
 },
 videoGridThumbnail: {
   width: '100%',
   height: '100%',
+  backgroundColor: 'transparent'
 },
 videoOverlay: {
   ...StyleSheet.absoluteFillObject,
@@ -971,13 +975,15 @@ playIconContainer: {
     // ==============================
     mainContainer: {
       flex: 1,
-      backgroundColor: '#f5f5f5',
+      backgroundColor: 'transparent',
     },
     container: {
       flex: 1,
+      backgroundColor: 'transparent',
     },
     tabContent: {
       padding: 20,
+      backgroundColor: 'transparent' 
     },
   
     // ==============================
@@ -1130,7 +1136,7 @@ playIconContainer: {
       width: '32.5%',
       height: 110,
       marginBottom: 2,
-      backgroundColor: '#fff',
+      backgroundColor: 'transparent',
       borderRadius: 10,
       overflow: 'hidden',
     },
@@ -1138,6 +1144,7 @@ playIconContainer: {
       width: '100%',
       height: '100%',
       borderRadius: 10,
+      backgroundColor: 'transparent',
     },
     playIconContainer: {
       position: 'absolute',
@@ -1154,10 +1161,11 @@ playIconContainer: {
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'transparent',
       padding: 4,
       borderBottomLeftRadius: 10,
       borderBottomRightRadius: 10,
+
     },
     videoTitle: {
       color: '#FFFFFF',
@@ -1176,15 +1184,18 @@ playIconContainer: {
       marginBottom: 8,
       borderRadius: 8,
       overflow: 'hidden',
+      backgroundColor: 'transparent',
     },
     thumbnailContainer: {
       width: '100%',
       height: '100%',
       position: 'relative',
+      backgroundColor: 'transparent',
     },
     videoThumbnail: {
       width: '100%',
       height: '100%',
+      backgroundColor: 'transparent',
     },
     playButtonOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -1204,7 +1215,7 @@ playIconContainer: {
       position: 'absolute',
       right: 8,
       bottom: 24,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      backgroundColor: 'transparent',
       paddingHorizontal: 6,
       paddingVertical: 2,
       borderRadius: 4,
@@ -1219,7 +1230,7 @@ playIconContainer: {
       left: 0,
       right: 0,
       padding: 8,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'transparent',
     },
     videoTitleText: {
       color: '#fff',
@@ -1235,10 +1246,12 @@ playIconContainer: {
       backgroundColor: '#000',
       justifyContent: 'center',
       alignItems: 'center',
+      backgroundColor: 'transparent',
     },
     videoPlayer: {
       width: '100%',
       height: '100%',
+      backgroundColor: 'transparent',
     },
     videoModalCloseButton: {
       position: 'absolute',
