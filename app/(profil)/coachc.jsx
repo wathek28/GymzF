@@ -315,6 +315,13 @@ const CoachProfile1 = () => {
   const [reelsLoading, setReelsLoading] = useState(true);
   const [reelsError, setReelsError] = useState(null);
 
+  const idCoach = route.params?.idCoach || route.params?.id;
+  const userId = route.params?.userId;
+  useEffect(() => {
+    console.log("IDcoach:", idCoach);
+    console.log("UserID:", userId);
+  }, [idCoach, userId]);
+
   const { galleryImages, isLoading, error } = useGalleryImages(route.params?.id, selectedTab);
 
   const {
@@ -331,6 +338,16 @@ const CoachProfile1 = () => {
     santeEtBienEtre = [],
     bio,
   } = route.params || {};
+
+  const handleContactCoach = () => {
+    router.push({
+      pathname: '/Coachd',
+      params: {
+        idCoach: idCoach,
+        userId: userId
+      }
+    });
+  };
 
   // Fonction helper pour convertir blob/base64 en URI vidéo
   const blobToBase64 = (blob) => {
@@ -843,7 +860,7 @@ const CoachProfile1 = () => {
             <Text style={styles.buttonText}>Découvrez mes cours</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.buttonBlack}
-            onPress={() => router.push('/Coachd')}
+             onPress={handleContactCoach}
           >
             <Text style={styles.buttonText1}>Contactez-moi</Text>
           </TouchableOpacity>

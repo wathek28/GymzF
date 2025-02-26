@@ -8,9 +8,10 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   SafeAreaView,
-  Dimensions 
+  Dimensions,
+  Alert
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -18,6 +19,14 @@ const cardWidth = (width - 48) / 2;
 
 const CoachSearchScreen = () => {
   const router = useRouter();
+  
+  // Récupération correcte de l'ID utilisateur
+  const params = useLocalSearchParams();
+  const { userId } = params;
+  
+  // Log pour vérifier l'ID
+  console.log("User ID récupéré:", userId);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [level, setLevel] = useState('');
@@ -25,10 +34,6 @@ const CoachSearchScreen = () => {
   const [coaches, setCoaches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Cela affiche l'ID utilisateur
-   // Valeur par défaut vide si params est undefined
-console.log("User ID:", id); // Cela devrait afficher l'ID si c'est passé correctement
-const { id } = useRouter().params || {}; // Valeur par défaut vide si params est undefined
 
   const competences = [
     { id: '1', label: "Coaching individuel" },
@@ -50,6 +55,13 @@ const { id } = useRouter().params || {}; // Valeur par défaut vide si params es
 
   useEffect(() => {
     fetchCoaches();
+    
+    // Vérifier l'ID utilisateur
+    if (userId) {
+      console.log("ID utilisateur disponible dans useEffect:", userId);
+    } else {
+      console.warn("Aucun ID utilisateur n'a été transmis à cette page");
+    }
   }, [location, level, selectedCompetences]);
   
   const toggleCompetence = (id) => {
@@ -72,14 +84,14 @@ const { id } = useRouter().params || {}; // Valeur par défaut vide si params es
       
       query = query.slice(0, -1);
   
-      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches${query}`);
+      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches${query}`);
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
       }
       
       const data = await response.json();
-      console.log("Data received:", data);
+     // console.log("Data received:", data);
       setCoaches(data);
       setError(null);
     } catch (err) {
@@ -201,15 +213,20 @@ const { id } = useRouter().params || {}; // Valeur par défaut vide si params es
                 key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
                 style={styles.coachCard}
                 onPress={() => {
-                  const userId = "some-user-id"; // Remplacer par l'ID utilisateur réel
+                  // Utiliser l'ID utilisateur récupéré des paramètres
                   if (!userId) {
-                    console.log('User ID est manquant');
-                    return; // Arrêter la navigation si l'ID n'est pas disponible
+                    console.warn('ID utilisateur manquant');
+                    Alert.alert('Erreur', 'Impossible de continuer sans identification');
+                    return;
                   }
                 
+                  console.log('Navigation vers Coachb avec userId:', userId);
                   router.push({
                     pathname: "/Coachb",
-                    params: { ...coach, userId },
+                    params: { 
+                      ...coach, 
+                      userId: userId  // Passer l'ID utilisateur dans les paramètres
+                    },
                   });
                 }}
               >
@@ -250,7 +267,9 @@ const { id } = useRouter().params || {}; // Valeur par défaut vide si params es
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Coachs</Text>
+        <Text style={styles.headerTitle}>
+          Coachs {userId ? `(ID: ${userId})` : ''}
+        </Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -287,9 +306,6 @@ const { id } = useRouter().params || {}; // Valeur par défaut vide si params es
     </SafeAreaView>
   );
 };
-
-
-
 
 const styles = StyleSheet.create({
   container: {

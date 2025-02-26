@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,20 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';  // Utilisation correcte du hook
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 const ContactForm = () => {
-  const navigation = useNavigation();  // Utilisation du hook à l'intérieur du composant
+  const navigation = useNavigation();
+  const route = useRoute();
+  
+  // Extract idCoach and userId from route params
+  const { idCoach, userId } = route.params || {};
+
+  // Log the IDs as soon as the component mounts
+  useEffect(() => {
+    console.log("IDcoach:", idCoach);
+    console.log("UserID:", userId);
+  }, [idCoach, userId]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -22,6 +32,8 @@ const ContactForm = () => {
     whatsapp: '',
     reason: '',
     message: '',
+    idCoach: idCoach, // Include idCoach in the form data
+    userId: userId,   // Include userId in the form data
   });
 
   const [showPicker, setShowPicker] = useState(false);
@@ -64,7 +76,12 @@ const ContactForm = () => {
       return;
     }
 
+    // Log form data including idCoach and userId
     console.log('Form submitted:', formData);
+    
+    // Here you would typically make an API call to send the form data
+    // For example:
+    // sendContactForm(formData);
   };
 
   return (
@@ -78,6 +95,13 @@ const ContactForm = () => {
             <Ionicons name="chevron-back" size={24} color="#000" />
           </TouchableOpacity>
           <Text style={styles.header}>Contactez-moi</Text>
+        </View>
+
+        {/* ID information - Optional, can be removed in production */}
+        <View style={styles.idInfoContainer}>
+          <Text style={styles.idInfoText}>
+            Coach ID: {idCoach || 'Non spécifié'} | User ID: {userId || 'Non spécifié'}
+          </Text>
         </View>
 
         {/* Nom et prénom */}
@@ -192,6 +216,8 @@ const ContactForm = () => {
               whatsapp: '',
               reason: '',
               message: '',
+              idCoach, // Preserve the IDs when resetting the form
+              userId,
             })}
           >
             <Text style={styles.cancelButtonText}>Annuler</Text>
@@ -211,8 +237,7 @@ const ContactForm = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#fff' ,
-    
+    backgroundColor: '#fff',
   },
   formContainer: { 
     padding: 20 
@@ -220,8 +245,7 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    
-    marginBottom: 30,  // Augmenter l'espacement sous l'en-tête
+    marginBottom: 20,
     marginTop: 40, 
   },
   backButton: {
@@ -233,6 +257,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000',
     flex: 1,
+  },
+  idInfoContainer: {
+    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  idInfoText: {
+    fontSize: 14,
+    color: '#666',
   },
   inputGroup: { 
     marginBottom: 20 

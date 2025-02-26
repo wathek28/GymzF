@@ -40,15 +40,14 @@ const CodeC = () => {
     }
   
     try {
-      // Ensure consistent phone number format
       const formattedPhoneNumber = fullPhoneNumber || 
         (phoneNumber.startsWith('+') ? phoneNumber : `+216${phoneNumber}`);
-
+  
       console.log('Formatted Phone Number:', formattedPhoneNumber);
       console.log('Verification Code:', verificationCode);
       console.log('Role:', role?.toUpperCase() || 'USER');
-
-      const response = await fetch('http://192.168.0.6:8082/api/auth/verify-login', {
+  
+      const response = await fetch('http://192.168.1.194:8082/api/auth/verify-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,21 +64,25 @@ const CodeC = () => {
   
       if (response.ok) {
         const authToken = data.token;
+        const userId = data.userId; // Récupération de l'ID utilisateur
   
-        if (authToken) {
-          // Store token in AsyncStorage
+        if (authToken && userId) {
+          // Stocker le token et l'userId dans AsyncStorage
           await AsyncStorage.setItem('authToken', authToken);
+          await AsyncStorage.setItem('userId', userId.toString()); // Stocker l'userId comme chaîne
           
-          // Navigate to home page
-          router.push('/home');
+          console.log('userId passé à home:', userId);
+          
+          // Naviguer vers la page d'accueil avec userId comme paramètre
+          router.push({
+            pathname: '/home',
+            params: { userId: userId }
+          });
         } else {
-          setErrorMessage('Jeton non trouvé dans la réponse.');
+          setErrorMessage('Jeton ou identifiant utilisateur non trouvé.');
         }
       } else {
-        // More detailed error handling
         setErrorMessage(data.message || 'Code incorrect. Veuillez réessayer.');
-        
-        // Optional: Show an alert with more details
         Alert.alert(
           'Échec de la connexion', 
           data.message || 'Impossible de vérifier votre compte',
@@ -91,6 +94,7 @@ const CodeC = () => {
       setErrorMessage('Une erreur s\'est produite lors de la vérification.');
     }
   };
+  
 
   // Resend verification code
   const handleResendCode = async () => {
@@ -99,7 +103,7 @@ const CodeC = () => {
       const formattedPhoneNumber = fullPhoneNumber || 
         (phoneNumber.startsWith('+') ? phoneNumber : `+216${phoneNumber}`);
 
-      const response = await fetch('http://192.168.0.6:8082/api/auth/login', {
+      const response = await fetch('http://192.168.1.194:8082/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

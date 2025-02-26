@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,148 +6,303 @@ import {
   StyleSheet, 
   SafeAreaView, 
   TouchableOpacity,
-  ScrollView
+  ScrollView,
+  Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation, useLocalSearchParams, useRouter } from 'expo-router';
-
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import Animated, { 
+  useAnimatedGestureHandler, 
+  useAnimatedStyle, 
+  useSharedValue, 
+  withSpring, 
+  runOnJS 
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+const SWIPE_THRESHOLD = width * 0.3;
 
 const CoachDetailsScreen = () => {
   const navigation = useNavigation();
   const router = useRouter(); 
   const params = useLocalSearchParams();
-  const coach = params;
-
-
-  console.log("Coach object:", coach);
-  console.log("User ID:", coach.id);
+  const originalCoach = params;
   
+  // État des coachs et de l'index actuel
+  const [coaches, setCoaches] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
+  // Extract userId from params
+  const userId = params.userId;
   
-
+  // Animation pour le swipe
+  const translateX = useSharedValue(0);
+  const scrollViewRef = useRef(null);
+  
+  // Charger tous les coachs au chargement du composant
+  useEffect(() => {
+    fetchCoaches();
+  }, []);
+  
+  // Mettre à jour l'index actuel lorsque les coachs sont chargés
+  useEffect(() => {
+    if (coaches.length > 0 && originalCoach.id) {
+      const index = coaches.findIndex(coach => coach.id.toString() === originalCoach.id.toString());
+      if (index !== -1) {
+        setCurrentIndex(index);
+      }
+    }
+  }, [coaches, originalCoach.id]);
+  
+  // Fonction pour récupérer tous les coachs
+  const fetchCoaches = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data)) {
+        setCoaches(data);
+      } else {
+        console.error('La réponse n\'est pas un tableau', data);
+        setError('Format de données incorrect');
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des coachs:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Obtenir le coach actuel
+  const coach = coaches.length > 0 ? coaches[currentIndex] : originalCoach;
+  
+  // Fonction pour naviguer vers un autre coach
+  const navigateToCoach = (direction) => {
+    let newIndex = currentIndex;
+    
+    if (direction === 'next' && currentIndex < coaches.length - 1) {
+      newIndex = currentIndex + 1;
+    } else if (direction === 'prev' && currentIndex > 0) {
+      newIndex = currentIndex - 1;
+    } else {
+      // Si on ne peut pas naviguer, retour à la position initiale
+      translateX.value = withSpring(0);
+      return;
+    }
+    
+    // Mettre à jour l'index et réinitialiser la position
+    setCurrentIndex(newIndex);
+    translateX.value = withSpring(0);
+    
+    // Remonter le scrollView
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: 0, y: 0, animated: false });
+    }
+  };
+  
+  // Gestionnaire de swipe
+  const gestureHandler = useAnimatedGestureHandler({
+    onStart: (_, context) => {
+      context.startX = translateX.value;
+    },
+    onActive: (event, context) => {
+      translateX.value = context.startX + event.translationX;
+    },
+    onEnd: (event) => {
+      if (event.velocityX > 500 || translateX.value > SWIPE_THRESHOLD) {
+        // Swipe vers la droite (coach précédent)
+        runOnJS(navigateToCoach)('prev');
+      } else if (event.velocityX < -500 || translateX.value < -SWIPE_THRESHOLD) {
+        // Swipe vers la gauche (coach suivant)
+        runOnJS(navigateToCoach)('next');
+      } else {
+        // Retour à la position initiale
+        translateX.value = withSpring(0);
+      }
+    },
+  });
+  
+  // Style animé pour le contenu
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+  
+  // Fonctions de rendu des éléments UI
   const renderBadge = (icon, text, value) => (
     <View style={styles.badge}>
       <Ionicons name={icon} size={16} color="#FFF" style={styles.badgeIcon} />
       <Text style={styles.badgeText}>{text}</Text>
-      <Text style={styles.badgeValue}>{value}</Text>
+      <Text style={styles.badgeValue}>{value || 'N/A'}</Text>
     </View>
   );
 
   const renderLocationInfo = () => (
     <View style={styles.locationContainer}>
-      
       <View style={styles.locationBox}>
-      
-      <Text style={styles.locationText}>Des Cours : En ligne, à domicile aux alentours de {coach.typeCoaching}, ou à {coach.disciplines}</Text>
-
-        
+        <Text style={styles.locationText}>
+          Des Cours : En ligne, à domicile aux alentours de {coach.typeCoaching || 'N/A'}, ou à {coach.disciplines || 'N/A'}
+        </Text>
       </View>
     </View>
   );
+  
   const handleProfilePress = () => {
-    // Pass the coach data as params when navigating
     router.push({
       pathname: '/Coachc',
       params: {
-        
+        userId: userId,
+        idCoach: coach.id, 
         id: coach.id, 
-      competencesGenerales: coach.competencesGenerales,
-      coursSpecifiques: coach.coursSpecifiques,
-      disciplines: coach.disciplines,
-      dureeExperience: coach.dureeExperience,
-      dureeSeance: coach.dureeSeance,
-      email: coach.email,
-      entrainementPhysique: coach.entrainementPhysique,
-      fb: coach.fb,
-      firstName: coach.firstName,
-      insta: coach.insta,
-      niveauCours: coach.niveauCours,
-      phoneNumber: coach.phoneNumber,
-      photo: coach.photo,
-      poste: coach.poste,
-      prixSeance: coach.prixSeance,
-      santeEtBienEtre: coach.santeEtBienEtre,
-      tiktok: coach.tiktok,
-      typeCoaching: coach.typeCoaching,
-      bio:coach.bio,
+        competencesGenerales: coach.competencesGenerales,
+        coursSpecifiques: coach.coursSpecifiques,
+        disciplines: coach.disciplines,
+        dureeExperience: coach.dureeExperience,
+        dureeSeance: coach.dureeSeance,
+        email: coach.email,
+        entrainementPhysique: coach.entrainementPhysique,
+        fb: coach.fb,
+        firstName: coach.firstName,
+        insta: coach.insta,
+        niveauCours: coach.niveauCours,
+        phoneNumber: coach.phoneNumber,
+        photo: coach.photo,
+        poste: coach.poste,
+        prixSeance: coach.prixSeance,
+        santeEtBienEtre: coach.santeEtBienEtre,
+        tiktok: coach.tiktok,
+        typeCoaching: coach.typeCoaching,
+        bio: coach.bio,
       }
     });
   };
 
+  // Afficher un indicateur de chargement pendant le chargement des coachs
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#CCFF00" />
+        <Text style={styles.loadingText}>Chargement des coachs...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Afficher un message d'erreur si le chargement a échoué
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.errorContainer]}>
+        <Text style={styles.errorText}>Erreur: {error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchCoaches}>
+          <Text style={styles.retryButtonText}>Réessayer</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header Section with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()} 
-          >
-            <Ionicons name="chevron-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Image */}
-        <Image
-          source={
-            coach.photo 
-              ? { uri: `data:image/jpeg;base64,${coach.photo}` }
-              : require('../../assets/images/b.png')
-          }
-          style={styles.profileImage}
-          resizeMode="cover"
-        />
-
-        {/* Coach Info Overlay */}
-        <View style={styles.infoOverlay}>
-          <View style={styles.nameSection}>
-            <View style={styles.nameContainer}>
-            <Text style={styles.name}>{coach.firstName}</Text>
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <PanGestureHandler onGestureEvent={gestureHandler}>
+          <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Header Section with Back Button */}
+              <View style={styles.header}>
+                <TouchableOpacity 
+                  style={styles.backButton}
+                  onPress={() => router.back()} 
+                >
+                  <Ionicons name="chevron-back" size={24} color="#FFF" />
+                </TouchableOpacity>
+                
+                {/* Navigation indicators */}
+                <View style={styles.navIndicator}>
+                  <Text style={styles.navText}>
+                    {currentIndex + 1} / {coaches.length}
+                  </Text>
+                </View>
               </View>
+
+              {/* Les instructions de swipe ont été supprimées */}
+
+              {/* Profile Image */}
+              <Image
+                source={
+                  coach.photo 
+                    ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+                    : require('../../assets/images/b.png')
+                }
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+
+              {/* Coach Info Overlay */}
+              <View style={styles.infoOverlay}>
+                <View style={styles.nameSection}>
+                  <View style={styles.nameContainer}>
+                    <Text style={styles.name}>{coach.firstName || 'Coach'}</Text>
+                    <View style={styles.verifiedBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
+                    <Text style={styles.profileButtonText}>Voir le profil</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.title}>Coach sportif de {coach.entrainementPhysique || 'N/A'}</Text>
+
+                {/* Badges Section */}
+                <View style={styles.badgesContainer}>
+                  {renderBadge("stats-chart", "Niveau", coach.niveauCours)}
+                  <View style={styles.experienceBadge}>
+                    {renderBadge("time", "Expérience", coach.dureeExperience)}
+                  </View>
+                  {renderBadge("star", "Avis", "3.5/5")}
+                </View>
+
+                {renderLocationInfo()}
+              </View>
+            </ScrollView>
+
+            {/* Bottom Navigation */}
+            <View style={styles.bottomNav}>
+              <TouchableOpacity style={styles.navItem}>
+                <Ionicons name="home" size={24} color="#666" />
+                <Text style={styles.navText}>Accueil</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.navItem}>
+                <Ionicons name="heart-outline" size={24} color="#666" />
+                <Text style={styles.navText}>Messages</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.navItem}>
+                <Ionicons name="calendar-outline" size={24} color="#666" />
+                <Text style={styles.navText}>Réel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.navItem}>
+                <Ionicons name="person-outline" size={24} color="#666" />
+                <Text style={styles.navText}>Profil</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.profileButton } onPress={handleProfilePress} >
-              <Text style={styles.profileButtonText}>Voir le profil</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={styles.title}>Coach sportif de {coach.entrainementPhysique}</Text>
-
-
-          {/* Badges Section */}
-          <View style={styles.badgesContainer}>
-          {renderBadge("stats-chart", "Niveau", coach.niveauCours)}
-          <View style={styles.experienceBadge}>
-          {renderBadge("time", "Expérience", coach.dureeExperience)}
-          </View>
-          {renderBadge("star", "Avis", "3.5/5")}
-          </View>
-
-          {renderLocationInfo()}
-        </View>
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color="#666" />
-          <Text style={styles.navText}>Accueil</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="heart-outline" size={24} color="#666" />
-          <Text style={styles.navText}>Messages</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="calendar-outline" size={24} color="#666" />
-          <Text style={styles.navText}>Réel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="person-outline" size={24} color="#666" />
-          <Text style={styles.navText}>Profil</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          </Animated.View>
+        </PanGestureHandler>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -159,6 +314,34 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#FFF',
+  },
+  errorContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#FF4444',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#CCFF00',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: '#000',
+    fontWeight: '600',
+  },
   header: {
     position: 'absolute',
     top: 20,
@@ -166,6 +349,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1,
     padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,
@@ -175,10 +361,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  navIndicator: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 15,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  swipeInstructions: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignSelf: 'center',
+    borderRadius: 15,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginHorizontal: 'auto',
+    width: 'auto',
+  },
+  swipeText: {
+    color: '#999',
+    marginHorizontal: 5,
+    fontSize: 12,
+  },
   profileImage: {
     width: '100%',
     height: 450,
     backgroundColor: '#2C2C2C',
+    
   },
   infoOverlay: {
     padding: 20,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,10 @@ import {
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { Modal } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get("window");
 
@@ -53,8 +56,12 @@ const navItems = [
 ];
 
 const FitnessApp = () => {
-
   const navigation = useNavigation();
+  
+  // Récupération des paramètres de navigation
+  const params = useLocalSearchParams();
+  const { userId: paramUserId } = params;
+  
   // États
   const [searchText, setSearchText] = useState("");
   const [offers2, setOffers] = useState([]);
@@ -65,22 +72,55 @@ const FitnessApp = () => {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
 
-  
+  // Récupérer l'ID utilisateur à chaque fois que le composant est monté ou reçoit le focus
+  useFocusEffect(
+    useCallback(() => {
+      const getUserId = async () => {
+        try {
+          // Priorité 1: Utiliser l'ID des paramètres de navigation s'il existe
+          if (paramUserId) {
+            console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
+            setUserId(paramUserId);
+            return;
+          }
+          
+          // Priorité 2: Récupérer l'ID de l'AsyncStorage
+          const storedUserId = await AsyncStorage.getItem('userId');
+          if (storedUserId) {
+            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
+            setUserId(storedUserId);
+          } else {
+            console.warn('Aucun ID utilisateur trouvé');
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération de l\'ID utilisateur:', error);
+        }
+      };
+      
+      getUserId();
+    }, [paramUserId])
+  );
 
   // Effet pour charger les données
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (userId) {
+      console.log('Chargement des données avec userId:', userId);
+      fetchAllData();
+    }
+  }, [userId]);
 
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
+      console.log('Début des requêtes API avec userId:', userId);
+      
       const [offersRes, coachesRes, gymsRes, eventsRes] = await Promise.all([
-        fetch("http://192.168.0.6:8082/api/offres"),
-        fetch("http://192.168.0.6:8082/api/auth/coaches"),
-        fetch("http://192.168.0.6:8082/api/auth/gyms"),
-        fetch("http://192.168.0.6:8082/api/events")
+        fetch("http://192.168.1.194:8082/api/offres"),
+        fetch("http://192.168.1.194:8082/api/auth/coaches"),
+        fetch("http://192.168.1.194:8082/api/auth/gyms"),
+        fetch("http://192.168.1.194:8082/api/events")
       ]);
 
       if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok || !eventsRes.ok) {
@@ -101,6 +141,8 @@ const FitnessApp = () => {
       setGyms(validGyms);
       setEvents(eventsData);
       setError(null);
+      
+      console.log('Données chargées avec succès');
     } catch (err) {
       setError(err.message);
       console.error("Erreur:", err);
@@ -169,19 +211,27 @@ const FitnessApp = () => {
     coaches: coaches.filter((coach) =>
       coach.firstName?.toLowerCase().includes(searchText.toLowerCase())
     ),
-    
+  };
+
+  // Fonction pour naviguer avec l'ID utilisateur
+  const navigateWithUserId = (routeName, additionalParams = {}) => {
+    console.log(`Navigation vers ${routeName} avec userId: ${userId}`);
+    navigation.navigate(routeName, { 
+      userId: userId,
+      ...additionalParams
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Header */}
+        {/* Header avec l'ID utilisateur */}
         <View style={styles.headerContainer}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Image source={require("../../assets/images/G.png")} />
               <View>
-                <Text style={styles.headerText}>Hey</Text>
+                <Text style={styles.headerText}>Hey {userId ? `(ID: ${userId})` : ''}</Text>
                 <Text style={styles.subHeaderText}>Que cherchez-vous?</Text>
               </View>
             </View>
@@ -215,6 +265,7 @@ const FitnessApp = () => {
             </TouchableOpacity>
           </View>
         </View>
+        
         {/* Offres Spéciales */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Offres Spéciales</Text>
@@ -282,86 +333,110 @@ const FitnessApp = () => {
             </View>
           </Modal>
         </View>
-        {/* Section Coachs */}{" "}
-{/* Section Coachs */}
-<View style={styles.section}>
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>Coachs</Text>
-    <TouchableOpacity
-      style={styles.seeMoreButton}
-      onPress={() => navigation.navigate('(profil)')}
-    >
-      <Feather name="chevron-right" size={24} color="#666" />
-    </TouchableOpacity>
-  </View>
-
-  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-    {isLoading ? (
-      <Text>Chargement...</Text>
-    ) : error ? (
-      <Text>Erreur: {error}</Text>
-    ) : filteredItems.coaches.length > 0 ? (
-      filteredItems.coaches.map((coach, index) => (
-        <TouchableOpacity key={`coach-${coach.id || index}`} style={styles.coachCard} onPress={() => navigation.navigate('(profil)/coachb', { coach })}>
-          <Image
-            source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
-            style={styles.coachImage}
-          />
-          <View style={styles.coachInfo}>
-            <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
-            <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
+        
+        {/* Section Coachs */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Coachs</Text>
+            <TouchableOpacity
+              style={styles.seeMoreButton}
+              onPress={() => {
+                if (!userId) {
+                  console.warn('ID utilisateur manquant pour la navigation');
+                  return;
+                }
+                
+                console.log('Navigation vers profil avec userId:', userId);
+                
+                // Utiliser router.push d'expo-router
+                router.push({
+                  pathname: "/(profil)/Coacha",
+                  params: { userId: userId }
+                });
+              }}
+            >
+              <Feather name="chevron-right" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      ))
-    ) : (
-      <Text>Aucun coach trouvé</Text>
-    )}
-  </ScrollView>
-</View>
 
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {isLoading ? (
+              <Text>Chargement...</Text>
+            ) : error ? (
+              <Text>Erreur: {error}</Text>
+            ) : filteredItems.coaches.length > 0 ? (
+              filteredItems.coaches.map((coach, index) => (
+                <TouchableOpacity 
+                  key={`coach-${coach.id || index}`} 
+                  style={styles.coachCard} 
+                  onPress={() => navigateWithUserId('(profil)/coachb', { coach })}
+                >
+                  <Image
+                    source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
+                    style={styles.coachImage}
+                  />
+                  <View style={styles.coachInfo}>
+                    <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
+                    <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text>Aucun coach trouvé</Text>
+            )}
+          </ScrollView>
+        </View>
 
-<View style={styles.section}>
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>Gym</Text>
-    <TouchableOpacity style={styles.seeMoreButton}>
-      <Feather name="chevron-right" size={24} color="#666" />
-    </TouchableOpacity>
-  </View>
-
-  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-    {isLoading ? (
-      <Text>Chargement...</Text>
-    ) : error ? (
-      <Text>Erreur: {error}</Text>
-    ) : filteredItems.gyms.length > 0 ? (
-      filteredItems.gyms.map((gym, index) => (
-        <TouchableOpacity key={`gym-${gym.id || index}`} style={styles.gymCard}>
-          <Image
-            source={gym.photo ? { uri: `data:image/jpeg;base64,${gym.photo}` } : require("../../assets/images/F.png")}
-            style={styles.gymImage}
-          />
-          <View style={styles.gymInfo}>
-            <Text style={styles.gymName}>{gym.firstName || "Nom non disponible"}</Text>
-            <Text style={styles.gymLocation}>{gym.email || "Email non disponible"}</Text>
+        {/* Section Gym */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Gym</Text>
+            <TouchableOpacity 
+              style={styles.seeMoreButton}
+              onPress={() => navigateWithUserId('(gym)')}
+            >
+              <Feather name="chevron-right" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      ))
-    ) : (
-      <Text>Aucun gym trouvé</Text>
-    )}
-  </ScrollView>
-</View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {isLoading ? (
+              <Text>Chargement...</Text>
+            ) : error ? (
+              <Text>Erreur: {error}</Text>
+            ) : filteredItems.gyms.length > 0 ? (
+              filteredItems.gyms.map((gym, index) => (
+                <TouchableOpacity 
+                  key={`gym-${gym.id || index}`} 
+                  style={styles.gymCard}
+                  onPress={() => navigateWithUserId('(gym)/detail', { gym })}
+                >
+                  <Image
+                    source={gym.photo ? { uri: `data:image/jpeg;base64,${gym.photo}` } : require("../../assets/images/F.png")}
+                    style={styles.gymImage}
+                  />
+                  <View style={styles.gymInfo}>
+                    <Text style={styles.gymName}>{gym.firstName || "Nom non disponible"}</Text>
+                    <Text style={styles.gymLocation}>{gym.email || "Email non disponible"}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text>Aucun gym trouvé</Text>
+            )}
+          </ScrollView>
+        </View>
 
         {/* Événements */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Événements</Text>
             <TouchableOpacity
-      style={styles.seeMoreButton}
-      onPress={() => navigation.navigate('(event)')}
-    >
-      <Feather name="chevron-right" size={24} color="#666" />
-    </TouchableOpacity>
+              style={styles.seeMoreButton}
+              onPress={() => navigateWithUserId('(event)')}
+            >
+              <Feather name="chevron-right" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
           
           <ScrollView 
@@ -374,46 +449,55 @@ const FitnessApp = () => {
               <Text>Erreur: {error}</Text>
             ) : events.length > 0 ? (
               events.map((event) => (
-                <TouchableOpacity key={event.id} style={styles.container1}>
-  <ImageBackground
-    source={
-      event.photo
-        ? { uri: `data:image/jpeg;base64,${event.photo}` }
-        : require("../../assets/images/F.png")
-    }
-    style={styles.backgroundImage1}
-    imageStyle={styles.backgroundImageStyle1}
-  >
-    <View style={styles.overlay1}>
-      <View style={styles.header1}>
-        <View style={styles.dateContainer1}>
-          <Text style={styles.dateNumber1}>
-            {new Date(event.date).getDate()}
-          </Text>
-          <Text style={styles.dateMonth1}>
-            {new Date(event.date)
-              .toLocaleString("default", { month: "short" })
-              .toUpperCase()}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.content1}>
-        <Text style={styles.title1}>{event.titre}</Text>
-        <Text style={styles.location1}>{event.adresse}</Text>
-        <Text style={styles.time1}>
-          {event.heureDebut.slice(0, 5)} - {event.heureFin.slice(0, 5)}
-        </Text>
-        <Text style={styles.price1}>
-          {event.prix.toFixed(2)} DT / Pers
-        </Text>
-        <TouchableOpacity style={styles.participateButton1}>
-          <Text style={styles.participateButtonText1}>Participer</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </ImageBackground>
-</TouchableOpacity>
-
+                <TouchableOpacity 
+                  key={event.id} 
+                  style={styles.container1}
+                  onPress={() => navigateWithUserId('(event)/detail', { event })}
+                >
+                  <ImageBackground
+                    source={
+                      event.photo
+                        ? { uri: `data:image/jpeg;base64,${event.photo}` }
+                        : require("../../assets/images/F.png")
+                    }
+                    style={styles.backgroundImage1}
+                    imageStyle={styles.backgroundImageStyle1}
+                  >
+                    <View style={styles.overlay1}>
+                      <View style={styles.header1}>
+                        <View style={styles.dateContainer1}>
+                          <Text style={styles.dateNumber1}>
+                            {new Date(event.date).getDate()}
+                          </Text>
+                          <Text style={styles.dateMonth1}>
+                            {new Date(event.date)
+                              .toLocaleString("default", { month: "short" })
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.content1}>
+                        <Text style={styles.title1}>{event.titre}</Text>
+                        <Text style={styles.location1}>{event.adresse}</Text>
+                        <Text style={styles.time1}>
+                          {event.heureDebut.slice(0, 5)} - {event.heureFin.slice(0, 5)}
+                        </Text>
+                        <Text style={styles.price1}>
+                          {event.prix.toFixed(2)} DT / Pers
+                        </Text>
+                        <TouchableOpacity 
+                          style={styles.participateButton1}
+                          onPress={() => {
+                            console.log(`Participation à l'événement ${event.id} avec userId: ${userId}`);
+                            Alert.alert('Participation', `Inscription à l'événement ${event.titre} avec l'ID utilisateur: ${userId}`);
+                          }}
+                        >
+                          <Text style={styles.participateButtonText1}>Participer</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </ImageBackground>
+                </TouchableOpacity>
               ))
             ) : (
               <Text>Aucun événement disponible</Text>
@@ -428,6 +512,18 @@ const FitnessApp = () => {
           <TouchableOpacity
             key={`nav-${item.id}-${index}`}
             style={styles.navItem}
+            onPress={() => {
+              if (item.id === 'home') {
+                // Rester sur la page actuelle ou rafraîchir
+                console.log('Restez sur la page d\'accueil avec userId:', userId);
+              } else if (item.id === 'user') {
+                navigateWithUserId('(profil)');
+              } else if (item.id === 'calendar') {
+                navigateWithUserId('(event)');
+              } else if (item.id === 'heart') {
+                navigateWithUserId('favorites');
+              }
+            }}
           >
             <item.Component name={item.icon} size={24} color={item.color} />
             <Text
