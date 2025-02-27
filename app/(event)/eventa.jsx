@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const EventsScreen = () => {
   const navigation = useNavigation();
@@ -20,10 +21,29 @@ const EventsScreen = () => {
   const [selectedPriceType, setSelectedPriceType] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
-    fetchEvents();
+    // D'abord récupérer l'ID utilisateur
+    getUserId();
   }, []);
+  
+  // Effet séparé qui s'exécute quand userId change
+  useEffect(() => {
+    fetchEvents();
+  }, [userId]);
+
+  const getUserId = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      console.log('ID utilisateur récupéré:', storedUserId);
+      setUserId(storedUserId);
+      return storedUserId; // Retourne l'ID pour utilisation immédiate si nécessaire
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'ID utilisateur:', error);
+      return null;
+    }
+  };
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -33,6 +53,7 @@ const EventsScreen = () => {
         throw new Error("Erreur lors de la récupération des événements");
       }
       const data = await response.json();
+      console.log('Événements récupérés, utilisateur actuel ID:', userId);
       setEvents(data);
       setError(null);
     } catch (err) {
@@ -43,9 +64,17 @@ const EventsScreen = () => {
     }
   };
 
-  const filteredEvents = events.filter((event) => 
-    event.titre.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEvents = events.filter((event) => {
+    // Si un filtre de prix est sélectionné
+    if (selectedPriceType === 'gratuit' && event.prix !== 'Gratuit') {
+      return false;
+    }
+    if (selectedPriceType === 'payant' && event.prix === 'Gratuit') {
+      return false;
+    }
+    // Filtre de recherche par titre
+    return event.titre.toLowerCase().includes(search.toLowerCase());
+  });
 
   const getFormattedDate = (dateString) => {
     const date = new Date(dateString);
@@ -100,6 +129,12 @@ const EventsScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={fetchEvents}
+        >
+          <Text style={styles.retryButtonText}>Réessayer</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -107,11 +142,14 @@ const EventsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
-  <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-    <Ionicons name="chevron-back" size={24} color="#000" />
-  </TouchableOpacity>
-  <Text style={styles.title}>Événements</Text>
-</View>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Événements</Text>
+        {userId && (
+          <Text style={styles.userIdText}>User ID: {userId}</Text>
+        )}
+      </View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -134,7 +172,17 @@ const EventsScreen = () => {
         renderItem={({ item }) => {
           const { day, month } = getFormattedDate(item.date);
           return (
-            <TouchableOpacity style={styles.eventCard}>
+            <TouchableOpacity 
+              style={styles.eventCard}
+              onPress={() => {
+                console.log('Événement sélectionné:', item.id, 'par utilisateur:', userId);
+                navigation.navigate('eventb', { 
+                  eventId: item.id, 
+                  userId: userId,
+                  eventData: item // Garde eventData pour rétrocompatibilité
+                });
+              }}
+            >
               <ImageBackground
                 source={
                   item.photo
@@ -172,7 +220,12 @@ const EventsScreen = () => {
                     <TouchableOpacity
                       style={styles.participateButton}
                       onPress={() => {
-                        navigation.navigate('eventb', { eventData: item });
+                        console.log('Participation à l\'événement:', item.id, 'par utilisateur:', userId);
+                        navigation.navigate('eventb', { 
+                          eventId: item.id, 
+                          userId: userId,
+                          eventData: item // Garde eventData pour rétrocompatibilité
+                        });
                       }}
                     >
                       <Text style={styles.participateButtonText}>Participer</Text>
@@ -184,6 +237,11 @@ const EventsScreen = () => {
           );
         }}
         contentContainerStyle={{ paddingBottom: 20 }}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Aucun événement trouvé</Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -209,21 +267,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  
-  // Supprimez ces styles qui ne sont plus nécessaires
-  backIconContainer: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
+  userIdText: {
+    marginLeft: 'auto',
+    fontSize: 12,
+    color: '#666',
   },
-  
   errorText: {
     color: 'red',
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
   },
- 
+  retryButton: {
+    backgroundColor: '#CBFF06',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  retryButtonText: {
+    color: 'black',
+    fontWeight: 'bold',
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -351,6 +416,16 @@ const styles = StyleSheet.create({
     color: 'black',
     fontWeight: 'bold',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
 });
 
-export default EventsScreen;
+export default EventsScreen; 

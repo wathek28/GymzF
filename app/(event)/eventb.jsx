@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,27 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 const EventBScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const eventData = route?.params?.eventData || {};
   
-  console.log('Received event data:', eventData);
+  // Récupération des paramètres
+  const eventData = route?.params?.eventData || {};
+  const userId = route?.params?.userId;
+  const eventId = route?.params?.eventId || eventData?.id;
+  
+  // Console.log pour vérifier les IDs
+  useEffect(() => {
+    console.log('EventBScreen - userId récupéré:', userId);
+    console.log('EventBScreen - eventId récupéré:', eventId);
+    console.log('EventBScreen - eventData complet:', eventData);
+    
+    // Vérification des IDs
+    if (!userId) {
+      console.warn('Attention: userId est manquant ou null');
+    }
+    
+    if (!eventId) {
+      console.warn('Attention: eventId est manquant ou null');
+    }
+  }, [userId, eventId, eventData]);
 
   const getFormattedDate = (dateString) => {
     if (!dateString) return '';
@@ -26,19 +44,45 @@ const EventBScreen = () => {
       day: 'numeric',
     });
   };
+  
   const handleConfirmParticipation = () => {
-    navigation.navigate('eventc', { eventData });
+    console.log('Confirmation de participation - userId:', userId, 'eventId:', eventId);
+    
+    // Vérification des IDs avant la navigation
+    if (!userId) {
+      console.warn('Navigation vers eventc avec userId manquant');
+    }
+    if (!eventId) {
+      console.warn('Navigation vers eventc avec eventId manquant');
+    }
+    
+    // Passage des paramètres à l'écran suivant
+    navigation.navigate('eventc', { 
+      eventData, 
+      userId: userId,
+      eventId: eventId,
+      // Assurez-vous que les IDs sont explicitement passés
+      user_id: userId,  // Alternative au cas où eventc utiliserait un nom différent
+      event_id: eventId // Alternative au cas où eventc utiliserait un nom différent
+    });
+    
+    // Log après navigation
+    console.log('Navigation vers eventc effectuée avec les paramètres:', {
+      userId, 
+      eventId, 
+      eventDataId: eventData?.id
+    });
   };
 
   return (
     <View style={styles.mainContainer}>
         
       <TouchableOpacity 
-                onPress={() => navigation.goBack('/eventa')}
-                style={styles.backButton}
-              >
-                <Ionicons name="chevron-back" size={24} color="#000" />
-              </TouchableOpacity>
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
+        <Ionicons name="chevron-back" size={24} color="#000" />
+      </TouchableOpacity>
 
       <ScrollView style={styles.container}>
         <Image
@@ -52,6 +96,12 @@ const EventBScreen = () => {
         
         <View style={styles.content}>
           <Text style={styles.title}>{eventData.titre || 'Événement'}</Text>
+          
+          {/* Affichage des IDs (à des fins de débogage) */}
+          <View style={styles.debugSection}>
+            <Text style={styles.debugText}>User ID: {userId || 'Non disponible'}</Text>
+            <Text style={styles.debugText}>Event ID: {eventId || 'Non disponible'}</Text>
+          </View>
           
           <View style={styles.infoSection}>
             <View style={styles.infoRow}>
@@ -81,10 +131,8 @@ const EventBScreen = () => {
             </View>
           </View>
 
-          {/* The Confirm Button placed before the description */}
           <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmParticipation}>
             <Text style={styles.confirmButtonText}>Confirmer la participation</Text>
-            
           </TouchableOpacity>
 
           <View style={styles.descriptionContainer}>
@@ -130,6 +178,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
+  debugSection: {
+    marginBottom: 15,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+  },
   infoSection: {
     marginBottom: 20,
   },
@@ -147,7 +205,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   descriptionContainer: {
-    marginBottom: 20,  // Space added to ensure button stays below description
+    marginBottom: 20,
   },
   descriptionTitle: {
     fontSize: 18,
@@ -164,8 +222,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 50, 
-    // Ensures space above the button
+    marginBottom: 50,
   },
   confirmButtonText: {
     color: 'black',
