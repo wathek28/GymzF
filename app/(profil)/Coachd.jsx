@@ -8,10 +8,15 @@ import {
   ScrollView,
   Platform,
   Modal,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+
+// Configuration de l'API
+const API_BASE_URL = 'http://192.168.0.6:8082';
 
 const ContactForm = () => {
   const navigation = useNavigation();
@@ -36,6 +41,7 @@ const ContactForm = () => {
     userId: userId,   // Include userId in the form data
   });
 
+  const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
   const reasons = [
@@ -51,6 +57,12 @@ const ContactForm = () => {
     'Autre (à préciser dans le message)',
   ];
 
+  // Fonction de validation d'email simple
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(String(email).toLowerCase());
+  };
+
   const handleReasonChange = (value) => {
     if (value !== '') {
       setFormData({ ...formData, reason: value });
@@ -58,30 +70,109 @@ const ContactForm = () => {
     setShowPicker(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Form validation
     if (!formData.name.trim()) {
-      alert('Veuillez entrer votre nom');
+      Alert.alert('Erreur', 'Veuillez entrer votre nom');
       return;
     }
     if (!formData.email.trim()) {
-      alert('Veuillez entrer votre email');
+      Alert.alert('Erreur', 'Veuillez entrer votre email');
+      return;
+    }
+    if (!validateEmail(formData.email)) {
+      Alert.alert('Erreur', 'Veuillez entrer une adresse email valide');
       return;
     }
     if (!formData.whatsapp.trim()) {
-      alert('Veuillez entrer votre numéro WhatsApp');
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro WhatsApp');
       return;
     }
     if (!formData.reason) {
-      alert('Veuillez sélectionner une raison de contact');
+      Alert.alert('Erreur', 'Veuillez sélectionner une raison de contact');
+      return;
+    }
+    if (!formData.message.trim() || formData.message.length < 10) {
+      Alert.alert('Erreur', 'Veuillez entrer un message d\'au moins 10 caractères');
+      return;
+    }
+    if (!formData.idCoach || !formData.userId) {
+      Alert.alert('Erreur', 'Information de coach ou d\'utilisateur manquante');
       return;
     }
 
-    // Log form data including idCoach and userId
-    console.log('Form submitted:', formData);
+    // Construction de l'URL avec les IDs du coach et du gymzer
+    const apiUrl = `${API_BASE_URL}/api/contact/coach/${formData.idCoach}/gymzer/${formData.userId}`;
     
-    // Here you would typically make an API call to send the form data
-    // For example:
-    // sendContactForm(formData);
+    // Formatez les données exactement comme dans votre test Postman réussi
+    const apiData = {
+      raisonContact: formData.reason,
+      message: formData.message,
+      email: formData.email,
+      nom: formData.name,
+      telephone: formData.whatsapp
+    };
+
+    console.log('Sending data to API:', apiData);
+    console.log('Request URL:', apiUrl);
+    
+    try {
+      setLoading(true);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Response data:', responseData);
+      } catch (e) {
+        console.log('Response is not JSON:', e);
+        responseData = { message: responseText };
+      }
+      
+      if (response.ok) {
+        Alert.alert(
+          'Message envoyé',
+          `Votre demande concernant "${formData.reason}" a bien été envoyée au coach. Vous recevrez une réponse prochainement.`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        
+        setFormData({
+          name: '',
+          email: '',
+          whatsapp: '',
+          reason: '',
+          message: '',
+          idCoach: formData.idCoach,
+          userId: formData.userId,
+        });
+      } else {
+        if (responseData && responseData.error) {
+          Alert.alert('Erreur', `${responseData.error || 'Une erreur s\'est produite'}`);
+        } else {
+          Alert.alert('Erreur', 'Une erreur s\'est produite lors de l\'envoi du message.');
+        }
+      }
+    } catch (error) {
+      console.error('Error details:', error);
+      Alert.alert(
+        'Erreur de connexion',
+        `Impossible de se connecter au serveur: ${error.message}. Veuillez vérifier votre connexion internet et réessayer.`
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -98,11 +189,7 @@ const ContactForm = () => {
         </View>
 
         {/* ID information - Optional, can be removed in production */}
-        <View style={styles.idInfoContainer}>
-          <Text style={styles.idInfoText}>
-            Coach ID: {idCoach || 'Non spécifié'} | User ID: {userId || 'Non spécifié'}
-          </Text>
-        </View>
+       
 
         {/* Nom et prénom */}
         <View style={styles.inputGroup}>
@@ -219,14 +306,23 @@ const ContactForm = () => {
               idCoach, // Preserve the IDs when resetting the form
               userId,
             })}
+            disabled={loading}
           >
             <Text style={styles.cancelButtonText}>Annuler</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[styles.submitButton, loading && styles.disabledButton]}
             onPress={handleSubmit}
+            disabled={loading}
           >
-            <Text style={styles.submitButtonText}>Envoyer</Text>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.submitButtonText}>Envoi en cours...</Text>
+              </View>
+            ) : (
+              <Text style={styles.submitButtonText}>Envoyer</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -364,6 +460,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
     fontSize: 16,
+  },
+  disabledButton: {
+    backgroundColor: '#666',
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
   },
 });
 

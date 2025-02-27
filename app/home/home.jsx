@@ -117,10 +117,10 @@ const FitnessApp = () => {
       console.log('Début des requêtes API avec userId:', userId);
       
       const [offersRes, coachesRes, gymsRes, eventsRes] = await Promise.all([
-        fetch("http://192.168.1.194:8082/api/offres"),
-        fetch("http://192.168.1.194:8082/api/auth/coaches"),
-        fetch("http://192.168.1.194:8082/api/auth/gyms"),
-        fetch("http://192.168.1.194:8082/api/events")
+        fetch("http://192.168.0.6:8082/api/offres"),
+        fetch("http://192.168.0.6:8082/api/auth/coaches"),
+        fetch("http://192.168.0.6:8082/api/auth/gyms"),
+        fetch("http://192.168.0.6:8082/api/events")
       ]);
 
       if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok || !eventsRes.ok) {

@@ -34,7 +34,7 @@ const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.1.194:8082/api';
+  const API_BASE_URL = 'http://192.168.0.6:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
@@ -425,7 +425,7 @@ const CoachProfile1 = () => {
 
     try {
       console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-      const response = await fetch(`http://192.168.1.194:8082/api/reels/user/${coachId}`, {
+      const response = await fetch(`http://192.168.0.6:8082/api/reels/user/${coachId}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'

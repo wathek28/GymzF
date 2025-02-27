@@ -62,7 +62,7 @@ const CoachDetailsScreen = () => {
   const fetchCoaches = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 450,
     backgroundColor: '#2C2C2C',
-    
+      
   },
   infoOverlay: {
     padding: 20,

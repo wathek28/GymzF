@@ -84,7 +84,7 @@ const CoachSearchScreen = () => {
       
       query = query.slice(0, -1);
   
-      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches${query}`);
+      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches${query}`);
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
