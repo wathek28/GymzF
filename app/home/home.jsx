@@ -60,7 +60,7 @@ const FitnessApp = () => {
   
   // Récupération des paramètres de navigation
   const params = useLocalSearchParams();
-  const { userId: paramUserId } = params;
+  const { userId: paramUserId, firstName: paramFirstName } = params;
   
   // États
   const [searchText, setSearchText] = useState("");
@@ -73,34 +73,48 @@ const FitnessApp = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [firstName, setFirstName] = useState("");
 
-  // Récupérer l'ID utilisateur à chaque fois que le composant est monté ou reçoit le focus
+  // Récupérer l'ID utilisateur et le firstName à chaque fois que le composant est monté ou reçoit le focus
   useFocusEffect(
     useCallback(() => {
-      const getUserId = async () => {
+      const getUserData = async () => {
         try {
-          // Priorité 1: Utiliser l'ID des paramètres de navigation s'il existe
+          // Priorité 1: Utiliser l'ID et le firstName des paramètres de navigation s'ils existent
           if (paramUserId) {
             console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
             setUserId(paramUserId);
-            return;
           }
           
-          // Priorité 2: Récupérer l'ID de l'AsyncStorage
-          const storedUserId = await AsyncStorage.getItem('userId');
-          if (storedUserId) {
-            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
-            setUserId(storedUserId);
+          if (paramFirstName) {
+            console.log('FirstName trouvé dans les paramètres:', paramFirstName);
+            setFirstName(paramFirstName);
           } else {
-            console.warn('Aucun ID utilisateur trouvé');
+            // Essayer de récupérer le firstName depuis AsyncStorage si non présent dans les paramètres
+            const storedFirstName = await AsyncStorage.getItem('firstName');
+            if (storedFirstName) {
+              console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
+              setFirstName(storedFirstName);
+            }
+          }
+          
+          // Priorité 2: Récupérer l'ID de l'AsyncStorage si non présent dans les paramètres
+          if (!paramUserId) {
+            const storedUserId = await AsyncStorage.getItem('userId');
+            if (storedUserId) {
+              console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
+              setUserId(storedUserId);
+            } else {
+              console.warn('Aucun ID utilisateur trouvé');
+            }
           }
         } catch (error) {
-          console.error('Erreur lors de la récupération de l\'ID utilisateur:', error);
+          console.error('Erreur lors de la récupération des données utilisateur:', error);
         }
       };
       
-      getUserId();
-    }, [paramUserId])
+      getUserData();
+    }, [paramUserId, paramFirstName])
   );
 
   // Effet pour charger les données
@@ -213,11 +227,12 @@ const FitnessApp = () => {
     ),
   };
 
-  // Fonction pour naviguer avec l'ID utilisateur
+  // Fonction pour naviguer avec l'ID utilisateur et le firstName
   const navigateWithUserId = (routeName, additionalParams = {}) => {
-    console.log(`Navigation vers ${routeName} avec userId: ${userId}`);
+    console.log(`Navigation vers ${routeName} avec userId: ${userId}, firstName: ${firstName}`);
     navigation.navigate(routeName, { 
       userId: userId,
+      firstName: firstName,
       ...additionalParams
     });
   };
@@ -225,13 +240,13 @@ const FitnessApp = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Header avec l'ID utilisateur */}
+        {/* Header avec le firstName */}
         <View style={styles.headerContainer}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Image source={require("../../assets/images/G.png")} />
               <View>
-                <Text style={styles.headerText}>Hey {userId ? `(ID: ${userId})` : ''}</Text>
+                <Text style={styles.headerText}>Hey {firstName || 'utilisateur'}</Text>
                 <Text style={styles.subHeaderText}>Que cherchez-vous?</Text>
               </View>
             </View>
@@ -348,10 +363,13 @@ const FitnessApp = () => {
                 
                 console.log('Navigation vers profil avec userId:', userId);
                 
-                // Utiliser router.push d'expo-router
+                // Utiliser router.push d'expo-router avec firstName
                 router.push({
                   pathname: "/(profil)/Coacha",
-                  params: { userId: userId }
+                  params: { 
+                    userId: userId,
+                    firstName: firstName
+                  }
                 });
               }}
             >
@@ -367,19 +385,55 @@ const FitnessApp = () => {
             ) : filteredItems.coaches.length > 0 ? (
               filteredItems.coaches.map((coach, index) => (
                 <TouchableOpacity 
-                  key={`coach-${coach.id || index}`} 
-                  style={styles.coachCard} 
-                  onPress={() => navigateWithUserId('(profil)/coachb', { coach })}
-                >
-                  <Image
-                    source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
-                    style={styles.coachImage}
-                  />
-                  <View style={styles.coachInfo}>
-                    <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
-                    <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
-                  </View>
-                </TouchableOpacity>
+  key={`coach-${coach.id || index}`} 
+  style={styles.coachCard} 
+  onPress={() => {
+    if (!userId) {
+      console.warn('ID utilisateur manquant pour la navigation');
+      return;
+    }
+    
+    console.log(`Navigation vers coach detail avec userId: ${userId}, coachId: ${coach.id}`);
+    
+    // Use router.push from expo-router for consistent navigation
+    router.push({
+      pathname: "/(profil)/Coachb",
+      params: { 
+        userId: userId,
+        firstName: firstName,
+        id: coach.id,  // Changed from coachId to id to match your CoachB component
+        // Include all available coach data that might be needed
+        competencesGenerales: coach.competencesGenerales,
+        coursSpecifiques: coach.coursSpecifiques,
+        disciplines: coach.disciplines,
+        dureeExperience: coach.dureeExperience,
+        dureeSeance: coach.dureeSeance,
+        email: coach.email,
+        entrainementPhysique: coach.entrainementPhysique,
+        fb: coach.fb,
+        insta: coach.insta,
+        niveauCours: coach.niveauCours,
+        phoneNumber: coach.phoneNumber,
+        photo: coach.photo,
+        poste: coach.poste,
+        prixSeance: coach.prixSeance,
+        santeEtBienEtre: coach.santeEtBienEtre,
+        tiktok: coach.tiktok,
+        typeCoaching: coach.typeCoaching,
+        bio: coach.bio
+      }
+    });
+  }}
+>
+  <Image
+    source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
+    style={styles.coachImage}
+  />
+  <View style={styles.coachInfo}>
+    <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
+    <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
+  </View>
+</TouchableOpacity>
               ))
             ) : (
               <Text>Aucun coach trouvé</Text>
@@ -452,7 +506,7 @@ const FitnessApp = () => {
                 <TouchableOpacity 
                   key={event.id} 
                   style={styles.container1}
-                  onPress={() => navigateWithUserId('(event)/detail', { event })}
+                  onPress={() => navigateWithUserId('(event)/eventb', { event })}
                 >
                   <ImageBackground
                     source={

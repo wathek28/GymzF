@@ -65,18 +65,28 @@ const CodeC = () => {
       if (response.ok) {
         const authToken = data.token;
         const userId = data.userId; // Récupération de l'ID utilisateur
+        const firstName = data.firstName; // Récupération du prénom de l'utilisateur
   
         if (authToken && userId) {
-          // Stocker le token et l'userId dans AsyncStorage
+          // Stocker le token, l'userId et le firstName dans AsyncStorage
           await AsyncStorage.setItem('authToken', authToken);
           await AsyncStorage.setItem('userId', userId.toString()); // Stocker l'userId comme chaîne
           
-          console.log('userId passé à home:', userId);
+          // Stocker le firstName s'il existe
+          if (firstName) {
+            await AsyncStorage.setItem('firstName', firstName);
+          }
           
-          // Naviguer vers la page d'accueil avec userId comme paramètre
+          console.log('userId passé à home:', userId);
+          console.log('firstName passé à home:', firstName);
+          
+          // Naviguer vers la page d'accueil avec userId et firstName comme paramètres
           router.push({
             pathname: '/home',
-            params: { userId: userId }
+            params: { 
+              userId: userId,
+              firstName: firstName || '' // Passer une chaîne vide si firstName est null/undefined
+            }
           });
         } else {
           setErrorMessage('Jeton ou identifiant utilisateur non trouvé.');
