@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -9,7 +9,8 @@ import {
   StyleSheet, 
   SafeAreaView,
   Dimensions,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,9 +25,6 @@ const CoachSearchScreen = () => {
   const params = useLocalSearchParams();
   const { userId } = params;
   
-  // Log pour vérifier l'ID
-  console.log("User ID récupéré:", userId);
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [level, setLevel] = useState('');
@@ -34,6 +32,7 @@ const CoachSearchScreen = () => {
   const [coaches, setCoaches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   const competences = [
     { id: '1', label: "Coaching individuel" },
@@ -55,43 +54,18 @@ const CoachSearchScreen = () => {
 
   useEffect(() => {
     fetchCoaches();
-    
-    // Vérifier l'ID utilisateur
-    if (userId) {
-      console.log("ID utilisateur disponible dans useEffect:", userId);
-    } else {
-      console.warn("Aucun ID utilisateur n'a été transmis à cette page");
-    }
-  }, [location, level, selectedCompetences]);
+  }, []);
   
-  const toggleCompetence = (id) => {
-    setSelectedCompetences(prev => 
-      prev.includes(id) 
-        ? prev.filter(c => c !== id)
-        : [...prev, id]
-    );
-  };
-
-  const fetchCoaches = async () => {
+  const fetchCoaches = useCallback(async () => {
     setIsLoading(true);
     try {
-      let query = '?';
-      if (location) query += `location=${location}&`;
-      if (level) query += `level=${level}&`;
-      if (selectedCompetences.length > 0) {
-        query += `competences=${selectedCompetences.join(',')}&`;
-      }
-      
-      query = query.slice(0, -1);
-  
-      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches${query}`);
+      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches`);
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');
       }
       
       const data = await response.json();
-     // console.log("Data received:", data);
       setCoaches(data);
       setError(null);
     } catch (err) {
@@ -100,78 +74,184 @@ const CoachSearchScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  const renderLocationOptions = () => (
-    <View style={styles.optionsContainer}>
-      {locationOptions.map((option) => (
-        <TouchableOpacity 
-          key={option.id}
-          style={[ 
-            styles.optionButton, 
-            location === option.id && styles.optionButtonSelected
-          ]}
-          onPress={() => {
-            const newLocation = location === option.id ? '' : option.id;
-            setLocation(newLocation);
-          }}
-        >
-          <Text style={[ 
-            styles.optionText, 
-            location === option.id && styles.optionTextSelected 
-          ]}>
-            {option.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+  }, []);
 
-  const renderLevelOptions = () => (
-    <View style={styles.optionsContainer}>
-      {levelOptions.map((option) => (
-        <TouchableOpacity 
-          key={option.id}
-          style={[ 
-            styles.optionButton, 
-            level === option.id && styles.optionButtonSelected
-          ]}
-          onPress={() => setLevel(level === option.id ? '' : option.id)}
-        >
-          <Text style={[ 
-            styles.optionText, 
-            level === option.id && styles.optionTextSelected 
-          ]}>
-            {option.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+  const toggleCompetence = useCallback((id) => {
+    setSelectedCompetences(prev => 
+      prev.includes(id) 
+        ? prev.filter(c => c !== id)
+        : [...prev, id]
+    );
+  }, []);
 
-  const renderCompetences = () => (
-    <View style={styles.competencesContainer}>
-      {competences.map((comp) => (
-        <TouchableOpacity
-          key={comp.id}
-          style={[ 
-            styles.competenceButton, 
-            selectedCompetences.includes(comp.id) && styles.competenceButtonSelected
-          ]}
-          onPress={() => toggleCompetence(comp.id)}
-        >
-          <Text style={[ 
-            styles.competenceText, 
-            selectedCompetences.includes(comp.id) && styles.competenceTextSelected
-          ]}>
-            {comp.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+  // Filtrage et recherche des coachs
+  const filteredCoaches = useMemo(() => {
+    return coaches.filter(coach => {
+      // Filtre par recherche (nom ou spécialité)
+      const matchesSearch = !searchQuery.trim() || 
+        (coach.firstName && coach.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (coach.entrainementPhysique && coach.entrainementPhysique.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const renderCoaches = () => {
+      // Filtre par localisation
+      const matchesLocation = !location || coach.location === location;
+
+      // Filtre par niveau
+      const matchesLevel = !level || coach.level === level;
+
+      // Filtre par compétences
+      const matchesCompetences = selectedCompetences.length === 0 || 
+        selectedCompetences.some(compId => 
+          coach.competences && coach.competences.includes(compId)
+        );
+
+      return matchesSearch && matchesLocation && matchesLevel && matchesCompetences;
+    });
+  }, [coaches, searchQuery, location, level, selectedCompetences]);
+
+  // Réinitialisation des filtres
+  const resetFilters = useCallback(() => {
+    setLocation('');
+    setLevel('');
+    setSelectedCompetences([]);
+    setSearchQuery('');
+  }, []);
+
+  // Fonction pour surligner le texte
+  const highlightText = useCallback((text, query) => {
+    if (!query) return text;
+    
+    const regex = new RegExp(`(${query})`, 'gi');
+    
+    return text.split(regex).map((part, index) => 
+      regex.test(part) ? (
+        <Text key={index} style={styles.highlightText}>{part}</Text>
+      ) : (
+        <Text key={index}>{part}</Text>
+      )
+    );
+  }, []);
+
+  // Rendu du modal de filtres
+  const renderFilterModal = useCallback(() => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isFilterModalVisible}
+      onRequestClose={() => setIsFilterModalVisible(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filtres</Text>
+            <TouchableOpacity onPress={() => setIsFilterModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.filterSection}>
+              <Text style={styles.filterTitle}>Emplacement</Text>
+              <View style={styles.optionsContainer}>
+                {locationOptions.map((option) => (
+                  <TouchableOpacity 
+                    key={option.id}
+                    style={[ 
+                      styles.optionButton, 
+                      location === option.id && styles.optionButtonSelected
+                    ]}
+                    onPress={() => {
+                      const newLocation = location === option.id ? '' : option.id;
+                      setLocation(newLocation);
+                    }}
+                  >
+                    <Text style={[ 
+                      styles.optionText, 
+                      location === option.id && styles.optionTextSelected 
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterTitle}>Niveau</Text>
+              <View style={styles.optionsContainer}>
+                {levelOptions.map((option) => (
+                  <TouchableOpacity 
+                    key={option.id}
+                    style={[ 
+                      styles.optionButton, 
+                      level === option.id && styles.optionButtonSelected
+                    ]}
+                    onPress={() => setLevel(level === option.id ? '' : option.id)}
+                  >
+                    <Text style={[ 
+                      styles.optionText, 
+                      level === option.id && styles.optionTextSelected 
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterTitle}>Compétences</Text>
+              <View style={styles.competencesContainer}>
+                {competences.map((comp) => (
+                  <TouchableOpacity
+                    key={comp.id}
+                    style={[ 
+                      styles.competenceButton, 
+                      selectedCompetences.includes(comp.id) && styles.competenceButtonSelected
+                    ]}
+                    onPress={() => toggleCompetence(comp.id)}
+                  >
+                    <Text style={[ 
+                      styles.competenceText, 
+                      selectedCompetences.includes(comp.id) && styles.competenceTextSelected
+                    ]}>
+                      {comp.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity 
+              style={styles.resetButton} 
+              onPress={resetFilters}
+            >
+              <Text style={styles.resetButtonText}>Réinitialiser</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.applyButton} 
+              onPress={() => setIsFilterModalVisible(false)}
+            >
+              <Text style={styles.applyButtonText}>Appliquer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  ), [
+    isFilterModalVisible, 
+    location, 
+    level, 
+    selectedCompetences, 
+    locationOptions, 
+    levelOptions, 
+    competences, 
+    toggleCompetence, 
+    resetFilters
+  ]);
+
+  const renderCoaches = useCallback(() => {
     if (isLoading) {
       return (
         <View style={styles.messageContainer}>
@@ -191,7 +271,7 @@ const CoachSearchScreen = () => {
       );
     }
 
-    if (!coaches.length) {
+    if (!filteredCoaches.length) {
       return (
         <View style={styles.messageContainer}>
           <Text style={styles.messageText}>Aucun coach trouvé</Text>
@@ -200,8 +280,8 @@ const CoachSearchScreen = () => {
     }
 
     const pairs = [];
-    for (let i = 0; i < coaches.length; i += 2) {
-      pairs.push(coaches.slice(i, i + 2));
+    for (let i = 0; i < filteredCoaches.length; i += 2) {
+      pairs.push(filteredCoaches.slice(i, i + 2));
     }
 
     return (
@@ -213,7 +293,6 @@ const CoachSearchScreen = () => {
                 key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
                 style={styles.coachCard}
                 onPress={() => {
-                  // Utiliser l'ID utilisateur récupéré des paramètres
                   if (!userId) {
                     console.warn('ID utilisateur manquant');
                     Alert.alert('Erreur', 'Impossible de continuer sans identification');
@@ -225,7 +304,7 @@ const CoachSearchScreen = () => {
                     pathname: "/Coachb",
                     params: { 
                       ...coach, 
-                      userId: userId  // Passer l'ID utilisateur dans les paramètres
+                      userId: userId
                     },
                   });
                 }}
@@ -240,10 +319,16 @@ const CoachSearchScreen = () => {
                 />
                 <View style={styles.coachInfo}>
                   <Text style={styles.coachName} numberOfLines={1}>
-                    {coach.firstName || coach.first_name || "Nom non disponible"}
+                    {highlightText(
+                      coach.firstName || coach.first_name || "Nom non disponible", 
+                      searchQuery
+                    )}
                   </Text>
                   <Text style={styles.coachSpecialty} numberOfLines={1}>
-                    {coach.specialty || coach.entrainementPhysique || "Spécialité non disponible"}
+                    {highlightText(
+                      coach.entrainementPhysique || coach.specialty || "Spécialité non disponible", 
+                      searchQuery
+                    )}
                   </Text>
                   {coach.verified && (
                     <View style={styles.verifiedBadge}>
@@ -259,7 +344,7 @@ const CoachSearchScreen = () => {
         ))}
       </View>
     );
-  };
+  }, [filteredCoaches, userId, router, highlightText, searchQuery]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -275,39 +360,110 @@ const CoachSearchScreen = () => {
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Rechercher un coach"
+          placeholder="Rechercher par nom ou spécialité"
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#666"
         />
-        <TouchableOpacity style={styles.searchButton} onPress={fetchCoaches}>
-          <Ionicons name="search" size={20} color="#FFF" />
+        <TouchableOpacity 
+          style={styles.filterButton} 
+          onPress={() => setIsFilterModalVisible(true)}
+        >
+          <Ionicons name="filter" size={20} color="#FFF" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.filterSection}>
-          <Text style={styles.filterTitle}>Emplacement</Text>
-          {renderLocationOptions()}
-        </View>
-
-        <View style={styles.filterSection}>
-          <Text style={styles.filterTitle}>Niveau</Text>
-          {renderLevelOptions()}
-        </View>
-
-        <View style={styles.filterSection}>
-          <Text style={styles.filterTitle}>Compétences</Text>
-          {renderCompetences()}
-        </View>
-
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {renderCoaches()}
       </ScrollView>
+
+      {renderFilterModal()}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+
+  
+  highlightText: {
+    backgroundColor: '#CBFF06',
+    color: 'black',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'black',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#EEE',
+  },
+  resetButton: {
+    flex: 1,
+    marginRight: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  applyButton: {
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'black',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFF',
