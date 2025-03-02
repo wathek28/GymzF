@@ -84,15 +84,16 @@ const EventsScreen = () => {
   };
 
   const navigateToEventB = (item) => {
-    console.log('Navigation vers eventb avec userId:', userId, 'eventId:', item.id);
+    console.log('Navigation vers eventb avec userId:', userId, 'eventId:', item.id, 'reglement:', item.reglement);
     
-    // Utiliser router.push de expo-router
+    // Utiliser router.push de expo-router avec le paramètre reglement ajouté
     router.push({
       pathname: "/(event)/eventb",
       params: { 
         userId: userId,
         eventId: item.id,
-        eventData: JSON.stringify(item) // Convertir l'objet en chaîne JSON
+        eventData: JSON.stringify(item), // Convertir l'objet en chaîne JSON
+        reglement: item.reglement || '' // Ajout du paramètre reglement
       }
     });
   };

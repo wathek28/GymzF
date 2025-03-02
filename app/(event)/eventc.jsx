@@ -20,6 +20,8 @@ const RegistrationForm = () => {
   const eventData = route?.params?.eventData || {};
   const userId = route?.params?.userId;
   const eventId = route?.params?.eventId || eventData?.id;
+  // Récupérer le reglement directement des paramètres
+  const reglement = route?.params?.reglement || null;
   
   // États pour l'affichage et le formulaire
   const [isLoading, setIsLoading] = useState(false);
@@ -74,11 +76,14 @@ const RegistrationForm = () => {
     checkRegistration();
   }, [userId, eventId]);
 
-  // Vérifier la présence des IDs au chargement du composant
+  // Vérifier la présence des IDs et du reglement au chargement du composant
   useEffect(() => {
     console.log('RegistrationForm - userId récupéré:', userId);
     console.log('RegistrationForm - eventId récupéré:', eventId);
     console.log('RegistrationForm - eventData:', eventData);
+    
+    // Vérification de la présence de reglement
+    console.log('RegistrationForm - reglement récupéré directement des paramètres:', reglement);
     
     if (!userId) {
       console.warn('Attention: userId est manquant ou null dans RegistrationForm');
@@ -94,12 +99,15 @@ const RegistrationForm = () => {
       userId: userId,
       eventId: eventId
     }));
-  }, [userId, eventId, eventData]);
+  }, [userId, eventId, eventData, reglement]);
 
-  const parseRules = (reglement) => {
-    if (!reglement) return [];
+  const parseRules = (reglementText) => {
+    if (!reglementText) return [];
+    console.log('parseRules - reglement reçu:', reglementText);
     // Diviser le texte par des points et nettoyer les espaces inutiles
-    return reglement.split('.').filter(rule => rule.trim().length > 0);
+    const rules = reglementText.split('.').filter(rule => rule.trim().length > 0);
+    console.log('parseRules - règles extraites:', rules);
+    return rules;
   };
   
   const handleSubmit = async () => {
@@ -122,14 +130,15 @@ const RegistrationForm = () => {
       return;
     }
     
-    // Suppression de la validation du numéro de téléphone - accepte n'importe quel format
-    // Le format attendu est maintenant +216230310 ou similaire
-    
+    // Log des identifiants et données avant soumission
     console.log('Form submitted with IDs:', {
       userId: formData.userId,
       eventId: formData.eventId,
       formData: formData
     });
+    
+    // Vérification de reglement avant l'envoi
+    console.log('handleSubmit - reglement avant envoi:', reglement);
     
     // Vérifier à nouveau les IDs avant d'envoyer
     if (!formData.userId) {
@@ -151,6 +160,16 @@ const RegistrationForm = () => {
       phoneNumber: formData.phoneNumber
     };
     
+    // Ajouter reglement seulement s'il existe
+    if (reglement) {
+      apiData.reglement = reglement;
+      console.log('handleSubmit - reglement ajouté à apiData:', reglement);
+    } else {
+      console.log('handleSubmit - reglement non disponible, non ajouté à apiData');
+    }
+    
+    console.log('handleSubmit - apiData préparé:', apiData);
+    
     setIsLoading(true);
     
     try {
@@ -165,6 +184,7 @@ const RegistrationForm = () => {
       
       // Récupérer le texte brut de la réponse d'abord
       const responseText = await response.text();
+      console.log('handleSubmit - réponse brute de l\'API:', responseText);
       
       // Tenter de parser en JSON si possible
       let responseData;
@@ -187,7 +207,6 @@ const RegistrationForm = () => {
         const errorMessage = responseData.message || responseText || "Une erreur est survenue. Veuillez réessayer.";
         
         // Vérifier si le message d'erreur indique que l'utilisateur est déjà inscrit
-        // Recherche plus large pour détecter différentes variantes de messages
         if (
           errorMessage.toLowerCase().includes("déjà inscrit") || 
           errorMessage.toLowerCase().includes("already registered") ||
@@ -248,14 +267,15 @@ const RegistrationForm = () => {
         <Text style={styles.header}>Réservez votre place !</Text>
       </View>
       
-      <Text style={styles.eventTitle}>Événement: {eventData.titre || 'Non spécifié'}</Text>
+      
       
       {renderAlreadyRegisteredMessage()}
       
-      {/* Section de débogage pour afficher les IDs (à retirer en production) */}
+      {/* Section de débogage pour afficher les IDs et le reglement */}
       <View style={styles.debugSection}>
         <Text style={styles.debugText}>User ID: {userId || 'Non disponible'}</Text>
         <Text style={styles.debugText}>Event ID: {eventId || 'Non disponible'}</Text>
+        <Text style={styles.debugText}>Reglement présent: {reglement ? 'Oui' : 'Non'}</Text>
       </View>
 
       <View style={[styles.formContainer, isAlreadyRegistered && styles.disabledForm]}>
@@ -296,12 +316,22 @@ const RegistrationForm = () => {
           <Text style={styles.inputHint}>Format: +216230310</Text>
         </View>
 
-        <View style={styles.rulesContainer}>
-          <Text style={styles.rulesHeader}>Règles de participation</Text>
-          {eventData.reglement ? (
-            parseRules(eventData.reglement).map((rule, index) => (
-              <Text key={index} style={styles.ruleText}>• {rule}</Text>
-            ))
+        {/* Affichage du reglement selon le design de l'image */}
+        <View style={styles.rulesSection}>
+          <View style={styles.rulesTitleContainer}>
+            <View style={styles.greenCircle} />
+            <Text style={styles.rulesTitle}>Règles de participation</Text>
+          </View>
+          
+          {reglement ? (
+            <View style={styles.rulesListContainer}>
+              {parseRules(reglement).map((rule, index) => (
+                <View key={index} style={styles.ruleItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.ruleText}>{rule}</Text>
+                </View>
+              ))}
+            </View>
           ) : (
             <Text style={styles.noRulesText}>Aucune règle spécifiée pour cet événement.</Text>
           )}
@@ -358,8 +388,8 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 20,
+    marginBottom: 30,
+    marginTop: 50,
   },
   backButton: {
     padding: 5,
@@ -441,6 +471,11 @@ const styles = StyleSheet.create({
   },
   rulesContainer: {
     marginVertical: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#CBFF06',
   },
   rulesHeader: {
     fontSize: 18,
@@ -449,13 +484,51 @@ const styles = StyleSheet.create({
   },
   ruleText: {
     fontSize: 14,
-    marginBottom: 8,
-    color: '#444',
+    marginBottom: 0,
+    flex: 1,
+    color: '#333',
   },
   noRulesText: {
     fontSize: 14,
     fontStyle: 'italic',
     color: '#666',
+    marginLeft: 10,
+  },
+  // Styles pour l'affichage selon l'image
+  rulesSection: {
+    marginVertical: 20,
+  },
+  rulesTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  greenCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#CBFF06',
+    marginRight: 10,
+  },
+  rulesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  rulesListContainer: {
+    marginLeft: 5,
+  },
+  ruleItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+  },
+  bulletPoint: {
+    marginRight: 8,
+    marginLeft: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#000',
   },
   checkbox: {
     flexDirection: 'row',
