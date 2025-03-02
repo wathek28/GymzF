@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,20 +6,32 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useLocalSearchParams, router } from 'expo-router';
 
 const EventBScreen = () => {
-  const navigation = useNavigation();
-  const route = useRoute();
+  // Récupérer les paramètres avec Expo Router
+  const params = useLocalSearchParams();
   
-  // Récupération des paramètres
-  const eventData = route?.params?.eventData || {};
-  const userId = route?.params?.userId;
-  const eventId = route?.params?.eventId || eventData?.id;
+  // Extraire les paramètres
+  const userId = params?.userId;
+  const eventId = params?.eventId;
   
-  // Console.log pour vérifier les IDs
+  // Analyser les données de l'événement
+  let eventData = {};
+  try {
+    eventData = params?.eventData ? JSON.parse(params.eventData) : {};
+  } catch (error) {
+    console.error('Error parsing eventData:', error);
+  }
+  
+  // État pour l'acceptation du règlement
+  const [reglementAccepte, setReglementAccepte] = useState(false);
+  
+  // Journal des paramètres pour débogage
   useEffect(() => {
     console.log('EventBScreen - userId récupéré:', userId);
     console.log('EventBScreen - eventId récupéré:', eventId);
@@ -46,7 +58,18 @@ const EventBScreen = () => {
   };
   
   const handleConfirmParticipation = () => {
+    // Vérifier si le règlement est accepté
+    if (!reglementAccepte) {
+      Alert.alert(
+        "Règlement non accepté",
+        "Veuillez accepter le règlement de l'événement pour continuer.",
+        [{ text: "OK", style: "default" }]
+      );
+      return;
+    }
+    
     console.log('Confirmation de participation - userId:', userId, 'eventId:', eventId);
+    console.log('Règlement accepté:', reglementAccepte);
     
     // Vérification des IDs avant la navigation
     if (!userId) {
@@ -56,21 +79,23 @@ const EventBScreen = () => {
       console.warn('Navigation vers eventc avec eventId manquant');
     }
     
-    // Passage des paramètres à l'écran suivant
-    navigation.navigate('eventc', { 
-      eventData, 
-      userId: userId,
-      eventId: eventId,
-      // Assurez-vous que les IDs sont explicitement passés
-      user_id: userId,  // Alternative au cas où eventc utiliserait un nom différent
-      event_id: eventId // Alternative au cas où eventc utiliserait un nom différent
+    // Naviguer vers eventc avec router.push
+    router.push({
+      pathname: "/(event)/eventc",
+      params: { 
+        userId: userId,
+        eventId: eventId,
+        eventData: params.eventData,
+        reglementAccepte: reglementAccepte.toString() // Convertir le booléen en chaîne
+      }
     });
     
-    // Log après navigation
+    // Journal après navigation
     console.log('Navigation vers eventc effectuée avec les paramètres:', {
       userId, 
       eventId, 
-      eventDataId: eventData?.id
+      eventDataId: eventData?.id,
+      reglementAccepte
     });
   };
 
@@ -78,7 +103,7 @@ const EventBScreen = () => {
     <View style={styles.mainContainer}>
         
       <TouchableOpacity 
-        onPress={() => navigation.goBack()}
+        onPress={() => router.back()}
         style={styles.backButton}
       >
         <Ionicons name="chevron-back" size={24} color="#000" />
@@ -105,24 +130,24 @@ const EventBScreen = () => {
           
           <View style={styles.infoSection}>
             <View style={styles.infoRow}>
-              <Ionicons name="calendar" size={24}  />
+              <Ionicons name="calendar" size={24} color="#666" />
               <Text style={styles.infoText}>{getFormattedDate(eventData.date)}</Text>
             </View>
             
             <View style={styles.infoRow}>
-              <Ionicons name="time" size={24}  />
+              <Ionicons name="time" size={24} color="#666" />
               <Text style={styles.infoText}>
                 {eventData.heureDebut?.slice(0, 5)} - {eventData.heureFin?.slice(0, 5)}
               </Text>
             </View>
             
             <View style={styles.infoRow}>
-              <Ionicons name="location" size={24}  />
+              <Ionicons name="location" size={24} color="#666" />
               <Text style={styles.infoText}>{eventData.adresse || 'Adresse non spécifiée'}</Text>
             </View>
             
             <View style={styles.infoRow}>
-              <Ionicons name="pricetag" size={24}  />
+              <Ionicons name="pricetag" size={24} color="#666" />
               <Text style={[styles.infoText, eventData.prix === 'Gratuit' && styles.freePrice]}>
                 {typeof eventData.prix === 'number'
                   ? `${eventData.prix.toFixed(2)} DT / Pers`
@@ -131,7 +156,37 @@ const EventBScreen = () => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmParticipation}>
+          {/* Section règlement */}
+          <View style={styles.reglementSection}>
+            <Text style={styles.reglementTitle}>Règlement de l'événement</Text>
+            <Text style={styles.reglementText}>
+              En participant à cet événement, vous acceptez les conditions suivantes:
+            </Text>
+            <Text style={styles.reglementPoint}>• Être ponctuel et respecter les horaires indiqués</Text>
+            <Text style={styles.reglementPoint}>• Respecter les autres participants et le lieu de l'événement</Text>
+            <Text style={styles.reglementPoint}>• Suivre les instructions des organisateurs pendant l'événement</Text>
+            <Text style={styles.reglementPoint}>• Tout comportement inapproprié pourra entraîner une exclusion</Text>
+            
+            <View style={styles.reglementAcceptContainer}>
+              <Switch
+                value={reglementAccepte}
+                onValueChange={setReglementAccepte}
+                trackColor={{ false: '#767577', true: '#CBFF06' }}
+                thumbColor={reglementAccepte ? '#fff' : '#f4f3f4'}
+              />
+              <Text style={styles.reglementAcceptText}>
+                J'accepte le règlement de l'événement
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity 
+            style={[
+              styles.confirmButton,
+              !reglementAccepte && styles.confirmButtonDisabled
+            ]} 
+            onPress={handleConfirmParticipation}
+          >
             <Text style={styles.confirmButtonText}>Confirmer la participation</Text>
           </TouchableOpacity>
 
@@ -204,6 +259,40 @@ const styles = StyleSheet.create({
     color: 'green',
     fontWeight: 'bold',
   },
+  reglementSection: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  reglementTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  reglementText: {
+    fontSize: 14,
+    marginBottom: 10,
+    color: '#333',
+  },
+  reglementPoint: {
+    fontSize: 14,
+    marginBottom: 5,
+    color: '#333',
+    paddingLeft: 5,
+  },
+  reglementAcceptContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  reglementAcceptText: {
+    marginLeft: 10,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   descriptionContainer: {
     marginBottom: 20,
   },
@@ -222,7 +311,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 20,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#cccccc',
   },
   confirmButtonText: {
     color: 'black',

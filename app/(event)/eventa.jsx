@@ -11,11 +11,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const EventsScreen = () => {
-  const navigation = useNavigation();
   const [events, setEvents] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedPriceType, setSelectedPriceType] = useState(null);
@@ -84,6 +83,20 @@ const EventsScreen = () => {
     };
   };
 
+  const navigateToEventB = (item) => {
+    console.log('Navigation vers eventb avec userId:', userId, 'eventId:', item.id);
+    
+    // Utiliser router.push de expo-router
+    router.push({
+      pathname: "/(event)/eventb",
+      params: { 
+        userId: userId,
+        eventId: item.id,
+        eventData: JSON.stringify(item) // Convertir l'objet en chaîne JSON
+      }
+    });
+  };
+
   const renderPriceFilters = () => (
     <View style={styles.filterSection}>
       <Text style={styles.filterTitle}>Prix</Text>
@@ -142,7 +155,7 @@ const EventsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.title}>Événements</Text>
@@ -174,14 +187,7 @@ const EventsScreen = () => {
           return (
             <TouchableOpacity 
               style={styles.eventCard}
-              onPress={() => {
-                console.log('Événement sélectionné:', item.id, 'par utilisateur:', userId);
-                navigation.navigate('eventb', { 
-                  eventId: item.id, 
-                  userId: userId,
-                  eventData: item // Garde eventData pour rétrocompatibilité
-                });
-              }}
+              onPress={() => navigateToEventB(item)}
             >
               <ImageBackground
                 source={
@@ -219,14 +225,7 @@ const EventsScreen = () => {
                     </Text>
                     <TouchableOpacity
                       style={styles.participateButton}
-                      onPress={() => {
-                        console.log('Participation à l\'événement:', item.id, 'par utilisateur:', userId);
-                        navigation.navigate('eventb', { 
-                          eventId: item.id, 
-                          userId: userId,
-                          eventData: item // Garde eventData pour rétrocompatibilité
-                        });
-                      }}
+                      onPress={() => navigateToEventB(item)}
                     >
                       <Text style={styles.participateButtonText}>Participer</Text>
                     </TouchableOpacity>
@@ -428,4 +427,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EventsScreen; 
+export default EventsScreen;

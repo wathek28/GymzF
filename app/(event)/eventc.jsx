@@ -289,7 +289,7 @@ const RegistrationForm = () => {
             style={styles.input}
             value={formData.phoneNumber}
             onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
-            placeholder="+216230310"
+            placeholder="Votre Num"
             keyboardType="phone-pad"
             editable={!isAlreadyRegistered}
           />

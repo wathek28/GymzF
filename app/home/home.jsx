@@ -540,14 +540,23 @@ const FitnessApp = () => {
                           {event.prix.toFixed(2)} DT / Pers
                         </Text>
                         <TouchableOpacity 
-                          style={styles.participateButton1}
-                          onPress={() => {
-                            console.log(`Participation à l'événement ${event.id} avec userId: ${userId}`);
-                            Alert.alert('Participation', `Inscription à l'événement ${event.titre} avec l'ID utilisateur: ${userId}`);
-                          }}
-                        >
-                          <Text style={styles.participateButtonText1}>Participer</Text>
-                        </TouchableOpacity>
+  style={styles.participateButton1}
+  onPress={() => {
+    console.log(`Navigation vers eventb avec userId: ${userId}, eventId: ${event.id}`);
+    
+    // Use router.push from expo-router
+    router.push({
+      pathname: "/(event)/eventb",
+      params: { 
+        userId: userId,
+        eventId: event.id,
+        eventData: JSON.stringify(event)
+      }
+    });
+  }}
+>
+  <Text style={styles.participateButtonText1}>Participer</Text>
+</TouchableOpacity>
                       </View>
                     </View>
                   </ImageBackground>
@@ -564,20 +573,27 @@ const FitnessApp = () => {
       <View style={styles.bottomNav}>
         {navItems.map((item, index) => (
           <TouchableOpacity
-            key={`nav-${item.id}-${index}`}
-            style={styles.navItem}
-            onPress={() => {
-              if (item.id === 'home') {
-                // Rester sur la page actuelle ou rafraîchir
-                console.log('Restez sur la page d\'accueil avec userId:', userId);
-              } else if (item.id === 'user') {
-                navigateWithUserId('(profil)');
-              } else if (item.id === 'calendar') {
-                navigateWithUserId('(event)');
-              } else if (item.id === 'heart') {
-                navigateWithUserId('favorites');
-              }
-            }}
+          key={`nav-${item.id}-${index}`}
+          style={styles.navItem}
+          onPress={() => {
+            if (item.id === 'home') {
+              // Rester sur la page actuelle ou rafraîchir
+              console.log('Restez sur la page d\'accueil avec userId:', userId);
+            } else if (item.id === 'user') {
+              // Rediriger vers la page Gym au lieu de Profil
+              router.push({
+                pathname: "/(Gymzer)/Gym",
+                params: { 
+                  userId: userId,
+                  firstName: firstName
+                }
+              });
+            } else if (item.id === 'calendar') {
+              navigateWithUserId('(event)');
+            } else if (item.id === 'heart') {
+              navigateWithUserId('favorites');
+            }
+          }}
           >
             <item.Component name={item.icon} size={24} color={item.color} />
             <Text
