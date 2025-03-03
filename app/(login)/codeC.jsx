@@ -66,9 +66,12 @@ const CodeC = () => {
         const authToken = data.token;
         const userId = data.userId; // Récupération de l'ID utilisateur
         const firstName = data.firstName; // Récupération du prénom de l'utilisateur
+        const userPhoneNumber = data.phoneNumber; // Récupération du numéro de téléphone
+        const userPhoto = data.photo; // Récupération de la photo
+        const userEmail = data.email; // Récupération de l'email
   
         if (authToken && userId) {
-          // Stocker le token, l'userId et le firstName dans AsyncStorage
+          // Stocker le token, l'userId, le firstName, le phoneNumber, la photo et l'email dans AsyncStorage
           await AsyncStorage.setItem('authToken', authToken);
           await AsyncStorage.setItem('userId', userId.toString()); // Stocker l'userId comme chaîne
           
@@ -76,16 +79,37 @@ const CodeC = () => {
           if (firstName) {
             await AsyncStorage.setItem('firstName', firstName);
           }
+
+          // Stocker le phoneNumber s'il existe
+          if (userPhoneNumber) {
+            await AsyncStorage.setItem('phoneNumber', userPhoneNumber);
+          }
+
+          // Stocker la photo s'il existe
+          if (userPhoto) {
+            await AsyncStorage.setItem('userPhoto', userPhoto);
+          }
+          
+          // Stocker l'email s'il existe
+          if (userEmail) {
+            await AsyncStorage.setItem('userEmail', userEmail);
+          }
           
           console.log('userId passé à home:', userId);
           console.log('firstName passé à home:', firstName);
+          console.log('phoneNumber passé à home:', userPhoneNumber);
+          console.log('photo passée à home:', userPhoto ? 'Disponible' : 'Non disponible');
+          console.log('email passé à home:', userEmail || 'Non disponible');
           
-          // Naviguer vers la page d'accueil avec userId et firstName comme paramètres
+          // Naviguer vers la page d'accueil avec tous les paramètres
           router.push({
             pathname: '/home',
             params: { 
               userId: userId,
-              firstName: firstName || '' // Passer une chaîne vide si firstName est null/undefined
+              firstName: firstName || '', // Passer une chaîne vide si firstName est null/undefined
+              phoneNumber: userPhoneNumber || '', // Passer une chaîne vide si phoneNumber est null/undefined
+              photo: userPhoto || '', // Passer une chaîne vide si photo est null/undefined
+              email: userEmail || '' // Passer une chaîne vide si email est null/undefined
             }
           });
         } else {

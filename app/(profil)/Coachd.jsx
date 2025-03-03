@@ -14,6 +14,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuration de l'API
 const API_BASE_URL = 'http://192.168.0.6:8082';
@@ -22,14 +23,25 @@ const ContactForm = () => {
   const navigation = useNavigation();
   const route = useRoute();
   
-  // Extract idCoach and userId from route params
-  const { idCoach, userId } = route.params || {};
+  // Extract idCoach and user data from route params
+  const { 
+    idCoach, 
+    userId, 
+    firstName, 
+    email, 
+    phoneNumber 
+  } = route.params || {};
 
-  // Log the IDs as soon as the component mounts
+  // Log the parameters as soon as the component mounts
   useEffect(() => {
-    console.log("IDcoach:", idCoach);
-    console.log("UserID:", userId);
-  }, [idCoach, userId]);
+    console.log("Route params received:", {
+      idCoach,
+      userId,
+      firstName,
+      email,
+      phoneNumber
+    });
+  }, [idCoach, userId, firstName, email, phoneNumber]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,6 +55,51 @@ const ContactForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+
+  // Effect to pre-populate form fields with user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        // First priority: Use data from route params
+        let userData = {
+          name: firstName || '',
+          email: email || '',
+          whatsapp: phoneNumber || ''
+        };
+        
+        // Second priority: Try to get data from AsyncStorage if not present in params
+        if (!userData.name) {
+          const storedName = await AsyncStorage.getItem('firstName');
+          if (storedName) userData.name = storedName;
+        }
+        
+        if (!userData.email) {
+          const storedEmail = await AsyncStorage.getItem('userEmail');
+          if (storedEmail) userData.email = storedEmail;
+        }
+        
+        if (!userData.whatsapp) {
+          const storedPhone = await AsyncStorage.getItem('phoneNumber');
+          if (storedPhone) userData.whatsapp = storedPhone;
+        }
+        
+        // Log what we found
+        console.log("User data for form:", userData);
+        
+        // Update form data with user information
+        setFormData(prevData => ({
+          ...prevData,
+          name: userData.name,
+          email: userData.email,
+          whatsapp: userData.whatsapp
+        }));
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    };
+    
+    loadUserData();
+  }, [firstName, email, phoneNumber]);
 
   const reasons = [
     'Réservation d\'une séance individuelle',
@@ -188,8 +245,13 @@ const ContactForm = () => {
           <Text style={styles.header}>Contactez-moi</Text>
         </View>
 
-        {/* ID information - Optional, can be removed in production */}
-       
+        {/* ID information - Debug only */}
+        {__DEV__ && (
+          <View style={styles.idInfoContainer}>
+            <Text style={styles.idInfoText}>Coach ID: {formData.idCoach}</Text>
+            <Text style={styles.idInfoText}>User ID: {formData.userId}</Text>
+          </View>
+        )}
 
         {/* Nom et prénom */}
         <View style={styles.inputGroup}>
@@ -297,15 +359,14 @@ const ContactForm = () => {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.cancelButton}
-            onPress={() => setFormData({
-              name: '',
-              email: '',
-              whatsapp: '',
-              reason: '',
-              message: '',
-              idCoach, // Preserve the IDs when resetting the form
-              userId,
-            })}
+            onPress={() => {
+              // Reset the form but keep personal information and IDs
+              setFormData(prev => ({
+                ...prev,
+                reason: '',
+                message: ''
+              }));
+            }}
             disabled={loading}
           >
             <Text style={styles.cancelButtonText}>Annuler</Text>

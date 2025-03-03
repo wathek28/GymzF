@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,26 +11,133 @@ import {
   StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PhoneVerificationScreen = () => {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
   
+  // Récupération des paramètres via useLocalSearchParams
+  const params = useLocalSearchParams();
+  const { 
+    userId: paramUserId, 
+    firstName: paramFirstName,
+    phoneNumber: paramPhoneNumber,
+    photo: paramPhoto
+  } = params;
+  
+  // États pour les données utilisateur
+  const [userId, setUserId] = useState(null);
+  const [firstName, setFirstName] = useState("");
+  const [userPhoto, setUserPhoto] = useState("");
+
+  // Récupérer les données utilisateur au chargement du composant
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        console.log('=== RÉCUPÉRATION DES DONNÉES DANS PHONEVERIFICATIONSCREEN ===');
+        
+        // Vérification des paramètres reçus
+        console.log('Paramètres reçus:', {
+          userId: paramUserId || 'non défini',
+          firstName: paramFirstName || 'non défini',
+          phoneNumber: paramPhoneNumber || 'non défini',
+          photo: paramPhoto ? 'présente' : 'non définie'
+        });
+        
+        // Récupérer l'ID utilisateur
+        if (paramUserId) {
+          console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
+          setUserId(paramUserId);
+        } else {
+          const storedUserId = await AsyncStorage.getItem('userId');
+          if (storedUserId) {
+            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
+            setUserId(storedUserId);
+          }
+        }
+        
+        // Récupérer le prénom
+        if (paramFirstName) {
+          console.log('FirstName trouvé dans les paramètres:', paramFirstName);
+          setFirstName(paramFirstName);
+        } else {
+          const storedFirstName = await AsyncStorage.getItem('firstName');
+          if (storedFirstName) {
+            console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
+            setFirstName(storedFirstName);
+          }
+        }
+        
+        // Récupérer la photo
+        if (paramPhoto) {
+          console.log('Photo trouvée dans les paramètres');
+          setUserPhoto(paramPhoto);
+        } else {
+          const storedPhoto = await AsyncStorage.getItem('userPhoto');
+          if (storedPhoto) {
+            console.log('Photo récupérée de AsyncStorage');
+            setUserPhoto(storedPhoto);
+          }
+        }
+        
+        // Récupérer et définir le numéro de téléphone pour le champ de saisie
+        // Supprimer le préfixe +216 s'il est présent
+        if (paramPhoneNumber) {
+          const formattedNumber = paramPhoneNumber.replace('+216', '');
+          console.log('PhoneNumber trouvé dans les paramètres:', paramPhoneNumber);
+          console.log('PhoneNumber formatté pour l\'affichage:', formattedNumber);
+          setPhoneNumber(formattedNumber);
+        } else {
+          const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
+          if (storedPhoneNumber) {
+            const formattedNumber = storedPhoneNumber.replace('+216', '');
+            console.log('PhoneNumber récupéré de AsyncStorage:', storedPhoneNumber);
+            console.log('PhoneNumber formatté pour l\'affichage:', formattedNumber);
+            setPhoneNumber(formattedNumber);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données utilisateur:', error);
+      }
+    };
+    
+    getUserData();
+  }, [paramUserId, paramFirstName, paramPhoneNumber, paramPhoto]);
+  
   const handleSendSMS = () => {
     console.log('Code de vérification envoyé au numéro:', phoneNumber);
-    router.push('/Gymc');
-    // Logique pour envoyer le SMS
+    
+    // Naviguer vers la page Gymc avec tous les paramètres utilisateur
+    router.push({
+      pathname: '/Gymc',
+      params: {
+        userId: userId,
+        firstName: firstName,
+        phoneNumber: `+216${phoneNumber}`, // Ajouter le préfixe +216
+        photo: userPhoto,
+        newPhoneNumber: `+216${phoneNumber}` // Ajouter aussi le nouveau numéro comme paramètre spécifique
+      }
+    });
   };
   
   const handleCancel = () => {
     console.log('Modification annulée');
-    router.back();
+    navigateBack();
   };
   
   const navigateBack = () => {
-    router.push('/Gym');
-    
+    router.push({
+      pathname: '/Gym',
+      params: {
+        userId: userId,
+        firstName: firstName,
+        phoneNumber: paramPhoneNumber, // Conserver l'ancien numéro
+        photo: userPhoto
+      }
+    });
   };
 
   return (
@@ -81,9 +188,14 @@ const PhoneVerificationScreen = () => {
         {/* Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity 
-            style={styles.sendButton} 
+            style={[
+              styles.sendButton,
+              // Désactiver le bouton si le numéro est vide ou trop court
+              (!phoneNumber || phoneNumber.length < 8) && styles.disabledButton
+            ]} 
             onPress={handleSendSMS}
             activeOpacity={0.8}
+            disabled={!phoneNumber || phoneNumber.length < 8}
           >
             <Text style={styles.sendButtonText}>Envoyer le code par SMS</Text>
           </TouchableOpacity>
@@ -175,6 +287,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     marginBottom: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#aaa',
   },
   sendButtonText: {
     color: '#fff',

@@ -13,6 +13,7 @@ import {
   Platform,
   Alert,
   ImageBackground,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -60,7 +61,13 @@ const FitnessApp = () => {
   
   // Récupération des paramètres de navigation
   const params = useLocalSearchParams();
-  const { userId: paramUserId, firstName: paramFirstName } = params;
+  const { 
+    userId: paramUserId, 
+    firstName: paramFirstName,
+    phoneNumber: paramPhoneNumber,
+    photo: paramPhoto,
+    email: paramEmail
+  } = params;
   
   // États
   const [searchText, setSearchText] = useState("");
@@ -71,16 +78,75 @@ const FitnessApp = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [eventsError, setEventsError] = useState(null);
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [userPhoto, setUserPhoto] = useState("");
+  const [userEmail, setUserEmail] = useState("");
 
-  // Récupérer l'ID utilisateur et le firstName à chaque fois que le composant est monté ou reçoit le focus
+  // Fonction pour récupérer les événements
+  const fetchEvents = async () => {
+    try {
+      console.log('Fetching events from API...');
+      setEventsLoading(true);
+      setEventsError(null);
+      
+      const eventsRes = await fetch("http://192.168.0.6:8082/api/events", {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Events Response Status:', eventsRes.status);
+      
+      if (!eventsRes.ok) {
+        const errorText = await eventsRes.text();
+        console.error('Events Fetch Error:', errorText);
+        throw new Error(`Failed to fetch events: ${errorText}`);
+      }
+
+      const eventsData = await eventsRes.json();
+      console.log('Raw Events Data:', JSON.stringify(eventsData, null, 2));
+      
+      if (!Array.isArray(eventsData)) {
+        console.error('Events data is not an array:', typeof eventsData);
+        throw new Error('Events data format is invalid');
+      }
+
+      const validEvents = eventsData.filter(event => {
+        const isValid = event && 
+          typeof event === 'object' &&
+          event.titre && 
+          event.date;
+        
+        if (!isValid) {
+          console.warn('Skipping invalid event:', event);
+        }
+        
+        return isValid;
+      });
+
+      console.log('Valid Events Count:', validEvents.length);
+      setEvents(validEvents);
+    } catch (error) {
+      console.error('Events Fetch Error:', error);
+      setEventsError(error.message);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  // Récupérer les données utilisateur à chaque fois que le composant est monté ou reçoit le focus
   useFocusEffect(
     useCallback(() => {
       const getUserData = async () => {
         try {
-          // Priorité 1: Utiliser l'ID et le firstName des paramètres de navigation s'ils existent
+          // Priorité 1: Utiliser les données des paramètres de navigation si elles existent
           if (paramUserId) {
             console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
             setUserId(paramUserId);
@@ -90,11 +156,50 @@ const FitnessApp = () => {
             console.log('FirstName trouvé dans les paramètres:', paramFirstName);
             setFirstName(paramFirstName);
           } else {
-            // Essayer de récupérer le firstName depuis AsyncStorage si non présent dans les paramètres
+            // Essayer de récupérer le firstName depuis AsyncStorage
             const storedFirstName = await AsyncStorage.getItem('firstName');
             if (storedFirstName) {
               console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
               setFirstName(storedFirstName);
+            }
+          }
+          
+          // Récupérer le numéro de téléphone
+          if (paramPhoneNumber) {
+            console.log('PhoneNumber trouvé dans les paramètres:', paramPhoneNumber);
+            setPhoneNumber(paramPhoneNumber);
+          } else {
+            // Essayer de récupérer le phoneNumber depuis AsyncStorage
+            const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
+            if (storedPhoneNumber) {
+              console.log('PhoneNumber récupéré de AsyncStorage:', storedPhoneNumber);
+              setPhoneNumber(storedPhoneNumber);
+            }
+          }
+          
+          // Récupérer la photo
+          if (paramPhoto) {
+            console.log('Photo trouvée dans les paramètres');
+            setUserPhoto(paramPhoto);
+          } else {
+            // Essayer de récupérer la photo depuis AsyncStorage
+            const storedPhoto = await AsyncStorage.getItem('userPhoto');
+            if (storedPhoto) {
+              console.log('Photo récupérée de AsyncStorage');
+              setUserPhoto(storedPhoto);
+            }
+          }
+          
+          // Récupérer l'email
+          if (paramEmail) {
+            console.log('Email trouvé dans les paramètres:', paramEmail);
+            setUserEmail(paramEmail);
+          } else {
+            // Essayer de récupérer l'email depuis AsyncStorage
+            const storedEmail = await AsyncStorage.getItem('userEmail');
+            if (storedEmail) {
+              console.log('Email récupéré de AsyncStorage:', storedEmail);
+              setUserEmail(storedEmail);
             }
           }
           
@@ -114,7 +219,7 @@ const FitnessApp = () => {
       };
       
       getUserData();
-    }, [paramUserId, paramFirstName])
+    }, [paramUserId, paramFirstName, paramPhoneNumber, paramPhoto, paramEmail])
   );
 
   // Effet pour charger les données
@@ -122,44 +227,59 @@ const FitnessApp = () => {
     if (userId) {
       console.log('Chargement des données avec userId:', userId);
       fetchAllData();
+      fetchEvents(); // Charger les événements séparément
     }
   }, [userId]);
 
+  // Fonction modifiée pour éviter les problèmes de parsing JSON
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
       console.log('Début des requêtes API avec userId:', userId);
       
-      const [offersRes, coachesRes, gymsRes, eventsRes] = await Promise.all([
-        fetch("http://192.168.0.6:8082/api/offres"),
-        fetch("http://192.168.0.6:8082/api/auth/coaches"),
-        fetch("http://192.168.0.6:8082/api/auth/gyms"),
-        fetch("http://192.168.0.6:8082/api/events")
-      ]);
-
-      if (!offersRes.ok || !coachesRes.ok || !gymsRes.ok || !eventsRes.ok) {
-        throw new Error("Erreur lors de la récupération des données");
+      // Effectuer les requêtes séparément pour mieux gérer les erreurs
+      try {
+        const offersRes = await fetch("http://192.168.0.6:8082/api/offres");
+        if (offersRes.ok) {
+          const offersData = await offersRes.json();
+          setOffers(offersData);
+        } else {
+          console.log('Erreur lors de la récupération des offres');
+        }
+      } catch (err) {
+        console.error("Erreur offres:", err.message);
       }
-
-      const [offersData, coachesData, gymsData, eventsData] = await Promise.all([
-        offersRes.json(),
-        coachesRes.json(),
-        gymsRes.json(),
-        eventsRes.json()
-      ]);
-
-      const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
-
-      setOffers(offersData);
-      setCoaches(coachesData);
-      setGyms(validGyms);
-      setEvents(eventsData);
-      setError(null);
       
+      try {
+        const coachesRes = await fetch("http://192.168.0.6:8082/api/auth/coaches");
+        if (coachesRes.ok) {
+          const coachesData = await coachesRes.json();
+          setCoaches(coachesData);
+        } else {
+          console.log('Erreur lors de la récupération des coaches');
+        }
+      } catch (err) {
+        console.error("Erreur coaches:", err.message);
+      }
+      
+      try {
+        const gymsRes = await fetch("http://192.168.0.6:8082/api/auth/gyms");
+        if (gymsRes.ok) {
+          const gymsData = await gymsRes.json();
+          const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
+          setGyms(validGyms);
+        } else {
+          console.log('Erreur lors de la récupération des gyms');
+        }
+      } catch (err) {
+        console.error("Erreur gyms:", err.message);
+      }
+      
+      setError(null);
       console.log('Données chargées avec succès');
     } catch (err) {
       setError(err.message);
-      console.error("Erreur:", err);
+      console.error("Erreur générale:", err);
     } finally {
       setIsLoading(false);
     }
@@ -227,24 +347,94 @@ const FitnessApp = () => {
     ),
   };
 
-  // Fonction pour naviguer avec l'ID utilisateur et le firstName
-  const navigateWithUserId = (routeName, additionalParams = {}) => {
-    console.log(`Navigation vers ${routeName} avec userId: ${userId}, firstName: ${firstName}`);
-    navigation.navigate(routeName, { 
+  // Fonction pour naviguer avec toutes les données utilisateur
+  const navigateWithUserData = (routeName, additionalParams = {}) => {
+    console.log(`Navigation vers ${routeName} avec userId: ${userId}, firstName: ${firstName}, email: ${userEmail}`);
+    
+    // Utiliser uniquement les données de base pour éviter les problèmes de sérialisation
+    const baseParams = { 
       userId: userId,
       firstName: firstName,
-      ...additionalParams
+      phoneNumber: phoneNumber,
+      photo: userPhoto,
+      email: userEmail
+    };
+    
+    // Si additionalParams contient des objets complexes, extraire seulement les ID ou informations simples
+    let safeParams = { ...baseParams };
+    
+    // Pour gérer les objets complexes comme gym ou event
+    if (additionalParams.gym) {
+      safeParams.gymId = additionalParams.gym.id;
+    }
+    
+    if (additionalParams.event) {
+      safeParams.eventId = additionalParams.event.id;
+    }
+    
+    // Ajouter d'autres paramètres simples
+    Object.keys(additionalParams).forEach(key => {
+      if (key !== 'gym' && key !== 'event' && typeof additionalParams[key] !== 'object') {
+        safeParams[key] = additionalParams[key];
+      }
     });
+    
+    navigation.navigate(routeName, safeParams);
+  };
+  
+  // Fonction pour naviguer vers la page coachd avec les paramètres utilisateur
+  const navigateToCoachd = () => {
+    console.log('Navigation vers coachd avec:', {
+      userId: userId,
+      firstName: firstName,
+      phoneNumber: phoneNumber,
+      email: userEmail
+    });
+    
+    router.push({
+      pathname: "/(profil)/Coachd",
+      params: {
+        userId: userId,
+        firstName: firstName,
+        phoneNumber: phoneNumber,
+        photo: userPhoto,
+        email: userEmail
+      }
+    });
+  };
+
+  // Fonction pour rafraîchir les événements
+  const refreshEvents = () => {
+    setEventsError(null);
+    fetchEvents();
+  };
+
+  // Formatage de la date pour les événements
+  const formatEventDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return { day: "N/A", month: "N/A" };
+      }
+      
+      const day = date.getDate();
+      const month = date.toLocaleString('fr-FR', {month: 'short'});
+      return { day, month };
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return { day: "N/A", month: "N/A" };
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Header avec le firstName */}
+        {/* Header avec le firstName et potentiellement une photo */}
         <View style={styles.headerContainer}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Image source={require("../../assets/images/G.png")} />
+              
+            <Image source={require("../../assets/images/G.png")} />
               <View>
                 <Text style={styles.headerText}>Hey {firstName || 'utilisateur'}</Text>
                 <Text style={styles.subHeaderText}>Que cherchez-vous?</Text>
@@ -289,37 +479,43 @@ const FitnessApp = () => {
             showsHorizontalScrollIndicator={false}
             style={styles.offersScroll3}
           >
-            {offers2.map((offer, index) => (
-              <TouchableOpacity
-                key={`offer-${offer.id || index}`}
-                style={styles.container3}
-              >
-                <View style={styles.header3}>
-                  <View style={styles.logoContainer3}>
-                    <Text style={styles.brandName3}>{offer.titre}</Text>
-                  </View>
-                  <View style={styles.discountBadge3}>
-                    <Text style={styles.discountText3}>
-                      {offer.pourcentageReduction
-                        ? `${offer.pourcentageReduction}%`
-                        : "0%"}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.description3}>{offer.description}</Text>
-
+            {offers2.length > 0 ? (
+              offers2.map((offer, index) => (
                 <TouchableOpacity
-                  style={styles.button3}
-                  onPress={() => {
-                    setSelectedOffer(offer);
-                    setModalVisible(true);
-                  }}
+                  key={`offer-${offer.id || index}`}
+                  style={styles.container3}
                 >
-                  <Text style={styles.buttonText3}>Profiter</Text>
+                  <View style={styles.header3}>
+                    <View style={styles.logoContainer3}>
+                      <Text style={styles.brandName3}>{offer.titre}</Text>
+                    </View>
+                    <View style={styles.discountBadge3}>
+                      <Text style={styles.discountText3}>
+                        {offer.pourcentageReduction
+                          ? `${offer.pourcentageReduction}%`
+                          : "0%"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.description3}>{offer.description}</Text>
+
+                  <TouchableOpacity
+                    style={styles.button3}
+                    onPress={() => {
+                      setSelectedOffer(offer);
+                      setModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.buttonText3}>Profiter</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
+              ))
+            ) : (
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>Aucune offre disponible</Text>
+              </View>
+            )}
           </ScrollView>
 
           <Modal
@@ -363,12 +559,15 @@ const FitnessApp = () => {
                 
                 console.log('Navigation vers profil avec userId:', userId);
                 
-                // Utiliser router.push d'expo-router avec firstName
+                // Utiliser router.push d'expo-router avec toutes les données utilisateur
                 router.push({
                   pathname: "/(profil)/Coacha",
                   params: { 
                     userId: userId,
-                    firstName: firstName
+                    firstName: firstName,
+                    phoneNumber: phoneNumber,
+                    photo: userPhoto,
+                    email: userEmail
                   }
                 });
               }}
@@ -379,66 +578,72 @@ const FitnessApp = () => {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {isLoading ? (
-              <Text>Chargement...</Text>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Chargement des coachs...</Text>
+              </View>
             ) : error ? (
-              <Text>Erreur: {error}</Text>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Erreur: {error}</Text>
+                <TouchableOpacity style={styles.refreshButton} onPress={fetchAllData}>
+                  <Text style={styles.refreshButtonText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
             ) : filteredItems.coaches.length > 0 ? (
               filteredItems.coaches.map((coach, index) => (
                 <TouchableOpacity 
-  key={`coach-${coach.id || index}`} 
-  style={styles.coachCard} 
-  onPress={() => {
-    if (!userId) {
-      console.warn('ID utilisateur manquant pour la navigation');
-      return;
-    }
-    
-    console.log(`Navigation vers coach detail avec userId: ${userId}, coachId: ${coach.id}`);
-    
-    // Use router.push from expo-router for consistent navigation
-    router.push({
-      pathname: "/(profil)/Coachb",
-      params: { 
-        userId: userId,
-        firstName: firstName,
-        id: coach.id,  // Changed from coachId to id to match your CoachB component
-        // Include all available coach data that might be needed
-        competencesGenerales: coach.competencesGenerales,
-        coursSpecifiques: coach.coursSpecifiques,
-        disciplines: coach.disciplines,
-        dureeExperience: coach.dureeExperience,
-        dureeSeance: coach.dureeSeance,
-        email: coach.email,
-        entrainementPhysique: coach.entrainementPhysique,
-        fb: coach.fb,
-        insta: coach.insta,
-        niveauCours: coach.niveauCours,
-        phoneNumber: coach.phoneNumber,
-        photo: coach.photo,
-        poste: coach.poste,
-        prixSeance: coach.prixSeance,
-        santeEtBienEtre: coach.santeEtBienEtre,
-        tiktok: coach.tiktok,
-        typeCoaching: coach.typeCoaching,
-        bio: coach.bio
-      }
-    });
-  }}
->
-  <Image
-    source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
-    style={styles.coachImage}
-  />
-  <View style={styles.coachInfo}>
-    <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
-    <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
-  </View>
-</TouchableOpacity>
+                  key={`coach-${coach.id || index}`} 
+                  style={styles.coachCard} 
+                  onPress={() => {
+                    if (!userId) {
+                      console.warn('ID utilisateur manquant pour la navigation');
+                      return;
+                    }
+                    
+                    console.log(`Navigation vers coach detail avec userId: ${userId}, coachId: ${coach.id}`);
+                    
+                    // Extraire seulement les propriétés nécessaires pour éviter les problèmes de sérialisation
+                    router.push({
+                      pathname: "/(profil)/Coachb",
+                      params: { 
+                        userId: userId,
+                        firstName: firstName,
+                        phoneNumber: phoneNumber,
+                        photo: userPhoto,
+                        email: userEmail,
+                        coachId: coach.id,
+                        coachFirstName: coach.firstName,
+                        coachEmail: coach.email,
+                        coachPhone: coach.phoneNumber,
+                        coachPoste: coach.poste
+                      }
+                    });
+                  }}
+                >
+                  <Image
+                    source={coach.photo ? { uri: `data:image/jpeg;base64,${coach.photo}` } : require("../../assets/images/F.png")}
+                    style={styles.coachImage}
+                  />
+                  <View style={styles.coachInfo}>
+                    <Text style={styles.coachName}>{coach.firstName || "Nom non disponible"}</Text>
+                    <Text style={styles.coachSpecialty}>{coach.poste || "Email non disponible"}</Text>
+                  </View>
+                </TouchableOpacity>
               ))
             ) : (
-              <Text>Aucun coach trouvé</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>Aucun coach trouvé</Text>
+              </View>
             )}
           </ScrollView>
+          
+          {/* Bouton pour naviguer vers Coachd avec les paramètres utilisateur */}
+          <TouchableOpacity 
+            style={styles.coachDButton}
+            onPress={navigateToCoachd}
+          >
+            <Text style={styles.coachDButtonText}>Voir tous les coachs</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Section Gym */}
@@ -447,7 +652,7 @@ const FitnessApp = () => {
             <Text style={styles.sectionTitle}>Gym</Text>
             <TouchableOpacity 
               style={styles.seeMoreButton}
-              onPress={() => navigateWithUserId('(gym)')}
+              onPress={() => navigateWithUserData('(gym)')}
             >
               <Feather name="chevron-right" size={24} color="#666" />
             </TouchableOpacity>
@@ -455,15 +660,26 @@ const FitnessApp = () => {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {isLoading ? (
-              <Text>Chargement...</Text>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Chargement des gyms...</Text>
+              </View>
             ) : error ? (
-              <Text>Erreur: {error}</Text>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Erreur: {error}</Text>
+                <TouchableOpacity style={styles.refreshButton} onPress={fetchAllData}>
+                  <Text style={styles.refreshButtonText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
             ) : filteredItems.gyms.length > 0 ? (
               filteredItems.gyms.map((gym, index) => (
                 <TouchableOpacity 
                   key={`gym-${gym.id || index}`} 
                   style={styles.gymCard}
-                  onPress={() => navigateWithUserId('(gym)/detail', { gym })}
+                  onPress={() => {
+                    // Envoyer uniquement l'ID du gym plutôt que l'objet entier
+                    navigateWithUserData('(gym)/detail', { gymId: gym.id });
+                  }}
                 >
                   <Image
                     source={gym.photo ? { uri: `data:image/jpeg;base64,${gym.photo}` } : require("../../assets/images/F.png")}
@@ -476,18 +692,21 @@ const FitnessApp = () => {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text>Aucun gym trouvé</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>Aucun gym trouvé</Text>
+              </View>
             )}
           </ScrollView>
         </View>
 
-        {/* Événements */}
-        <View style={styles.section}>
+        {/* Événements - Section corrigée */}
+{/* Événements */}
+<View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Événements</Text>
             <TouchableOpacity
               style={styles.seeMoreButton}
-              onPress={() => navigateWithUserId('(event)')}
+              onPress={() => navigateWithUserData('(event)')}
             >
               <Feather name="chevron-right" size={24} color="#666" />
             </TouchableOpacity>
@@ -506,7 +725,7 @@ const FitnessApp = () => {
                 <TouchableOpacity 
                   key={event.id} 
                   style={styles.container1}
-                  onPress={() => navigateWithUserId('(event)/eventb', { event })}
+                  onPress={() => navigateWithUserData('(event)/eventb', { event })}
                 >
                   <ImageBackground
                     source={
@@ -567,12 +786,13 @@ const FitnessApp = () => {
             )}
           </ScrollView>
         </View>
+
       </ScrollView>
 
       {/* Navigation */}
       <View style={styles.bottomNav}>
-        {navItems.map((item, index) => (
-          <TouchableOpacity
+      {navItems.map((item, index) => (
+        <TouchableOpacity
           key={`nav-${item.id}-${index}`}
           style={styles.navItem}
           onPress={() => {
@@ -580,38 +800,49 @@ const FitnessApp = () => {
               // Rester sur la page actuelle ou rafraîchir
               console.log('Restez sur la page d\'accueil avec userId:', userId);
             } else if (item.id === 'user') {
-              // Rediriger vers la page Gym au lieu de Profil
+              // Vérifier les données avant navigation
+              console.log('=== NAVIGATION VERS GYM ===');
+              console.log('userId à transmettre:', userId);
+              console.log('firstName à transmettre:', firstName);
+              console.log('phoneNumber à transmettre:', phoneNumber);
+              console.log('photo à transmettre:', userPhoto ? `présente (longueur: ${userPhoto.length})` : 'non définie');
+              console.log('email à transmettre:', userEmail || 'non défini');
+              
+              // Rediriger vers la page Gym avec toutes les données utilisateur, y compris l'email
               router.push({
                 pathname: "/(Gymzer)/Gym",
                 params: { 
                   userId: userId,
-                  firstName: firstName
+                  firstName: firstName,
+                  phoneNumber: phoneNumber,
+                  photo: userPhoto,
+                  email: userEmail
                 }
               });
             } else if (item.id === 'calendar') {
-              navigateWithUserId('(event)');
+              navigateWithUserData('(event)');
             } else if (item.id === 'heart') {
-              navigateWithUserId('favorites');
+              navigateWithUserData('favorites');
             }
           }}
+        >
+          <item.Component name={item.icon} size={24} color={item.color} />
+          <Text
+            style={[
+              styles.navText,
+              item.color === "#4CAF50" && styles.activeNavText,
+            ]}
           >
-            <item.Component name={item.icon} size={24} color={item.color} />
-            <Text
-              style={[
-                styles.navText,
-                item.color === "#4CAF50" && styles.activeNavText,
-              ]}
-            >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+            {item.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
       </View>
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
+  
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
@@ -758,26 +989,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 5,
   },
-  eventCard: {
-    width: 200,
-    marginRight: 15,
-    backgroundColor: "white",
-    borderRadius: 15,
-    overflow: "hidden",
-  },
-  eventInfo: {
-    padding: 10,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-  },
-  eventDate: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 5,
-  },
+
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",

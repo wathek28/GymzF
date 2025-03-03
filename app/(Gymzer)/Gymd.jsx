@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HelpCenterScreen = () => {
   const router = useRouter();
@@ -20,6 +21,116 @@ const HelpCenterScreen = () => {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
+  const [userId, setUserId] = useState(null);
+  const [userPhoto, setUserPhoto] = useState('');
+
+  // Récupération des paramètres via useLocalSearchParams
+  const params = useLocalSearchParams();
+  const { 
+    userId: paramUserId, 
+    firstName: paramFirstName,
+    phoneNumber: paramPhoneNumber,
+    photo: paramPhoto,
+    email: paramEmail
+  } = params;
+
+  // Récupérer les données utilisateur au chargement du composant
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        console.log('=== RÉCUPÉRATION DES DONNÉES DANS HELPCENTERDCREEN ===');
+        
+        // Vérification des paramètres reçus
+        console.log('Paramètres reçus:', {
+          userId: paramUserId || 'non défini',
+          firstName: paramFirstName || 'non défini',
+          phoneNumber: paramPhoneNumber || 'non défini',
+          photo: paramPhoto ? 'présente' : 'non définie',
+          email: paramEmail || 'non défini'
+        });
+        
+        // Récupération de l'ID utilisateur
+        if (paramUserId) {
+          console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
+          setUserId(paramUserId);
+        } else {
+          // Essayer de récupérer l'ID depuis AsyncStorage
+          const storedUserId = await AsyncStorage.getItem('userId');
+          if (storedUserId) {
+            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
+            setUserId(storedUserId);
+          } else {
+            console.warn('Aucun ID utilisateur trouvé');
+          }
+        }
+        
+        // Récupération du nom
+        if (paramFirstName) {
+          console.log('FirstName trouvé dans les paramètres:', paramFirstName);
+          setName(paramFirstName);
+        } else {
+          // Essayer de récupérer le firstName depuis AsyncStorage
+          const storedFirstName = await AsyncStorage.getItem('firstName');
+          if (storedFirstName) {
+            console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
+            setName(storedFirstName);
+          } else {
+            console.warn('Aucun firstName trouvé');
+          }
+        }
+        
+        // Récupération de l'email
+        if (paramEmail) {
+          console.log('Email trouvé dans les paramètres:', paramEmail);
+          setEmail(paramEmail);
+        } else {
+          // Essayer de récupérer l'email depuis AsyncStorage
+          const storedEmail = await AsyncStorage.getItem('userEmail');
+          if (storedEmail) {
+            console.log('Email récupéré de AsyncStorage:', storedEmail);
+            setEmail(storedEmail);
+          } else {
+            console.warn('Aucun email trouvé');
+          }
+        }
+        
+        // Récupération du numéro de téléphone
+        if (paramPhoneNumber) {
+          console.log('PhoneNumber trouvé dans les paramètres:', paramPhoneNumber);
+          setPhoneNumber(paramPhoneNumber);
+        } else {
+          // Essayer de récupérer le phoneNumber depuis AsyncStorage
+          const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
+          if (storedPhoneNumber) {
+            console.log('PhoneNumber récupéré de AsyncStorage:', storedPhoneNumber);
+            setPhoneNumber(storedPhoneNumber);
+          } else {
+            console.warn('Aucun phoneNumber trouvé');
+          }
+        }
+        
+        // Récupération de la photo (pour passer aux écrans suivants)
+        if (paramPhoto) {
+          console.log('Photo trouvée dans les paramètres');
+          setUserPhoto(paramPhoto);
+        } else {
+          // Essayer de récupérer la photo depuis AsyncStorage
+          const storedPhoto = await AsyncStorage.getItem('userPhoto');
+          if (storedPhoto) {
+            console.log('Photo récupérée de AsyncStorage');
+            setUserPhoto(storedPhoto);
+          } else {
+            console.warn('Aucune photo trouvée');
+          }
+        }
+        
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données utilisateur:', error);
+      }
+    };
+    
+    getUserData();
+  }, [paramUserId, paramFirstName, paramPhoneNumber, paramPhoto, paramEmail]);
 
   const handleSendMessage = () => {
     // Validation
@@ -32,12 +143,22 @@ const HelpCenterScreen = () => {
     console.log('Message envoyé:', { name, email, phoneNumber, message });
     alert('Votre message a été envoyé avec succès');
     
-    // Optionally reset form or navigate
-    // resetForm();
+    // Optionally reset form or navigate back with user data
+    navigateBack();
   };
 
   const navigateBack = () => {
-    router.back();
+    // Retourner à l'écran précédent avec les données utilisateur
+    router.push({
+      pathname: '/Gym',
+      params: {
+        userId: userId,
+        firstName: name,
+        phoneNumber: phoneNumber,
+        photo: userPhoto,
+        email: email
+      }
+    });
   };
 
   return (

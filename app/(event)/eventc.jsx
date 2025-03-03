@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const RegistrationForm = () => {
   const navigation = useNavigation();
@@ -20,6 +21,10 @@ const RegistrationForm = () => {
   const eventData = route?.params?.eventData || {};
   const userId = route?.params?.userId;
   const eventId = route?.params?.eventId || eventData?.id;
+  // Récupérer les informations utilisateur des paramètres
+  const firstName = route?.params?.firstName;
+  const email = route?.params?.email;
+  const phoneNumber = route?.params?.phoneNumber;
   // Récupérer le reglement directement des paramètres
   const reglement = route?.params?.reglement || null;
   
@@ -37,6 +42,18 @@ const RegistrationForm = () => {
     userId: userId,
     eventId: eventId,
   });
+
+  // Log initial des paramètres reçus
+  useEffect(() => {
+    console.log('Paramètres reçus dans RegistrationForm:', {
+      userId,
+      eventId,
+      firstName,
+      email,
+      phoneNumber,
+      reglement: reglement ? 'présent' : 'absent'
+    });
+  }, []);
 
   // Vérifier si l'utilisateur est déjà inscrit à l'événement
   useEffect(() => {
@@ -75,6 +92,59 @@ const RegistrationForm = () => {
     
     checkRegistration();
   }, [userId, eventId]);
+
+  // Effet pour charger les données utilisateur et initialiser le formulaire
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        let userData = {
+          firstName: '',
+          email: '',
+          phoneNumber: ''
+        };
+        
+        // Priorité 1: Utiliser les données des paramètres
+        if (firstName) userData.firstName = firstName;
+        if (email) userData.email = email;
+        if (phoneNumber) userData.phoneNumber = phoneNumber;
+        
+        // Priorité 2: Utiliser les données stockées dans AsyncStorage si les données ne sont pas dans les paramètres
+        if (!userData.firstName) {
+          const storedFirstName = await AsyncStorage.getItem('firstName');
+          if (storedFirstName) userData.firstName = storedFirstName;
+        }
+        
+        if (!userData.email) {
+          const storedEmail = await AsyncStorage.getItem('userEmail');
+          if (storedEmail) userData.email = storedEmail;
+        }
+        
+        if (!userData.phoneNumber) {
+          const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
+          if (storedPhoneNumber) userData.phoneNumber = storedPhoneNumber;
+        }
+        
+        console.log('Données utilisateur chargées:', userData);
+        
+        // Mettre à jour le formulaire avec les données utilisateur
+        setFormData(prevState => ({
+          ...prevState,
+          firstName: userData.firstName,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+          userId: userId,
+          eventId: eventId
+        }));
+      } catch (error) {
+        console.error('Erreur lors du chargement des données utilisateur:', error);
+      }
+    };
+    
+    // Charger les données uniquement si on n'est pas déjà inscrit
+    if (!isAlreadyRegistered) {
+      loadUserData();
+    }
+  }, [firstName, email, phoneNumber, userId, eventId, isAlreadyRegistered]);
 
   // Vérifier la présence des IDs et du reglement au chargement du composant
   useEffect(() => {
@@ -267,16 +337,19 @@ const RegistrationForm = () => {
         <Text style={styles.header}>Réservez votre place !</Text>
       </View>
       
-      
-      
       {renderAlreadyRegisteredMessage()}
       
-      {/* Section de débogage pour afficher les IDs et le reglement */}
-      <View style={styles.debugSection}>
-        <Text style={styles.debugText}>User ID: {userId || 'Non disponible'}</Text>
-        <Text style={styles.debugText}>Event ID: {eventId || 'Non disponible'}</Text>
-        <Text style={styles.debugText}>Reglement présent: {reglement ? 'Oui' : 'Non'}</Text>
-      </View>
+      {/* Section de débogage pour afficher les IDs et le reglement - COMMENTEZ CETTE SECTION EN PRODUCTION */}
+      {__DEV__ && (
+        <View style={styles.debugSection}>
+          <Text style={styles.debugText}>User ID: {userId || 'Non disponible'}</Text>
+          <Text style={styles.debugText}>Event ID: {eventId || 'Non disponible'}</Text>
+          <Text style={styles.debugText}>Reglement présent: {reglement ? 'Oui' : 'Non'}</Text>
+          <Text style={styles.debugText}>FirstName: {firstName || 'Non disponible'}</Text>
+          <Text style={styles.debugText}>Email: {email || 'Non disponible'}</Text>
+          <Text style={styles.debugText}>PhoneNumber: {phoneNumber || 'Non disponible'}</Text>
+        </View>
+      )}
 
       <View style={[styles.formContainer, isAlreadyRegistered && styles.disabledForm]}>
         <View style={styles.inputContainer}>
