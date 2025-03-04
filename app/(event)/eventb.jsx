@@ -36,7 +36,7 @@ const EventBScreen = () => {
     const fetchEventData = async () => {
       if (eventId) {
         try {
-          const response = await fetch(`http://192.168.0.6:8082/api/events/${eventId}`);
+          const response = await fetch(`http://192.168.0.7:8082/api/events/${eventId}`);
           if (response.ok) {
             const data = await response.json();
             setFullEventData(data);

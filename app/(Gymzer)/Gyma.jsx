@@ -10,210 +10,231 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  StatusBar
+  StatusBar,
+  Modal,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-const { width, height } = Dimensions.get('window');
+// Configuration de base
+const API_BASE_URL = 'http://192.168.0.7:8082/api/auth';
 
+// Service de gestion des utilisateurs
+class UserService {
+  // Formater la date au format JJ/MM/AAAA
+  static formatDateForBackend(date) {
+    if (!(date instanceof Date)) {
+      date = new Date(date);
+    }
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  // Méthode de mise à jour du profil utilisateur
+  static async updateUserProfile(userId, userData) {
+    try {
+      // Récupérer le token d'authentification
+      const token = await AsyncStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('Aucun token d\'authentification trouvé');
+      }
+
+      // Préparer les données pour l'API
+      const formattedData = {
+        ...userData,
+        birthDate: this.formatDateForBackend(userData.birthDate)
+      };
+
+      // Construire l'URL de mise à jour
+      const url = `${API_BASE_URL}/modifier-user?userId=${userId}`;
+
+      // Effectuer la requête de mise à jour
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formattedData)
+      });
+
+      // Vérifier la réponse du serveur
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erreur lors de la mise à jour du profil');
+      }
+
+      // Récupérer et retourner les données de réponse
+      const responseData = await response.json();
+
+      // Sauvegarder les informations localement
+      await AsyncStorage.setItem('userEmail', userData.email);
+      await AsyncStorage.setItem('firstName', userData.firstName);
+      await AsyncStorage.setItem('birthDate', formattedData.birthDate);
+
+      return responseData;
+
+    } catch (error) {
+      console.error('Erreur de mise à jour du profil:', error);
+      throw error;
+    }
+  }
+}
+
+// Composant de formulaire de profil
 const PersonalInfoForm = () => {
+  // États et hooks
   const router = useRouter();
-  const [screenDimensions, setScreenDimensions] = useState({ width, height });
-  
-  // Récupération des paramètres via useLocalSearchParams
+  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
   const params = useLocalSearchParams();
-  const { 
-    userId: paramUserId, 
-    firstName: paramFirstName,
-    phoneNumber: paramPhoneNumber,
-    photo: paramPhoto,
-    email: paramEmail // Ajout de la récupération de l'email depuis les paramètres
-  } = params;
-  
-  // États pour les données utilisateur
+
+  // États du formulaire
   const [userId, setUserId] = useState(null);
-  const [firstName, setFirstName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [userPhoto, setUserPhoto] = useState("");
-  const [userEmail, setUserEmail] = useState(""); // Ajout d'un état pour l'email
-  
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    birthDate: "",
-    address: ""
+    fullName: '',
+    email: '',
+    birthDate: '',
+    address: '',
+    phoneNumber: '',
+    photo: ''
   });
 
-  // Récupérer les données utilisateur et initialiser le formulaire
+  // Charger les données initiales
   useEffect(() => {
-    const getUserData = async () => {
+    const loadInitialData = async () => {
       try {
-        console.log('=== RÉCUPÉRATION DES DONNÉES DANS PERSONALINFOFORM ===');
-        
-        // Vérification des paramètres reçus
-        console.log('Paramètres reçus:', {
-          userId: paramUserId || 'non défini',
-          firstName: paramFirstName || 'non défini',
-          phoneNumber: paramPhoneNumber || 'non défini',
-          photo: paramPhoto ? 'présente' : 'non définie',
-          email: paramEmail || 'non défini' // Log de l'email reçu
-        });
-        
-        // Priorité 1: Utiliser les données des paramètres de navigation si elles existent
-        if (paramUserId) {
-          console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
-          setUserId(paramUserId);
-        }
-        
-        let userFirstName = "";
-        let userEmail = ""; // Variable pour stocker l'email récupéré
-        
-        if (paramFirstName) {
-          console.log('FirstName trouvé dans les paramètres:', paramFirstName);
-          userFirstName = paramFirstName;
-          setFirstName(paramFirstName);
-        } else {
-          // Essayer de récupérer le firstName depuis AsyncStorage
-          const storedFirstName = await AsyncStorage.getItem('firstName');
-          if (storedFirstName) {
-            console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
-            userFirstName = storedFirstName;
-            setFirstName(storedFirstName);
-          } else {
-            console.warn('Aucun firstName trouvé');
-          }
-        }
-        
-        // Récupérer l'email
-        if (paramEmail) {
-          console.log('Email trouvé dans les paramètres:', paramEmail);
-          userEmail = paramEmail;
-          setUserEmail(paramEmail);
-        } else {
-          // Essayer de récupérer l'email depuis AsyncStorage
-          const storedEmail = await AsyncStorage.getItem('userEmail');
-          if (storedEmail) {
-            console.log('Email récupéré de AsyncStorage:', storedEmail);
-            userEmail = storedEmail;
-            setUserEmail(storedEmail);
-          } else {
-            console.warn('Aucun email trouvé');
-          }
-        }
-        
-        // Mettre à jour le formulaire avec le nom et l'email récupérés
-        setFormData(prevData => ({
-          ...prevData,
-          fullName: userFirstName,
-          email: userEmail // Initialiser le champ email avec l'email récupéré
+        // Définir l'ID utilisateur
+        setUserId(params.userId);
+
+        // Initialiser les données du formulaire
+        setFormData(prev => ({
+          ...prev,
+          fullName: params.firstName || '',
+          email: params.email || '',
+          phoneNumber: params.phoneNumber || '',
+          photo: params.photo || ''
         }));
-        
-        // Récupérer le numéro de téléphone
-        if (paramPhoneNumber) {
-          console.log('PhoneNumber trouvé dans les paramètres:', paramPhoneNumber);
-          setPhoneNumber(paramPhoneNumber);
-        } else {
-          // Essayer de récupérer le phoneNumber depuis AsyncStorage
-          const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
-          if (storedPhoneNumber) {
-            console.log('PhoneNumber récupéré de AsyncStorage:', storedPhoneNumber);
-            setPhoneNumber(storedPhoneNumber);
-          } else {
-            console.warn('Aucun phoneNumber trouvé');
-          }
+
+        // Récupérer la date de naissance stockée
+        const storedBirthDate = await AsyncStorage.getItem('birthDate');
+        if (storedBirthDate) {
+          const parsedDate = parseStoredDate(storedBirthDate);
+          setSelectedDate(parsedDate);
+          setFormData(prev => ({
+            ...prev,
+            birthDate: formatDisplayDate(parsedDate)
+          }));
         }
-        
-        // Récupérer la photo
-        if (paramPhoto) {
-          console.log('Photo trouvée dans les paramètres');
-          setUserPhoto(paramPhoto);
-        } else {
-          // Essayer de récupérer la photo depuis AsyncStorage
-          const storedPhoto = await AsyncStorage.getItem('userPhoto');
-          if (storedPhoto) {
-            console.log('Photo récupérée de AsyncStorage');
-            setUserPhoto(storedPhoto);
-          } else {
-            console.warn('Aucune photo trouvée');
-          }
-        }
-        
-        // Priorité 2: Récupérer l'ID de l'AsyncStorage si non présent dans les paramètres
-        if (!paramUserId) {
-          const storedUserId = await AsyncStorage.getItem('userId');
-          if (storedUserId) {
-            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
-            setUserId(storedUserId);
-          } else {
-            console.warn('Aucun ID utilisateur trouvé');
-          }
-        }
-        
       } catch (error) {
-        console.error('Erreur lors de la récupération des données utilisateur:', error);
+        console.error('Erreur de chargement des données:', error);
+        Alert.alert('Erreur', 'Impossible de charger les données');
       }
     };
-    
-    getUserData();
-  }, [paramUserId, paramFirstName, paramPhoneNumber, paramPhoto, paramEmail]);
 
-  // Mettre à jour les dimensions lors de la rotation de l'écran
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener(
-      'change',
-      ({ window }) => {
-        setScreenDimensions({ width: window.width, height: window.height });
-      }
-    );
-    return () => subscription?.remove();
+    loadInitialData();
+
+    // Gestion des dimensions d'écran
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions(window);
+    });
+
+    return () => subscription.remove();
   }, []);
 
+  // Formater une date pour l'affichage
+  const formatDisplayDate = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Parser une date stockée
+  const parseStoredDate = (dateString) => {
+    const [day, month, year] = dateString.split('/').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Gérer les changements de formulaire
   const handleChange = (field, value) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [field]: value
-    });
+    }));
   };
 
+  // Gestion du changement de date
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || new Date();
+    setShowDatePicker(Platform.OS === 'ios');
+    setSelectedDate(currentDate);
+    setFormData(prev => ({
+      ...prev,
+      birthDate: formatDisplayDate(currentDate)
+    }));
+  };
+
+  // Soumettre le formulaire
   const handleSubmit = async () => {
-    console.log('Données enregistrées:', formData);
-    
-    // Stocker l'email mis à jour dans AsyncStorage
-    if (formData.email) {
-      try {
-        await AsyncStorage.setItem('userEmail', formData.email);
-        console.log('Email mis à jour dans AsyncStorage:', formData.email);
-        setUserEmail(formData.email);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde de l\'email:', error);
-      }
+    // Validation de base
+    if (!formData.fullName || !formData.email || !formData.birthDate) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+      return;
     }
-    
-    // Enregistrer les données et retourner à la page précédente avec les paramètres utilisateur
+
+    try {
+      // Préparer les données pour l'API
+      const updateData = {
+        firstName: formData.fullName,
+        email: formData.email,
+        birthDate: selectedDate,
+        address: formData.address,
+        phoneNumber: formData.phoneNumber,
+        photo: formData.photo
+      };
+
+      // Mettre à jour le profil
+      await UserService.updateUserProfile(userId, updateData);
+      
+      // Message de succès
+      Alert.alert('Succès', 'Profil mis à jour avec succès');
+      
+      // Naviguer vers la page Gym
+      navigateToGym();
+    } catch (error) {
+      // Gérer les erreurs
+      Alert.alert('Erreur', error.message || 'Impossible de mettre à jour le profil');
+    }
+  };
+
+  // Annuler et retourner à la page Gym
+  const handleCancel = () => {
     navigateToGym();
   };
 
-  const handleCancel = () => {
-    console.log('Formulaire annulé');
-    navigateToGym();
-  };
-  
+  // Navigation vers la page Gym
   const navigateToGym = () => {
     router.push({
       pathname: '/Gym',
       params: {
         userId: userId,
-        firstName: firstName,
-        phoneNumber: phoneNumber,
-        photo: userPhoto,
-        email: userEmail // Passer l'email en paramètre
+        firstName: formData.fullName,
+        phoneNumber: formData.phoneNumber,
+        photo: formData.photo,
+        email: formData.email
       }
     });
   };
 
-  // Déterminer si l'appareil est en mode paysage
+  // Déterminer l'orientation de l'écran
   const isLandscape = screenDimensions.width > screenDimensions.height;
 
   return (
@@ -228,6 +249,7 @@ const PersonalInfoForm = () => {
           contentContainerStyle={styles.scrollViewContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* En-tête */}
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.backButton} 
@@ -236,15 +258,16 @@ const PersonalInfoForm = () => {
             >
               <Ionicons name="chevron-back" size={24} color="#999" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Information personnelles</Text>
+            <Text style={styles.headerTitle}>Informations personnelles</Text>
             <View style={styles.headerSpacer} />
           </View>
 
+          {/* Formulaire */}
           <View style={[
             styles.formContainer,
             isLandscape && styles.formContainerLandscape
           ]}>
-            {/* Nom et prénom */}
+            {/* Champ Nom et Prénom */}
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <Ionicons name="person-outline" size={20} color="#555" />
@@ -260,7 +283,7 @@ const PersonalInfoForm = () => {
               />
             </View>
 
-            {/* E-mail */}
+            {/* Champ E-mail */}
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <Ionicons name="mail-outline" size={20} color="#555" />
@@ -284,17 +307,58 @@ const PersonalInfoForm = () => {
                 <Ionicons name="calendar-outline" size={20} color="#555" />
                 <Text style={styles.label}>Date de naissance</Text>
               </View>
-              <TextInput
-                style={styles.input}
-                value={formData.birthDate}
-                onChangeText={(text) => handleChange('birthDate', text)}
-                returnKeyType="next"
-                keyboardType={Platform.OS === 'ios' ? 'default' : 'numeric'}
-                placeholder="JJ/MM/AAAA"
-              />
+              
+              <TouchableOpacity 
+                style={styles.datePickerButton} 
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {formData.birthDate || "Sélectionner votre date de naissance"}
+                </Text>
+                <Ionicons name="calendar" size={22} color="#555" />
+              </TouchableOpacity>
+              
+              {/* Sélecteur de date */}
+              {showDatePicker && (
+                Platform.OS === 'ios' ? (
+                  <Modal
+                    transparent={true}
+                    animationType="slide"
+                    visible={showDatePicker}
+                  >
+                    <View style={styles.modalContainer}>
+                      <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                          <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                            <Text style={styles.modalCancelButton}>Annuler</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.modalTitle}>Sélectionner une date</Text>
+                          <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                            <Text style={styles.modalDoneButton}>OK</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={selectedDate}
+                          mode="date"
+                          display="spinner"
+                          onChange={onDateChange}
+                          style={styles.datePicker}
+                        />
+                      </View>
+                    </View>
+                  </Modal>
+                ) : (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display="default"
+                    onChange={onDateChange}
+                  />
+                )
+              )}
             </View>
 
-            {/* Adresse */}
+            {/* Champ Adresse */}
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <Ionicons name="location-outline" size={20} color="#555" />
@@ -336,6 +400,7 @@ const PersonalInfoForm = () => {
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -403,6 +468,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  datePickerButton: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  modalCancelButton: {
+    fontSize: 16,
+    color: '#999',
+  },
+  modalDoneButton: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  datePicker: {
+    height: 200,
+    width: '100%',
   },
   buttonContainer: {
     flexDirection: 'row',

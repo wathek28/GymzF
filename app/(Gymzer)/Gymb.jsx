@@ -8,15 +8,60 @@ import {
   SafeAreaView,
   Image,
   Platform,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Service pour l'API de changement de numéro
+class PhoneService {
+  static BASE_URL = 'http://192.168.0.7:8082/api/auth/initiate-phone-change';
+
+  // Méthode pour initier le changement de numéro
+  static async initiatePhoneChange(currentPhoneNumber, newPhoneNumber) {
+    try {
+      // Préparer les données pour l'API
+      const requestData = {
+        currentPhoneNumber: currentPhoneNumber,
+        newPhoneNumber: newPhoneNumber
+      };
+
+      console.log('Données envoyées:', requestData);
+
+      // Effectuer la requête
+      const response = await fetch(this.BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      // Vérifier la réponse du serveur
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erreur de réponse:', errorText);
+        throw new Error(errorText || 'Erreur lors de l\'initiation du changement de numéro');
+      }
+
+      // Récupérer et retourner les données de réponse
+      const responseData = await response.json();
+      console.log('Réponse reçue:', responseData);
+      return responseData;
+
+    } catch (error) {
+      console.error('Erreur d\'initiation de changement de numéro:', error);
+      throw error;
+    }
+  }
+}
+
 const PhoneVerificationScreen = () => {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Récupération des paramètres via useLocalSearchParams
   const params = useLocalSearchParams();
@@ -31,100 +76,109 @@ const PhoneVerificationScreen = () => {
   const [userId, setUserId] = useState(null);
   const [firstName, setFirstName] = useState("");
   const [userPhoto, setUserPhoto] = useState("");
+  const [currentPhoneNumber, setCurrentPhoneNumber] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
 
   // Récupérer les données utilisateur au chargement du composant
   useEffect(() => {
     const getUserData = async () => {
       try {
-        console.log('=== RÉCUPÉRATION DES DONNÉES DANS PHONEVERIFICATIONSCREEN ===');
-        
-        // Vérification des paramètres reçus
-        console.log('Paramètres reçus:', {
-          userId: paramUserId || 'non défini',
-          firstName: paramFirstName || 'non défini',
-          phoneNumber: paramPhoneNumber || 'non défini',
-          photo: paramPhoto ? 'présente' : 'non définie'
-        });
-        
         // Récupérer l'ID utilisateur
         if (paramUserId) {
-          console.log('ID utilisateur trouvé dans les paramètres:', paramUserId);
           setUserId(paramUserId);
         } else {
           const storedUserId = await AsyncStorage.getItem('userId');
           if (storedUserId) {
-            console.log('ID utilisateur récupéré de AsyncStorage:', storedUserId);
             setUserId(storedUserId);
           }
         }
         
         // Récupérer le prénom
         if (paramFirstName) {
-          console.log('FirstName trouvé dans les paramètres:', paramFirstName);
           setFirstName(paramFirstName);
         } else {
           const storedFirstName = await AsyncStorage.getItem('firstName');
           if (storedFirstName) {
-            console.log('FirstName récupéré de AsyncStorage:', storedFirstName);
             setFirstName(storedFirstName);
           }
         }
         
         // Récupérer la photo
         if (paramPhoto) {
-          console.log('Photo trouvée dans les paramètres');
           setUserPhoto(paramPhoto);
         } else {
           const storedPhoto = await AsyncStorage.getItem('userPhoto');
           if (storedPhoto) {
-            console.log('Photo récupérée de AsyncStorage');
             setUserPhoto(storedPhoto);
           }
         }
         
-        // Récupérer et définir le numéro de téléphone pour le champ de saisie
-        // Supprimer le préfixe +216 s'il est présent
+        // Récupérer et définir le numéro de téléphone actuel
         if (paramPhoneNumber) {
+          setCurrentPhoneNumber(paramPhoneNumber);
           const formattedNumber = paramPhoneNumber.replace('+216', '');
-          console.log('PhoneNumber trouvé dans les paramètres:', paramPhoneNumber);
-          console.log('PhoneNumber formatté pour l\'affichage:', formattedNumber);
           setPhoneNumber(formattedNumber);
         } else {
           const storedPhoneNumber = await AsyncStorage.getItem('phoneNumber');
           if (storedPhoneNumber) {
+            setCurrentPhoneNumber(storedPhoneNumber);
             const formattedNumber = storedPhoneNumber.replace('+216', '');
-            console.log('PhoneNumber récupéré de AsyncStorage:', storedPhoneNumber);
-            console.log('PhoneNumber formatté pour l\'affichage:', formattedNumber);
             setPhoneNumber(formattedNumber);
           }
         }
         
       } catch (error) {
         console.error('Erreur lors de la récupération des données utilisateur:', error);
+        Alert.alert('Erreur', 'Impossible de charger les données utilisateur');
       }
     };
     
     getUserData();
   }, [paramUserId, paramFirstName, paramPhoneNumber, paramPhoto]);
   
-  const handleSendSMS = () => {
-    console.log('Code de vérification envoyé au numéro:', phoneNumber);
-    
-    // Naviguer vers la page Gymc avec tous les paramètres utilisateur
-    router.push({
-      pathname: '/Gymc',
-      params: {
-        userId: userId,
-        firstName: firstName,
-        phoneNumber: `+216${phoneNumber}`, // Ajouter le préfixe +216
-        photo: userPhoto,
-        newPhoneNumber: `+216${phoneNumber}` // Ajouter aussi le nouveau numéro comme paramètre spécifique
-      }
-    });
+  const handleSendSMS = async () => {
+    // Validation du numéro de téléphone
+    if (!phoneNumber || phoneNumber.length < 8) {
+      Alert.alert('Erreur', 'Veuillez saisir un numéro de téléphone valide');
+      return;
+    }
+
+    // Construire le nouveau numéro avec le préfixe
+    const newPhoneNumber = `+216${phoneNumber}`;
+
+    try {
+      setIsLoading(true);
+      
+      // Appeler le service pour initier le changement de numéro
+      const response = await PhoneService.initiatePhoneChange(
+        currentPhoneNumber, 
+        newPhoneNumber
+      );
+
+      // Naviguer vers la page de vérification du code
+      router.push({
+        pathname: '/Gymc',
+        params: {
+          userId: userId,
+          firstName: firstName,
+          currentPhoneNumber: currentPhoneNumber,
+          newPhoneNumber: newPhoneNumber,
+          photo: userPhoto,
+          verificationCode: response.code // Ajouter le code de vérification
+        }
+      });
+    } catch (error) {
+      // Gérer les erreurs
+      Alert.alert(
+        'Erreur', 
+        error.message || 'Impossible d\'envoyer le code de vérification'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleCancel = () => {
-    console.log('Modification annulée');
     navigateBack();
   };
   
@@ -134,8 +188,10 @@ const PhoneVerificationScreen = () => {
       params: {
         userId: userId,
         firstName: firstName,
-        phoneNumber: paramPhoneNumber, // Conserver l'ancien numéro
-        photo: userPhoto
+        phoneNumber: currentPhoneNumber,
+        photo: userPhoto,
+        // Ajouter le code de vérification comme nouveau paramètre
+        verificationCode: verificationCode
       }
     });
   };
@@ -191,19 +247,22 @@ const PhoneVerificationScreen = () => {
             style={[
               styles.sendButton,
               // Désactiver le bouton si le numéro est vide ou trop court
-              (!phoneNumber || phoneNumber.length < 8) && styles.disabledButton
+              (isLoading || !phoneNumber || phoneNumber.length < 8) && styles.disabledButton
             ]} 
             onPress={handleSendSMS}
             activeOpacity={0.8}
-            disabled={!phoneNumber || phoneNumber.length < 8}
+            disabled={isLoading || !phoneNumber || phoneNumber.length < 8}
           >
-            <Text style={styles.sendButtonText}>Envoyer le code par SMS</Text>
+            <Text style={styles.sendButtonText}>
+              {isLoading ? 'Envoi en cours...' : 'Envoyer le code par SMS'}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.cancelButton} 
             onPress={handleCancel}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
             <Text style={styles.cancelButtonText}>Annuler</Text>
           </TouchableOpacity>
@@ -212,8 +271,8 @@ const PhoneVerificationScreen = () => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
+  // Les styles restent identiques à la version précédente
   container: {
     flex: 1,
     backgroundColor: '#ffffff',

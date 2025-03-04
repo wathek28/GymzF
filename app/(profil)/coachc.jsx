@@ -13,7 +13,8 @@ import {
   TextInput,
   TouchableWithoutFeedback,
   Modal, 
-  Keyboard
+  Keyboard,
+  
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -34,7 +35,7 @@ const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.0.6:8082/api';
+  const API_BASE_URL = 'http://192.168.0.7:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
@@ -188,6 +189,7 @@ const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setCommen
         style={styles.modalOverlay}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <ScrollView>
@@ -337,6 +339,8 @@ const CoachProfile1 = () => {
     prixSeance,
     santeEtBienEtre = [],
     bio,
+    typeCoaching,
+    
   } = route.params || {};
 
   const handleContactCoach = () => {
@@ -425,7 +429,7 @@ const CoachProfile1 = () => {
 
     try {
       console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-      const response = await fetch(`http://192.168.0.6:8082/api/reels/user/${coachId}`, {
+      const response = await fetch(`http://192.168.0.7:8082/api/reels/user/${coachId}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -800,7 +804,7 @@ const CoachProfile1 = () => {
               </Text>
             </View>
             <Text style={styles.competencesTitle}>Entraînement physique</Text>
-            <Text style={styles.tag}>
+            <Text style={styles.tag1}>
               {entrainementPhysique.length ? `${entrainementPhysique}` : "Coach non spécifié"}
             </Text>
             <Text style={styles.competencesTitle}>Cours spécifiques</Text>
@@ -852,10 +856,15 @@ const CoachProfile1 = () => {
           />
           <Text style={styles.name}>{firstName}</Text>
           <Text style={styles.title}>Coach sportif à {disciplines}</Text>
-          <Text style={styles.price}>Séance de {dureeSeance} min à partir de {prixSeance} DT</Text>
-          <Text style={styles.location}>
-            📍 En ligne - {email}
-          </Text>
+          <Text style={styles.price}>
+    Séance de <Text style={styles.highlight}>{dureeSeance}</Text> min à partir de 
+    <Text style={styles.highlight}> {prixSeance}</Text> DT
+</Text>
+          <Text style={styles.locationText}>
+    En ligne, à domicile aux alentours de{' '}
+    <Text style={styles.highlight}>{typeCoaching || 'N/A'}</Text>, Ou à{' '}
+    <Text style={styles.highlight}>{disciplines || 'N/A'}</Text>
+</Text>
           <TouchableOpacity style={styles.buttonYellow}>
             <Text style={styles.buttonText}>Découvrez mes cours</Text>
           </TouchableOpacity>
@@ -949,6 +958,18 @@ const CoachProfile1 = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  locationText: {
+   
+    maxWidth: 310, 
+    lineHeight: 20,
+    textAlign: 'center',
+    fontSize: 14,
+      fontWeight: 'bold',
+      color: '#000',
+  },
+  highlight: {
+    color: 'red',
+  },
   // Dans StyleSheet.create, ajoutez/modifiez ces styles :
 videoGridContainer: {
   flexDirection: 'row',
@@ -1040,7 +1061,7 @@ playIconContainer: {
     },
     title: {
       fontSize: 14,
-      color: 'gray',
+      color: 'red', 
       marginBottom: 5,
     },
     price: {
@@ -1357,7 +1378,17 @@ playIconContainer: {
       borderRadius: 20,
       fontSize: 13,
       color: '#666',
-      marginRight: 8,
+      marginRight: 10,
+      marginBottom: 8,
+    },
+    tag1: {
+      backgroundColor: '#EAEAEA',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 220,
+      fontSize: 13,
+      color: '#666',
+      marginRight: 250,
       marginBottom: 8,
     },
   
@@ -1366,7 +1397,7 @@ playIconContainer: {
     // ==============================
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'rgba(19, 19, 19, 0.5)',
       justifyContent: 'center',
       alignItems: 'center',
     },

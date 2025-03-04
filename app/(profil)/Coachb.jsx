@@ -62,7 +62,7 @@ const CoachDetailsScreen = () => {
   const fetchCoaches = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.0.6:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.0.7:8082/api/auth/coaches`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

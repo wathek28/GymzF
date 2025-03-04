@@ -64,7 +64,7 @@ const RegistrationForm = () => {
       }
       
       try {
-        const response = await fetch(`http://192.168.0.6:8082/api/events/${eventId}/participation/${userId}`);
+        const response = await fetch(`http://192.168.0.7:8082/api/events/${eventId}/participation/${userId}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -244,7 +244,7 @@ const RegistrationForm = () => {
     
     try {
       // Appel à l'API
-      const response = await fetch(`http://192.168.0.6:8082/api/events/${formData.eventId}/participate/${formData.userId}/form`, {
+      const response = await fetch(`http://192.168.0.7:8082/api/events/${formData.eventId}/participate/${formData.userId}/form`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

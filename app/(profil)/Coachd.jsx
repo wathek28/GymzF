@@ -17,7 +17,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuration de l'API
-const API_BASE_URL = 'http://192.168.0.6:8082';
+const API_BASE_URL = 'http://192.168.0.7:8082';
 
 const ContactForm = () => {
   const navigation = useNavigation();

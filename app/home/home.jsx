@@ -94,7 +94,7 @@ const FitnessApp = () => {
       setEventsLoading(true);
       setEventsError(null);
       
-      const eventsRes = await fetch("http://192.168.0.6:8082/api/events", {
+      const eventsRes = await fetch("http://192.168.0.7:8082/api/events", {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -239,7 +239,7 @@ const FitnessApp = () => {
       
       // Effectuer les requêtes séparément pour mieux gérer les erreurs
       try {
-        const offersRes = await fetch("http://192.168.0.6:8082/api/offres");
+        const offersRes = await fetch("http://192.168.0.7:8082/api/offres");
         if (offersRes.ok) {
           const offersData = await offersRes.json();
           setOffers(offersData);
@@ -251,7 +251,7 @@ const FitnessApp = () => {
       }
       
       try {
-        const coachesRes = await fetch("http://192.168.0.6:8082/api/auth/coaches");
+        const coachesRes = await fetch("http://192.168.0.7:8082/api/auth/coaches");
         if (coachesRes.ok) {
           const coachesData = await coachesRes.json();
           setCoaches(coachesData);
@@ -263,7 +263,7 @@ const FitnessApp = () => {
       }
       
       try {
-        const gymsRes = await fetch("http://192.168.0.6:8082/api/auth/gyms");
+        const gymsRes = await fetch("http://192.168.0.7:8082/api/auth/gyms");
         if (gymsRes.ok) {
           const gymsData = await gymsRes.json();
           const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
