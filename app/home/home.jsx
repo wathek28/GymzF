@@ -642,7 +642,7 @@ const FitnessApp = () => {
             style={styles.coachDButton}
             onPress={navigateToCoachd}
           >
-            <Text style={styles.coachDButtonText}>Voir tous les coachs</Text>
+            
           </TouchableOpacity>
         </View>
 
@@ -1182,7 +1182,7 @@ const styles = StyleSheet.create({
   /////////// event //////
 
   container1: {
-    height: 250,
+    height: 200,
     width:340,
     borderRadius: 15,
     overflow: 'hidden',
@@ -1267,6 +1267,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+  
+    borderRadius: 25,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+  }
+
+
 });
 
 export default FitnessApp;
