@@ -528,101 +528,260 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
   };
 
   // Composant VideoModal mis à jour pour utiliser expo-av Video
-  const VideoModal = ({ visible, onClose, videoUri }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [localVideoUri, setLocalVideoUri] = useState(null);
-    const videoRef = useRef(null);
+ // Composant VideoModal mis à jour pour être scrollable
+const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [localVideoUris, setLocalVideoUris] = useState({});
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const scrollViewRef = useRef(null);
+  const videoRefs = useRef({});
 
-    // Définition de prepareVideo accessible depuis le retry
-    const prepareVideo = useCallback(async () => {
-      if (!videoUri) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const processedUri = await processVideoData(videoUri);
-        if (processedUri) {
-          setLocalVideoUri(processedUri);
-        } else {
-          setError('Format vidéo non supporté');
+  // Détermine les vidéos à afficher
+  const videosToShow = allVideos.length > 0 && videoUri 
+    ? allVideos 
+    : videoUri ? [{ id: 'single', videoUri }] : [];
+
+  // Trouve l'index de la vidéo sélectionnée
+  const initialIndex = videoUri 
+    ? allVideos.findIndex(video => video.videoUri === videoUri) 
+    : 0;
+
+  // Prépare toutes les vidéos
+  const prepareVideos = useCallback(async () => {
+    if (videosToShow.length === 0) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Prépare seulement la vidéo actuelle et les adjacentes pour optimiser les performances
+      const videosToProcess = videosToShow.filter((_, index) => {
+        return Math.abs(index - initialIndex) <= 1;
+      });
+
+      const processedUris = {};
+      
+      for (const video of videosToProcess) {
+        const videoData = video.videoUri;
+        if (videoData) {
+          try {
+            const processedUri = await processVideoData(videoData);
+            if (processedUri) {
+              processedUris[video.id] = processedUri;
+            }
+          } catch (err) {
+            console.error(`Error processing video ${video.id}:`, err);
+          }
         }
-      } catch (err) {
-        console.error('Error preparing video:', err);
-        setError('Erreur lors de la préparation de la vidéo');
-      } finally {
-        setIsLoading(false);
       }
-    }, [videoUri]);
+      
+      setLocalVideoUris(processedUris);
+      
+    } catch (err) {
+      console.error('Error preparing videos:', err);
+      setError('Erreur lors de la préparation des vidéos');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [videosToShow, initialIndex]);
 
-    useEffect(() => {
-      prepareVideo();
-      return () => {
-        // Cleanup des fichiers temporaires
-        if (localVideoUri?.startsWith(FileSystem.cacheDirectory)) {
-          FileSystem.deleteAsync(localVideoUri, { idempotent: true })
+  // Charge la vidéo à l'index spécifié lorsqu'elle devient visible
+  const loadVideoAtIndex = useCallback(async (index) => {
+    if (index < 0 || index >= videosToShow.length) return;
+    
+    const video = videosToShow[index];
+    
+    // Si la vidéo est déjà chargée, ne rien faire
+    if (localVideoUris[video.id]) return;
+    
+    try {
+      const processedUri = await processVideoData(video.videoUri);
+      if (processedUri) {
+        setLocalVideoUris(prev => ({
+          ...prev,
+          [video.id]: processedUri
+        }));
+      }
+    } catch (err) {
+      console.error(`Error loading video at index ${index}:`, err);
+    }
+  }, [videosToShow, localVideoUris]);
+
+  // Gère le changement de vidéo lors du défilement
+  const handleScroll = useCallback((event) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const width = Dimensions.get('window').width;
+    const newIndex = Math.round(offsetX / width);
+    
+    if (newIndex !== currentVideoIndex) {
+      // Pause toutes les vidéos
+      Object.keys(videoRefs.current).forEach(id => {
+        if (videoRefs.current[id]) {
+          videoRefs.current[id].pauseAsync().catch(console.error);
+        }
+      });
+      
+      setCurrentVideoIndex(newIndex);
+      
+      // Précharge les vidéos adjacentes
+      loadVideoAtIndex(newIndex - 1);
+      loadVideoAtIndex(newIndex + 1);
+      
+      // Lecture de la vidéo courante
+      const currentVideo = videosToShow[newIndex];
+      if (currentVideo && videoRefs.current[currentVideo.id]) {
+        videoRefs.current[currentVideo.id].playAsync().catch(console.error);
+      }
+    }
+  }, [currentVideoIndex, videosToShow, loadVideoAtIndex]);
+
+  // Initialisation au montage du composant
+  useEffect(() => {
+    if (visible) {
+      prepareVideos();
+      
+      // Définir l'index initial
+      if (initialIndex >= 0) {
+        setCurrentVideoIndex(initialIndex);
+      }
+    }
+    
+    return () => {
+      // Nettoyage des fichiers temporaires
+      Object.values(localVideoUris).forEach(uri => {
+        if (uri && uri.startsWith(FileSystem.cacheDirectory)) {
+          FileSystem.deleteAsync(uri, { idempotent: true })
             .catch(console.error);
         }
-      };
-    }, [videoUri, prepareVideo]);
+      });
+    };
+  }, [visible, prepareVideos, initialIndex]);
 
-    if (!visible) return null;
+  // Effet pour lecture automatique de la vidéo courante
+  useEffect(() => {
+    if (visible && videosToShow.length > 0) {
+      const currentVideo = videosToShow[currentVideoIndex];
+      if (currentVideo && videoRefs.current[currentVideo.id]) {
+        // Pause toutes les autres vidéos d'abord
+        Object.keys(videoRefs.current).forEach(id => {
+          if (id !== currentVideo.id && videoRefs.current[id]) {
+            videoRefs.current[id].pauseAsync().catch(console.error);
+          }
+        });
+        
+        // Lecture de la vidéo courante
+        videoRefs.current[currentVideo.id].playAsync().catch(console.error);
+      }
+    }
+  }, [visible, currentVideoIndex, videosToShow, localVideoUris]);
 
-    return (
-      <Modal
-        visible={visible}
-        animationType="slide"
-        onRequestClose={onClose}
-        transparent={false}
-      >
-        <View style={styles.videoModalContainer}>
-          <TouchableOpacity 
-            style={styles.videoModalCloseButton}
-            onPress={onClose}
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      transparent={false}
+    >
+      <View style={styles.videoModalContainer}>
+        <TouchableOpacity 
+          style={styles.videoModalCloseButton}
+          onPress={onClose}
+        >
+          <Text style={styles.videoModalCloseText}>Fermer</Text>
+        </TouchableOpacity>
+
+        {videosToShow.length > 0 ? (
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScroll}
+            contentContainerStyle={styles.videoScrollViewContent}
+            scrollEventThrottle={16}
           >
-            <Text style={styles.videoModalCloseText}>Fermer</Text>
-          </TouchableOpacity>
+            {videosToShow.map((video, index) => (
+              <View key={video.id} style={styles.videoScrollItem}>
+                {localVideoUris[video.id] ? (
+                  <Video
+                    ref={ref => { videoRefs.current[video.id] = ref; }}
+                    style={styles.videoPlayer}
+                    source={{ uri: localVideoUris[video.id] }}
+                    resizeMode="contain"
+                    useNativeControls
+                    shouldPlay={index === currentVideoIndex}
+                    isLooping
+                    onLoadStart={() => {
+                      if (index === currentVideoIndex) setIsLoading(true);
+                    }}
+                    onLoad={() => {
+                      if (index === currentVideoIndex) setIsLoading(false);
+                    }}
+                    onError={(error) => {
+                      console.error(`Video playback error for ${video.id}:`, error);
+                      if (index === currentVideoIndex) {
+                        setError('Erreur de lecture de la vidéo');
+                        setIsLoading(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <View style={styles.videoLoadingContainer}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                    <Text style={styles.videoLoadingText}>
+                      Chargement de la vidéo...
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.videoErrorContainer}>
+            <Text style={styles.videoErrorText}>Aucune vidéo disponible</Text>
+          </View>
+        )}
 
-          {localVideoUri && !error && (
-            <Video
-              ref={videoRef}
-              style={styles.videoPlayer}
-              source={{ uri: localVideoUri }}
-              resizeMode="contain"
-              useNativeControls
-              shouldPlay
-              isLooping
-              onLoadStart={() => setIsLoading(true)}
-              onLoad={() => setIsLoading(false)}
-              onError={(error) => {
-                console.error('Video playback error:', error);
-                setError('Erreur de lecture de la vidéo');
-                setIsLoading(false);
-              }}
-            />
-          )}
+        {isLoading && currentVideoIndex >= 0 && (
+          <View style={styles.videoLoadingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.videoLoadingText}>Chargement de la vidéo...</Text>
+          </View>
+        )}
 
-          {isLoading && (
-            <View style={styles.videoLoadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.videoLoadingText}>Chargement de la vidéo...</Text>
-            </View>
-          )}
-
-          {error && (
-            <View style={styles.videoErrorContainer}>
-              <Text style={styles.videoErrorText}>{error}</Text>
-              <TouchableOpacity
-                style={styles.retryButton}
-                onPress={prepareVideo}
-              >
-                <Text style={styles.retryButtonText}>Réessayer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </Modal>
-    );
-  };
+        {error && (
+          <View style={styles.videoErrorContainer}>
+            <Text style={styles.videoErrorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={prepareVideos}
+            >
+              <Text style={styles.retryButtonText}>Réessayer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {/* Indicateur de position */}
+        {videosToShow.length > 1 && (
+          <View style={styles.videoPageIndicator}>
+            {videosToShow.map((_, index) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.indicatorDot,
+                  index === currentVideoIndex && styles.indicatorDotActive
+                ]} 
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+};
 
   // useEffect pour charger les reels
   useEffect(() => {
@@ -1003,13 +1162,14 @@ const renderGalleryContent = () => {
         firstName={firstName}
       />
       <VideoModal 
-        visible={videoModalVisible}
-        onClose={() => {
-          setVideoModalVisible(false);
-          setSelectedVideoUri(null);
-        }}
-        videoUri={selectedVideoUri}
-      />
+  visible={videoModalVisible}
+  onClose={() => {
+    setVideoModalVisible(false);
+    setSelectedVideoUri(null);
+  }}
+  videoUri={selectedVideoUri}
+  allVideos={reels}
+/>
       <PhotoViewerModal
   visible={photoModalVisible}
   onClose={() => {
@@ -1031,6 +1191,105 @@ const renderGalleryContent = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  /////////vedio 
+  videoScrollItem: {
+    width: Dimensions.get('window').width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoScrollViewContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoModalContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlayer: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
+  },
+  videoModalCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 25,
+    padding: 10,
+  },
+  videoModalCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  videoLoadingContainer: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 5,
+  },
+  videoLoadingText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 10,
+  },
+  videoErrorContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 10,
+  },
+  videoErrorText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#D4FF00',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: '#000',
+    fontWeight: 'bold',
+  },
+  videoPageIndicator: {
+    position: 'absolute',
+    bottom: 30,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  indicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: 4,
+  },
+  indicatorDotActive: {
+    backgroundColor: '#fff',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  /////////
   //////////////photo 
   galleryContainer1: {
     flexDirection: 'row',
