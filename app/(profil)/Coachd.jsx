@@ -120,11 +120,13 @@ const ContactForm = () => {
     return re.test(String(email).toLowerCase());
   };
 
+  // MODIFIÉ: Ne ferme plus automatiquement le picker après sélection
   const handleReasonChange = (value) => {
     if (value !== '') {
       setFormData({ ...formData, reason: value });
     }
-    setShowPicker(false);
+    // Ne plus fermer automatiquement
+    // setShowPicker(false); <- Cette ligne a été retirée
   };
 
   const handleSubmit = async () => {
@@ -311,6 +313,7 @@ const ContactForm = () => {
                     <Picker
                       selectedValue={formData.reason}
                       onValueChange={handleReasonChange}
+                      itemStyle={{ fontSize: 14 }}
                     >
                       <Picker.Item label="Sélectionner une raison" value="" color="#999" />
                       {reasons.map((reason, index) => (
@@ -330,6 +333,7 @@ const ContactForm = () => {
                 selectedValue={formData.reason}
                 onValueChange={handleReasonChange}
                 style={styles.picker}
+                itemStyle={{ fontSize: 14 }}
               >
                 <Picker.Item label="Sélectionner une raison" value="" color="#999" />
                 {reasons.map((reason, index) => (
@@ -459,7 +463,8 @@ const styles = StyleSheet.create({
   },
   picker: { 
     height: 50, 
-    width: '100%' 
+    width: '100%',
+    fontSize: 14 
   },
   pickerButton: { 
     borderWidth: 1, 
