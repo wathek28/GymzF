@@ -23,6 +23,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Dimensions } from 'react-native';
 
 // Pour l'instant, nous utilisons expo-av pour le composant Video
 import { Video } from 'expo-av';
@@ -747,7 +748,12 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
   );
 //////
 // Composant pour afficher une photo en plein écran
-const PhotoViewerModal = ({ visible, onClose, imageUri }) => {
+// Enhanced PhotoViewerModal with horizontal scrolling
+const PhotoViewerModal = ({ visible, onClose, imageUri, allImages = [] }) => {
+  // If there's only the selected image, use it as the only item in the scrollable view
+  const imagesToShow = allImages.length > 0 ? allImages : [{ id: 'single', uri: imageUri }];
+  const initialScrollIndex = allImages.findIndex(img => img.uri === imageUri);
+  
   if (!visible || !imageUri) return null;
   
   return (
@@ -759,12 +765,24 @@ const PhotoViewerModal = ({ visible, onClose, imageUri }) => {
     >
       <View style={styles.photoModalContainer}>
         <View style={styles.photoModalContent}>
-          <Image 
-            source={{ uri: imageUri }} 
-            style={styles.photoModalImage1}
-            resizeMode="contain"
-          />
-
+          <ScrollView 
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={initialScrollIndex > -1 ? initialScrollIndex : 0}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            {imagesToShow.map(image => (
+              <View key={image.id} style={styles.photoScrollItem}>
+                <Image 
+                  source={{ uri: image.uri }} 
+                  style={styles.photoModalImage}
+                  resizeMode="contain"
+                />
+              </View>
+            ))}
+          </ScrollView>
           
           <TouchableOpacity 
             style={styles.photoModalCloseButtonBottom}
@@ -776,7 +794,7 @@ const PhotoViewerModal = ({ visible, onClose, imageUri }) => {
       </View>
     </Modal>
   );
-}
+};
 const renderGalleryContent = () => {
   if (isLoading) return <ActivityIndicator size="large" color="#000" />;
   if (error) return <Text style={styles.errorText}>{error}</Text>;
@@ -992,13 +1010,14 @@ const renderGalleryContent = () => {
         }}
         videoUri={selectedVideoUri}
       />
-    <PhotoViewerModal
+      <PhotoViewerModal
   visible={photoModalVisible}
   onClose={() => {
     setPhotoModalVisible(false);
     setSelectedImage(null);
   }}
   imageUri={selectedImage}
+  allImages={galleryImages}
 />
     </View>
   );
@@ -1065,7 +1084,49 @@ const styles = StyleSheet.create({
     height: '70%',
     borderRadius: 10,
   },
-
+//////
+photoScrollItem: {
+  width: Dimensions.get('window').width,
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+scrollViewContent: {
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+photoModalImage: {
+  width: Dimensions.get('window').width * 0.9,
+  height: '70%',
+  borderRadius: 10,
+},
+photoModalContainer: {
+  flex: 1,
+  backgroundColor: 'rgba(56, 51, 51, 0.9)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+photoModalContent: {
+  width: '100%',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+photoModalCloseButtonBottom: {
+  position: 'absolute',
+  bottom: 40,
+  paddingVertical: 10,
+  paddingHorizontal: 20,
+  backgroundColor: '#000',
+  borderRadius: 25,
+  borderWidth: 1,
+  borderColor: '#FFF',
+},
+photoModalCloseText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 'bold',
+},
 
 
 

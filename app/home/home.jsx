@@ -702,90 +702,101 @@ const FitnessApp = () => {
         {/* Événements - Section corrigée */}
 {/* Événements */}
 <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Événements</Text>
-            <TouchableOpacity
-              style={styles.seeMoreButton}
-              onPress={() => navigateWithUserData('(event)')}
-            >
-              <Feather name="chevron-right" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionTitle}>Événements</Text>
+    <TouchableOpacity
+      style={styles.seeMoreButton}
+      onPress={() => navigateWithUserData('(event)')}
+    >
+      <Feather name="chevron-right" size={24} color="#666" />
+    </TouchableOpacity>
+  </View>
+  
+  <ScrollView 
+    horizontal 
+    showsHorizontalScrollIndicator={false}
+  >
+    {isLoading ? (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color="#4CAF50" />
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    ) : error ? (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Erreur: {error}</Text>
+      </View>
+    ) : events.length > 0 ? (
+      events.map((event) => (
+        <TouchableOpacity 
+          key={event.id || `event-${Math.random()}`} 
+          style={styles.container1}
+          onPress={() => navigateWithUserData('(event)/eventb', { event })}
+        >
+          <ImageBackground
+            source={
+              event.photo
+                ? { uri: `data:image/jpeg;base64,${event.photo}` }
+                : require("../../assets/images/F.png")
+            }
+            style={styles.backgroundImage1}
+            imageStyle={styles.backgroundImageStyle1}
           >
-            {isLoading ? (
-              <Text>Chargement...</Text>
-            ) : error ? (
-              <Text>Erreur: {error}</Text>
-            ) : events.length > 0 ? (
-              events.map((event) => (
+            <View style={styles.overlay1}>
+              <View style={styles.header1}>
+                <View style={styles.dateContainer1}>
+                  <Text style={styles.dateNumber1}>
+                    {event.date ? new Date(event.date).getDate() : '--'}
+                  </Text>
+                  <Text style={styles.dateMonth1}>
+                    {event.date 
+                      ? new Date(event.date).toLocaleString("default", { month: "short" }).toUpperCase()
+                      : '---'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.content1}>
+                <Text style={styles.title1}>{event.titre || 'Sans titre'}</Text>
+                <Text style={styles.location1}>{event.adresse || 'Adresse non disponible'}</Text>
+                <Text style={styles.time1}>
+                  {event.heureDebut ? event.heureDebut.slice(0, 5) : '--'} - {event.heureFin ? event.heureFin.slice(0, 5) : '--'}
+                </Text>
+                <Text style={styles.price1}>
+                  {event.prix ? event.prix.toFixed(2) : '--'} DT / Pers
+                </Text>
                 <TouchableOpacity 
-                  key={event.id} 
-                  style={styles.container1}
-                  onPress={() => navigateWithUserData('(event)/eventb', { event })}
+                  style={styles.participateButton1}
+                  onPress={() => {
+                    console.log(`Navigation vers eventb avec userId: ${userId}, eventId: ${event.id}`);
+                    
+                    // Use router.push from expo-router
+                    router.push({
+                      pathname: "/(event)/eventb",
+                      params: { 
+                        userId: userId,
+                        eventId: event.id,
+                        // Ne pas utiliser JSON.stringify sur l'objet entier, envoyer uniquement les données nécessaires
+                        eventTitle: event.titre,
+                        eventDate: event.date,
+                        eventAddress: event.adresse,
+                        eventPrice: event.prix?.toString()
+                      }
+                    });
+                  }}
                 >
-                  <ImageBackground
-                    source={
-                      event.photo
-                        ? { uri: `data:image/jpeg;base64,${event.photo}` }
-                        : require("../../assets/images/F.png")
-                    }
-                    style={styles.backgroundImage1}
-                    imageStyle={styles.backgroundImageStyle1}
-                  >
-                    <View style={styles.overlay1}>
-                      <View style={styles.header1}>
-                        <View style={styles.dateContainer1}>
-                          <Text style={styles.dateNumber1}>
-                            {new Date(event.date).getDate()}
-                          </Text>
-                          <Text style={styles.dateMonth1}>
-                            {new Date(event.date)
-                              .toLocaleString("default", { month: "short" })
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.content1}>
-                        <Text style={styles.title1}>{event.titre}</Text>
-                        <Text style={styles.location1}>{event.adresse}</Text>
-                        <Text style={styles.time1}>
-                          {event.heureDebut.slice(0, 5)} - {event.heureFin.slice(0, 5)}
-                        </Text>
-                        <Text style={styles.price1}>
-                          {event.prix.toFixed(2)} DT / Pers
-                        </Text>
-                        <TouchableOpacity 
-  style={styles.participateButton1}
-  onPress={() => {
-    console.log(`Navigation vers eventb avec userId: ${userId}, eventId: ${event.id}`);
-    
-    // Use router.push from expo-router
-    router.push({
-      pathname: "/(event)/eventb",
-      params: { 
-        userId: userId,
-        eventId: event.id,
-        eventData: JSON.stringify(event)
-      }
-    });
-  }}
->
-  <Text style={styles.participateButtonText1}>Participer</Text>
-</TouchableOpacity>
-                      </View>
-                    </View>
-                  </ImageBackground>
+                  <Text style={styles.participateButtonText1}>Participer</Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <Text>Aucun événement disponible</Text>
-            )}
-          </ScrollView>
-        </View>
+              </View>
+            </View>
+          </ImageBackground>
+        </TouchableOpacity>
+      ))
+    ) : (
+      <View style={styles.noDataContainer}>
+        <Text style={styles.noDataText}>Aucun événement disponible</Text>
+      </View>
+    )}
+  </ScrollView>
+</View>
 
       </ScrollView>
 
