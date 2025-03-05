@@ -317,6 +317,10 @@ const CoachProfile1 = () => {
   const [reelsLoading, setReelsLoading] = useState(true);
   const [reelsError, setReelsError] = useState(null);
 
+  // États pour la lecture image 
+  const [selectedImage, setSelectedImage] = useState(null);
+const [photoModalVisible, setPhotoModalVisible] = useState(false);
+
   const idCoach = route.params?.idCoach || route.params?.id;
   const userId = route.params?.userId;
   useEffect(() => {
@@ -741,24 +745,66 @@ const CoachProfile1 = () => {
       ))}
     </View>
   );
-
-  const renderGalleryContent = () => {
-    if (isLoading) return <ActivityIndicator size="large" color="#000" />;
-    if (error) return <Text style={styles.errorText}>{error}</Text>;
-    if (!galleryImages || galleryImages.length === 0) return <Text style={styles.noImagesText}>Aucune image disponible</Text>;
-    return (
-      <View style={styles.galleryContainer}>
-        {galleryImages.map((image) => (
+//////
+// Composant pour afficher une photo en plein écran
+const PhotoViewerModal = ({ visible, onClose, imageUri }) => {
+  if (!visible || !imageUri) return null;
+  
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.photoModalContainer}>
+        <View style={styles.photoModalContent}>
           <Image 
-            key={image.id} 
+            source={{ uri: imageUri }} 
+            style={styles.photoModalImage1}
+            resizeMode="contain"
+          />
+
+          
+          <TouchableOpacity 
+            style={styles.photoModalCloseButtonBottom}
+            onPress={onClose}
+          >
+            <Text style={styles.photoModalCloseText}>Fermer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+const renderGalleryContent = () => {
+  if (isLoading) return <ActivityIndicator size="large" color="#000" />;
+  if (error) return <Text style={styles.errorText}>{error}</Text>;
+  if (!galleryImages || galleryImages.length === 0) return <Text style={styles.noImagesText}>Aucune image disponible</Text>;
+  
+  return (
+    <View style={styles.galleryContainer1}>
+      {galleryImages.map((image) => (
+        <TouchableOpacity 
+          key={image.id} 
+          onPress={() => {
+            console.log("Image cliquée:", image.uri);
+            setSelectedImage(image.uri);
+            setPhotoModalVisible(true);
+          }}
+          activeOpacity={0.7}
+          style={styles.galleryImageWrapper1}
+        >
+          <Image 
             source={{ uri: image.uri }} 
-            style={styles.galleryImage}
+            style={styles.galleryImage1}
             resizeMode="cover"
           />
-        ))}
-      </View>
-    );
-  };
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
   const renderEmojiContent = () => (
     <ScrollView style={styles.emojiScrollView}>
@@ -946,6 +992,14 @@ const CoachProfile1 = () => {
         }}
         videoUri={selectedVideoUri}
       />
+    <PhotoViewerModal
+  visible={photoModalVisible}
+  onClose={() => {
+    setPhotoModalVisible(false);
+    setSelectedImage(null);
+  }}
+  imageUri={selectedImage}
+/>
     </View>
   );
 };
@@ -958,6 +1012,71 @@ const CoachProfile1 = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  //////////////photo 
+  galleryContainer1: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  galleryImageWrapper1: {
+    width: '32.5%',
+    height: 110,
+    marginBottom: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  galleryImage1: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  // Pour améliorer le modal d'affichage d'image
+  photoModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(56, 51, 51, 0.9)',
+    
+    
+  },
+  photoModalContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+ 
+  photoModalCloseButtonBottom: {
+    position: 'absolute',
+    bottom: 40,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#000',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#FFF',
+  },
+  photoModalCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  photoModalImage1: {
+    width: '90%',
+    height: '70%',
+    borderRadius: 10,
+  },
+
+
+
+
+
+
+
+
+
+
+
+  ///////
   locationText: {
    
     maxWidth: 310, 
