@@ -271,7 +271,7 @@ const ProfileScreen = () => {
       }
       
       console.log('Envoi de la requête à l\'API...');
-      const apiUrl = 'http://192.168.0.7:8082/api/auth/update-photo';
+      const apiUrl = 'http://192.168.0.3:8082/api/auth/update-photo';
       console.log('URL de l\'API:', apiUrl);
       
       console.log('Début de la requête fetch');
@@ -599,35 +599,7 @@ const ProfileScreen = () => {
       </View>
 
       {/* Navigation Bar - Positionnée plus haut */}
-      <View style={styles.bottomNav}>
-        {navItems.map((item, index) => (
-          <TouchableOpacity
-            key={`nav-${item.id}-${index}`}
-            style={styles.navItem}
-            onPress={() => {
-              if (item.id === 'home') {
-                navigateWithUserData('/home');
-              } else if (item.id === 'user') {
-                // Déjà sur la page profil, ne rien faire
-              } else if (item.id === 'calendar') {
-                navigateWithUserData('/(event)');
-              } else if (item.id === 'heart') {
-                navigateWithUserData('/favorites');
-              }
-            }}
-          >
-            <item.Component name={item.icon} size={24} color={item.color} />
-            <Text
-              style={[
-                styles.navText,
-                item.color === "#4CAF50" && styles.activeNavText,
-              ]}
-            >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      
     </SafeAreaView>
   );
 };
@@ -635,7 +607,7 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    
   },
   contentContainer: {
     flex: 1,

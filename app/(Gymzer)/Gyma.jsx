@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Configuration de base
-const API_BASE_URL = 'http://192.168.0.7:8082/api/auth';
+const API_BASE_URL = 'http://192.168.0.3:8082/api/auth';
 
 // Service de gestion des utilisateurs
 class UserService {

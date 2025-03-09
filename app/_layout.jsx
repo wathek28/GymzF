@@ -1,7 +1,11 @@
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
+
   return (
+<>
+
+
     <Stack>
       {/* Désactivation de l'en-tête pour l'écran login */}
       <Stack.Screen name="(login)" options={{ headerShown: false }} />
@@ -15,11 +19,15 @@ export default function RootLayout() {
       <Stack.Screen name="(event)" options={{ headerShown: false  }} />
 
       <Stack.Screen name="(Gymzer)" options={{ headerShown: false }} />
+
       {/* Désactivation de l'en-tête pour l'écran coach */}
      
-      
-
+      <Stack.Screen name="(Salle)" options={{ headerShown: false }} />
+      {/* Désactivation de l'en-tête pour l'écran coach */}
+     
+    
       
     </Stack>
+    </>
   );
 }

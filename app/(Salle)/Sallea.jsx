@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
 
-const CoachSearchScreen = () => {
+const CoachSearchScreen1 = () => {
   const router = useRouter();
   
   // Récupération correcte de l'ID utilisateur
@@ -29,7 +29,7 @@ const CoachSearchScreen = () => {
   const [location, setLocation] = useState('');
   const [level, setLevel] = useState('');
   const [selectedCompetences, setSelectedCompetences] = useState([]);
-  const [coaches, setCoaches] = useState([]);
+  const [gyms, setGyms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -53,20 +53,20 @@ const CoachSearchScreen = () => {
   ];
 
   useEffect(() => {
-    fetchCoaches();
+    fetchGyms();
   }, []);
   
-  const fetchCoaches = useCallback(async () => {
+  const fetchGyms = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://192.168.0.3:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
       
       if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des coachs');
+        throw new Error('Erreur lors de la récupération des gyms');
       }
       
       const data = await response.json();
-      setCoaches(data);
+      setGyms(data);
       setError(null);
     } catch (err) {
       console.error('Fetch error:', err);
@@ -84,29 +84,29 @@ const CoachSearchScreen = () => {
     );
   }, []);
 
-  // Filtrage et recherche des coachs
-  const filteredCoaches = useMemo(() => {
-    return coaches.filter(coach => {
+  // Filtrage et recherche des gyms
+  const filteredGyms = useMemo(() => {
+    return gyms.filter(gym => {
       // Filtre par recherche (nom ou spécialité)
       const matchesSearch = !searchQuery.trim() || 
-        (coach.firstName && coach.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (coach.entrainementPhysique && coach.entrainementPhysique.toLowerCase().includes(searchQuery.toLowerCase()));
+        (gym.firstName && gym.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (gym.entrainementPhysique && gym.entrainementPhysique.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Filtre par localisation
-      const matchesLocation = !location || coach.location === location;
+      const matchesLocation = !location || gym.location === location;
 
       // Filtre par niveau
-      const matchesLevel = !level || coach.level === level;
+      const matchesLevel = !level || gym.level === level;
 
       // Filtre par compétences
       const matchesCompetences = selectedCompetences.length === 0 || 
         selectedCompetences.some(compId => 
-          coach.competences && coach.competences.includes(compId)
+          gym.competences && gym.competences.includes(compId)
         );
 
       return matchesSearch && matchesLocation && matchesLevel && matchesCompetences;
     });
-  }, [coaches, searchQuery, location, level, selectedCompetences]);
+  }, [gyms, searchQuery, location, level, selectedCompetences]);
 
   // Réinitialisation des filtres
   const resetFilters = useCallback(() => {
@@ -251,7 +251,47 @@ const CoachSearchScreen = () => {
     resetFilters
   ]);
 
-  const renderCoaches = useCallback(() => {
+  const navigateToGymDetails = useCallback((gym) => {
+    if (!userId) {
+      console.warn('ID utilisateur manquant');
+      Alert.alert('Erreur', 'Impossible de continuer sans identification');
+      return;
+    }
+    
+    // Assurez-vous que toutes les propriétés sont des chaînes
+    const gymParams = {
+      id: gym.id?.toString() || "",
+      userId: userId?.toString() || "",
+      firstName: gym.firstName || gym.first_name || "",
+      entrainementPhysique: gym.entrainementPhysique || "",
+      photo: gym.photo || "",
+      email: gym.email || "",
+      disciplines: gym.disciplines || "",
+      typeCoaching: gym.typeCoaching || "",
+      niveauCours: gym.niveauCours || "",
+      dureeExperience: gym.dureeExperience || "",
+      dureeSeance: gym.dureeSeance || "",
+      prixSeance: gym.prixSeance?.toString() || "",
+      competencesGenerales: gym.competencesGenerales || "",
+      coursSpecifiques: gym.coursSpecifiques || "",
+      santeEtBienEtre: gym.santeEtBienEtre || "",
+      poste: gym.poste || "",
+      phoneNumber: gym.phoneNumber || "",
+      fb: gym.fb || "",
+      insta: gym.insta || "",
+      tiktok: gym.tiktok || "",
+      bio: gym.bio || ""
+    };
+    
+    console.log('Navigation vers Salleb avec gym ID:', gymParams.id);
+    
+    router.push({
+      pathname: "/Salleb",
+      params: gymParams
+    });
+  }, [userId, router]);
+
+  const renderGyms = useCallback(() => {
     if (isLoading) {
       return (
         <View style={styles.messageContainer}>
@@ -264,73 +304,58 @@ const CoachSearchScreen = () => {
       return (
         <View style={styles.messageContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchCoaches}>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchGyms}>
             <Text style={styles.retryButtonText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (!filteredCoaches.length) {
+    if (!filteredGyms.length) {
       return (
         <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>Aucun coach trouvé</Text>
+          <Text style={styles.messageText}>Aucun gym trouvé</Text>
         </View>
       );
     }
 
     const pairs = [];
-    for (let i = 0; i < filteredCoaches.length; i += 2) {
-      pairs.push(filteredCoaches.slice(i, i + 2));
+    for (let i = 0; i < filteredGyms.length; i += 2) {
+      pairs.push(filteredGyms.slice(i, i + 2));
     }
 
     return (
-      <View style={styles.coachesContainer}>
+      <View style={styles.gymsContainer}>
         {pairs.map((pair, index) => (
-          <View key={index} style={styles.coachRow}>
-            {pair.map((coach) => (
+          <View key={index} style={styles.gymRow}>
+            {pair.map((gym) => (
               <TouchableOpacity
-                key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
-                style={styles.coachCard}
-                onPress={() => {
-                  if (!userId) {
-                    console.warn('ID utilisateur manquant');
-                    Alert.alert('Erreur', 'Impossible de continuer sans identification');
-                    return;
-                  }
-                
-                  console.log('Navigation vers Coachb avec userId:', userId);
-                  router.push({
-                    pathname: "/Coachb",
-                    params: { 
-                      ...coach, 
-                      userId: userId
-                    },
-                  });
-                }}
+                key={`gym-${gym.id || Math.random().toString(36).substr(2, 9)}`}
+                style={styles.gymCard}
+                onPress={() => navigateToGymDetails(gym)}
               >
                 <Image
-                  source={coach.photo 
-                    ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+                  source={gym.photo 
+                    ? { uri: `data:image/jpeg;base64,${gym.photo}` }
                     : require('../../assets/images/F.png')
                   }
-                  style={styles.coachImage}
+                  style={styles.gymImage}
                   resizeMode="cover"
                 />
-                <View style={styles.coachInfo}>
-                  <Text style={styles.coachName} numberOfLines={1}>
+                <View style={styles.gymInfo}>
+                  <Text style={styles.gymName} numberOfLines={1}>
                     {highlightText(
-                      coach.firstName || coach.first_name || "Nom non disponible", 
+                      gym.firstName || gym.first_name || "Nom non disponible", 
                       searchQuery
                     )}
                   </Text>
-                  <Text style={styles.coachSpecialty} numberOfLines={1}>
+                  <Text style={styles.gymSpecialty} numberOfLines={1}>
                     {highlightText(
-                      coach.entrainementPhysique || coach.specialty || "Spécialité non disponible", 
+                      gym.entrainementPhysique || gym.email || "Spécialité non disponible", 
                       searchQuery
                     )}
                   </Text>
-                  {coach.verified && (
+                  {gym.verified && (
                     <View style={styles.verifiedBadge}>
                       <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
                       <Text style={styles.verifiedText}>Vérifié</Text>
@@ -339,12 +364,12 @@ const CoachSearchScreen = () => {
                 </View>
               </TouchableOpacity>
             ))}
-            {pair.length === 1 && <View style={[styles.coachCard, styles.emptyCard]} />}
+            {pair.length === 1 && <View style={[styles.gymCard, styles.emptyCard]} />}
           </View>
         ))}
       </View>
     );
-  }, [filteredCoaches, userId, router, highlightText, searchQuery]);
+  }, [filteredGyms, navigateToGymDetails, highlightText, searchQuery]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -353,7 +378,7 @@ const CoachSearchScreen = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          Coachs {userId ? `(ID: ${userId})` : ''}
+          Gyms {userId ? `(ID: ${userId})` : ''}
         </Text>
       </View>
 
@@ -378,7 +403,7 @@ const CoachSearchScreen = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {renderCoaches()}
+        {renderGyms()}
       </ScrollView>
 
       {renderFilterModal()}
@@ -387,8 +412,6 @@ const CoachSearchScreen = () => {
 };
 
 const styles = StyleSheet.create({
-
-  
   highlightText: {
     backgroundColor: '#CBFF06',
     color: 'black',
@@ -562,14 +585,14 @@ const styles = StyleSheet.create({
   competenceTextSelected: {
     color: 'black',
   },
-  coachesContainer: {
+  gymsContainer: {
     gap: 16,
   },
-  coachRow: {
+  gymRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  coachCard: {
+  gymCard: {
     width: cardWidth,
     borderRadius: 12,
     backgroundColor: '#FFF',
@@ -585,20 +608,20 @@ const styles = StyleSheet.create({
     shadowColor: 'transparent',
     elevation: 0,
   },
-  coachImage: {
+  gymImage: {
     width: '100%',
     height: cardWidth,
     backgroundColor: '#F5F5F5',
   },
-  coachInfo: {
+  gymInfo: {
     padding: 12,
   },
-  coachName: {
+  gymName: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  coachSpecialty: {
+  gymSpecialty: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
@@ -641,4 +664,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CoachSearchScreen;
+export default CoachSearchScreen1;

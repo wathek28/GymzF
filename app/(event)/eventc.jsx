@@ -64,7 +64,7 @@ const RegistrationForm = () => {
       }
       
       try {
-        const response = await fetch(`http://192.168.0.7:8082/api/events/${eventId}/participation/${userId}`);
+        const response = await fetch(`http://192.168.0.3:8082/api/events/${eventId}/participation/${userId}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -244,7 +244,7 @@ const RegistrationForm = () => {
     
     try {
       // Appel à l'API
-      const response = await fetch(`http://192.168.0.7:8082/api/events/${formData.eventId}/participate/${formData.userId}/form`, {
+      const response = await fetch(`http://192.168.0.3:8082/api/events/${formData.eventId}/participate/${formData.userId}/form`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -340,16 +340,7 @@ const RegistrationForm = () => {
       {renderAlreadyRegisteredMessage()}
       
       {/* Section de débogage pour afficher les IDs et le reglement - COMMENTEZ CETTE SECTION EN PRODUCTION */}
-      {__DEV__ && (
-        <View style={styles.debugSection}>
-          <Text style={styles.debugText}>User ID: {userId || 'Non disponible'}</Text>
-          <Text style={styles.debugText}>Event ID: {eventId || 'Non disponible'}</Text>
-          <Text style={styles.debugText}>Reglement présent: {reglement ? 'Oui' : 'Non'}</Text>
-          <Text style={styles.debugText}>FirstName: {firstName || 'Non disponible'}</Text>
-          <Text style={styles.debugText}>Email: {email || 'Non disponible'}</Text>
-          <Text style={styles.debugText}>PhoneNumber: {phoneNumber || 'Non disponible'}</Text>
-        </View>
-      )}
+     
 
       <View style={[styles.formContainer, isAlreadyRegistered && styles.disabledForm]}>
         <View style={styles.inputContainer}>

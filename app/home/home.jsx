@@ -94,7 +94,7 @@ const FitnessApp = () => {
       setEventsLoading(true);
       setEventsError(null);
       
-      const eventsRes = await fetch("http://192.168.0.7:8082/api/events", {
+      const eventsRes = await fetch("http://192.168.0.3:8082/api/events", {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -239,7 +239,7 @@ const FitnessApp = () => {
       
       // Effectuer les requêtes séparément pour mieux gérer les erreurs
       try {
-        const offersRes = await fetch("http://192.168.0.7:8082/api/offres");
+        const offersRes = await fetch("http://192.168.0.3:8082/api/offres");
         if (offersRes.ok) {
           const offersData = await offersRes.json();
           setOffers(offersData);
@@ -251,7 +251,7 @@ const FitnessApp = () => {
       }
       
       try {
-        const coachesRes = await fetch("http://192.168.0.7:8082/api/auth/coaches");
+        const coachesRes = await fetch("http://192.168.0.3:8082/api/auth/coaches");
         if (coachesRes.ok) {
           const coachesData = await coachesRes.json();
           setCoaches(coachesData);
@@ -263,7 +263,7 @@ const FitnessApp = () => {
       }
       
       try {
-        const gymsRes = await fetch("http://192.168.0.7:8082/api/auth/gyms");
+        const gymsRes = await fetch("http://192.168.0.3:8082/api/auth/gyms");
         if (gymsRes.ok) {
           const gymsData = await gymsRes.json();
           const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
@@ -647,12 +647,27 @@ const FitnessApp = () => {
         </View>
 
         {/* Section Gym */}
+        {/* Section Gym */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Gym</Text>
             <TouchableOpacity 
               style={styles.seeMoreButton}
-              onPress={() => navigateWithUserData('(gym)')}
+              onPress={() => {
+                console.log('Navigation vers Sallea avec userId:', userId);
+                
+                // CORRIGÉ: Navigation vers Sallea sans référence à gym
+                router.push({
+                  pathname: "/(Salle)/Sallea",
+                  params: { 
+                    userId: userId,
+                    firstName: firstName,
+                    phoneNumber: phoneNumber,
+                    photo: userPhoto,
+                    email: userEmail
+                  }
+                });
+              }}
             >
               <Feather name="chevron-right" size={24} color="#666" />
             </TouchableOpacity>
@@ -677,8 +692,22 @@ const FitnessApp = () => {
                   key={`gym-${gym.id || index}`} 
                   style={styles.gymCard}
                   onPress={() => {
-                    // Envoyer uniquement l'ID du gym plutôt que l'objet entier
-                    navigateWithUserData('(gym)/detail', { gymId: gym.id });
+                    console.log(`Navigation vers Salleb avec userId: ${userId} et gymId: ${gym.id}`);
+                    
+                    // CORRIGÉ: Navigation directe avec router.push
+                    router.push({
+                      pathname: "/(Salle)/Salleb",
+                      params: { 
+                        userId: userId,
+                        firstName: firstName,
+                        phoneNumber: phoneNumber,
+                        photo: userPhoto,
+                        email: userEmail,
+                        gymId: gym.id,
+                        gymName: gym.firstName || "Nom non disponible",
+                        gymEmail: gym.email || "Email non disponible"
+                      }
+                    });
                   }}
                 >
                   <Image
@@ -1008,6 +1037,10 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#eee",
+    position: "absolute",
+    bottom: 2, 
+    width: "100%",
+    borderRadius: 25,
   },
   navItem: {
     alignItems: "center",

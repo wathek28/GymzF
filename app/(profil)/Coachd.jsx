@@ -17,7 +17,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuration de l'API
-const API_BASE_URL = 'http://192.168.0.7:8082';
+const API_BASE_URL = 'http://192.168.0.3:8082';
 
 const ContactForm = () => {
   const navigation = useNavigation();
@@ -248,12 +248,7 @@ const ContactForm = () => {
         </View>
 
         {/* ID information - Debug only */}
-        {__DEV__ && (
-          <View style={styles.idInfoContainer}>
-            <Text style={styles.idInfoText}>Coach ID: {formData.idCoach}</Text>
-            <Text style={styles.idInfoText}>User ID: {formData.userId}</Text>
-          </View>
-        )}
+       
 
         {/* Nom et prénom */}
         <View style={styles.inputGroup}>

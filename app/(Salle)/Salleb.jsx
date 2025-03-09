@@ -24,14 +24,13 @@ import { Ionicons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.3;
 
-const CoachDetailsScreen = () => {
+const GymDetailsScreen = () => {
   const navigation = useNavigation();
   const router = useRouter(); 
   const params = useLocalSearchParams();
-  const originalCoach = params;
   
-  // État des coachs et de l'index actuel
-  const [coaches, setCoaches] = useState([]);
+  // État des gyms et de l'index actuel
+  const [gyms, setGyms] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -43,26 +42,28 @@ const CoachDetailsScreen = () => {
   const translateX = useSharedValue(0);
   const scrollViewRef = useRef(null);
   
-  // Charger tous les coachs au chargement du composant
+  // Charger tous les gyms au chargement du composant
   useEffect(() => {
-    fetchCoaches();
+    fetchGyms();
   }, []);
   
-  // Mettre à jour l'index actuel lorsque les coachs sont chargés
+  // Mettre à jour l'index actuel lorsque les gyms sont chargés
   useEffect(() => {
-    if (coaches.length > 0 && originalCoach.id) {
-      const index = coaches.findIndex(coach => coach.id.toString() === originalCoach.id.toString());
+    if (gyms.length > 0 && params.id) {
+      const index = gyms.findIndex(gym => String(gym.id) === String(params.id));
+      console.log("Found index:", index, "for ID:", params.id);
+      
       if (index !== -1) {
         setCurrentIndex(index);
       }
     }
-  }, [coaches, originalCoach.id]);
+  }, [gyms, params.id]);
   
-  // Fonction pour récupérer tous les coachs
-  const fetchCoaches = async () => {
+  // Fonction pour récupérer tous les gyms
+  const fetchGyms = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.0.3:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -71,27 +72,29 @@ const CoachDetailsScreen = () => {
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        setCoaches(data);
+        setGyms(data);
       } else {
         console.error('La réponse n\'est pas un tableau', data);
         setError('Format de données incorrect');
       }
     } catch (err) {
-      console.error('Erreur lors du chargement des coachs:', err);
+      console.error('Erreur lors du chargement des gyms:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
   
-  // Obtenir le coach actuel
-  const coach = coaches.length > 0 ? coaches[currentIndex] : originalCoach;
+  // Obtenir le gym actuel
+  const gym = gyms.length > 0 && currentIndex >= 0 && currentIndex < gyms.length 
+    ? gyms[currentIndex] 
+    : params; // Fallback to params if gyms aren't loaded yet or index is invalid
   
-  // Fonction pour naviguer vers un autre coach
-  const navigateToCoach = (direction) => {
+  // Fonction pour naviguer vers un autre gym
+  const navigateToGym = (direction) => {
     let newIndex = currentIndex;
     
-    if (direction === 'next' && currentIndex < coaches.length - 1) {
+    if (direction === 'next' && currentIndex < gyms.length - 1) {
       newIndex = currentIndex + 1;
     } else if (direction === 'prev' && currentIndex > 0) {
       newIndex = currentIndex - 1;
@@ -121,11 +124,11 @@ const CoachDetailsScreen = () => {
     },
     onEnd: (event) => {
       if (event.velocityX > 500 || translateX.value > SWIPE_THRESHOLD) {
-        // Swipe vers la droite (coach précédent)
-        runOnJS(navigateToCoach)('prev');
+        // Swipe vers la droite (gym précédent)
+        runOnJS(navigateToGym)('prev');
       } else if (event.velocityX < -500 || translateX.value < -SWIPE_THRESHOLD) {
-        // Swipe vers la gauche (coach suivant)
-        runOnJS(navigateToCoach)('next');
+        // Swipe vers la gauche (gym suivant)
+        runOnJS(navigateToGym)('next');
       } else {
         // Retour à la position initiale
         translateX.value = withSpring(0);
@@ -153,48 +156,51 @@ const CoachDetailsScreen = () => {
     <View style={styles.locationContainer}>
       <View style={styles.locationBox}>
         <Text style={styles.locationText}>
-          Des Cours : En ligne, à domicile aux alentours de {coach.typeCoaching || 'N/A'}, ou à {coach.disciplines || 'N/A'}
+          Des Cours : En ligne, à domicile aux alentours de {gym.typeCoaching || 'N/A'}, ou à {gym.disciplines || 'N/A'}
         </Text>
       </View>
     </View>
   );
   
   const handleProfilePress = () => {
+    // Utiliser les données du gym actuel plutôt que les paramètres initiaux
+    const currentGym = gyms.length > 0 ? gyms[currentIndex] : params;
+    
     router.push({
-      pathname: '/Coachc',
+      pathname: '/',
       params: {
         userId: userId,
-        idCoach: coach.id, 
-        id: coach.id, 
-        competencesGenerales: coach.competencesGenerales,
-        coursSpecifiques: coach.coursSpecifiques,
-        disciplines: coach.disciplines,
-        dureeExperience: coach.dureeExperience,
-        dureeSeance: coach.dureeSeance,
-        email: coach.email,
-        entrainementPhysique: coach.entrainementPhysique,
-        fb: coach.fb,
-        firstName: coach.firstName,
-        insta: coach.insta,
-        niveauCours: coach.niveauCours,
-        phoneNumber: coach.phoneNumber,
-        photo: coach.photo,
-        poste: coach.poste,
-        prixSeance: coach.prixSeance,
-        santeEtBienEtre: coach.santeEtBienEtre,
-        tiktok: coach.tiktok,
-        typeCoaching: coach.typeCoaching,
-        bio: coach.bio,
+        idGym: currentGym.id, 
+        id: currentGym.id, 
+        competencesGenerales: currentGym.competencesGenerales,
+        coursSpecifiques: currentGym.coursSpecifiques,
+        disciplines: currentGym.disciplines,
+        dureeExperience: currentGym.dureeExperience,
+        dureeSeance: currentGym.dureeSeance,
+        email: currentGym.email,
+        entrainementPhysique: currentGym.entrainementPhysique,
+        fb: currentGym.fb,
+        firstName: currentGym.firstName,
+        insta: currentGym.insta,
+        niveauCours: currentGym.niveauCours,
+        phoneNumber: currentGym.phoneNumber,
+        photo: currentGym.photo,
+        poste: currentGym.poste,
+        prixSeance: currentGym.prixSeance,
+        santeEtBienEtre: currentGym.santeEtBienEtre,
+        tiktok: currentGym.tiktok,
+        typeCoaching: currentGym.typeCoaching,
+        bio: currentGym.bio,
       }
     });
   };
 
-  // Afficher un indicateur de chargement pendant le chargement des coachs
+  // Afficher un indicateur de chargement pendant le chargement des gyms
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#CCFF00" />
-        <Text style={styles.loadingText}>Chargement des coachs...</Text>
+        <Text style={styles.loadingText}>Chargement des gyms...</Text>
       </SafeAreaView>
     );
   }
@@ -204,7 +210,7 @@ const CoachDetailsScreen = () => {
     return (
       <SafeAreaView style={[styles.container, styles.errorContainer]}>
         <Text style={styles.errorText}>Erreur: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchCoaches}>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchGyms}>
           <Text style={styles.retryButtonText}>Réessayer</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -233,29 +239,27 @@ const CoachDetailsScreen = () => {
                 {/* Navigation indicators */}
                 <View style={styles.navIndicator}>
                   <Text style={styles.navText}>
-                    {currentIndex + 1} / {coaches.length}
+                    {currentIndex + 1} / {gyms.length}
                   </Text>
                 </View>
               </View>
 
-              {/* Les instructions de swipe ont été supprimées */}
-
               {/* Profile Image */}
               <Image
                 source={
-                  coach.photo 
-                    ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+                  gym.photo 
+                    ? { uri: `data:image/jpeg;base64,${gym.photo}` }
                     : require('../../assets/images/b.png')
                 }
                 style={styles.profileImage}
                 resizeMode="cover"
               />
 
-              {/* Coach Info Overlay */}
+              {/* Gym Info Overlay */}
               <View style={styles.infoOverlay}>
                 <View style={styles.nameSection}>
                   <View style={styles.nameContainer}>
-                    <Text style={styles.name}>{coach.firstName || 'Coach'}</Text>
+                    <Text style={styles.name}>{gym.firstName || 'Gym'}</Text>
                     <View style={styles.verifiedBadge}>
                       <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
                     </View>
@@ -265,13 +269,13 @@ const CoachDetailsScreen = () => {
                   </TouchableOpacity>
                 </View>
                 
-                <Text style={styles.title}>Coach sportif de {coach.entrainementPhysique || 'N/A'}</Text>
+                <Text style={styles.title}>Salle de sport de {gym.entrainementPhysique || 'N/A'}</Text>
 
                 {/* Badges Section */}
                 <View style={styles.badgesContainer}>
-                  {renderBadge("stats-chart", "Niveau", coach.niveauCours)}
+                  {renderBadge("stats-chart", "Niveau", gym.niveauCours)}
                   <View style={styles.experienceBadge}>
-                    {renderBadge("time", "Expérience", coach.dureeExperience)}
+                    {renderBadge("time", "Expérience", gym.dureeExperience)}
                   </View>
                   {renderBadge("star", "Avis", "3.5/5")}
                 </View>
@@ -279,9 +283,6 @@ const CoachDetailsScreen = () => {
                 {renderLocationInfo()}
               </View>
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            
           </Animated.View>
         </PanGestureHandler>
       </SafeAreaView>
@@ -292,7 +293,7 @@ const CoachDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    
+    backgroundColor: '#FFF',  // Ajout d'une couleur de fond explicite
   },
   scrollView: {
     flex: 1,
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#FFF',
+    color: '#333',  // Changé pour une meilleure lisibilité
   },
   errorContainer: {
     justifyContent: 'center',
@@ -350,44 +351,22 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
-  swipeInstructions: {
-    position: 'absolute',
-    top: 70,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    
-    alignSelf: 'center',
-    borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginHorizontal: 'auto',
-    width: 'auto',
-  },
-  swipeText: {
-    color: '#999',
-    marginHorizontal: 5,
-    fontSize: 12,
+  navText: {
+    color: '#FFF',  // Ajout de la couleur du texte
   },
   profileImage: {
     width: '100%',
     height: 450,
-    
-      
   },
   infoOverlay: {
     padding: 20,
-    
+    backgroundColor: '#FFF',  // Ajout d'une couleur de fond explicite
   },
   nameSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 8,
-   
   },
   nameContainer: {
     flex: 1,
@@ -431,7 +410,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
- 
+    flex: 1,
   },
   experienceBadge: {
     flex: 1,
@@ -453,11 +432,6 @@ const styles = StyleSheet.create({
   locationContainer: {
     marginBottom: 20,
   },
-  locationHeader: {
-    fontSize: 16,
-    color: '#FFF',
-    marginBottom: 12,
-  },
   locationBox: {
     backgroundColor: '#2C2C2C',
     padding: 16,
@@ -468,22 +442,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 12,
-    backgroundColor: '#000',
-    borderTopWidth: 1,
-    borderTopColor: '#2C2C2C',
-  },
-  navItem: {
-    alignItems: 'center',
-  },
-  navText: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 4,
-  }
 });
 
-export default CoachDetailsScreen;
+export default GymDetailsScreen;
