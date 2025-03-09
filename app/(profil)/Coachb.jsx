@@ -36,8 +36,15 @@ const CoachDetailsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Extract userId from params
+  // Extract userId and coachId from params
   const userId = params.userId;
+  const coachId = params.coachId;
+  
+  // Log parameters to verify they're received correctly
+  useEffect(() => {
+    console.log("Received in Session Screen - userId:", userId, "coachId:", coachId);
+    console.log("Coach details:", params.coachFirstName, params.coachEmail);
+  }, []);
   
   // Animation pour le swipe
   const translateX = useSharedValue(0);
@@ -50,13 +57,13 @@ const CoachDetailsScreen = () => {
   
   // Mettre à jour l'index actuel lorsque les coachs sont chargés
   useEffect(() => {
-    if (coaches.length > 0 && originalCoach.id) {
-      const index = coaches.findIndex(coach => coach.id.toString() === originalCoach.id.toString());
+    if (coaches.length > 0 && coachId) {
+      const index = coaches.findIndex(coach => coach.id.toString() === coachId.toString());
       if (index !== -1) {
         setCurrentIndex(index);
       }
     }
-  }, [coaches, originalCoach.id]);
+  }, [coaches, coachId]);
   
   // Fonction pour récupérer tous les coachs
   const fetchCoaches = async () => {
@@ -164,7 +171,7 @@ const CoachDetailsScreen = () => {
       pathname: '/Coachc',
       params: {
         userId: userId,
-        idCoach: coach.id, 
+        coachId: coach.id,  // Changed from idCoach to coachId for consistency
         id: coach.id, 
         competencesGenerales: coach.competencesGenerales,
         coursSpecifiques: coach.coursSpecifiques,
@@ -238,8 +245,6 @@ const CoachDetailsScreen = () => {
                 </View>
               </View>
 
-              {/* Les instructions de swipe ont été supprimées */}
-
               {/* Profile Image */}
               <Image
                 source={
@@ -279,9 +284,6 @@ const CoachDetailsScreen = () => {
                 {renderLocationInfo()}
               </View>
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            
           </Animated.View>
         </PanGestureHandler>
       </SafeAreaView>
@@ -292,7 +294,6 @@ const CoachDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    
   },
   scrollView: {
     flex: 1,
@@ -350,44 +351,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
-  swipeInstructions: {
-    position: 'absolute',
-    top: 70,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    
-    alignSelf: 'center',
-    borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginHorizontal: 'auto',
-    width: 'auto',
-  },
-  swipeText: {
-    color: '#999',
-    marginHorizontal: 5,
-    fontSize: 12,
-  },
   profileImage: {
     width: '100%',
     height: 450,
-    
-      
   },
   infoOverlay: {
     padding: 20,
-    
   },
   nameSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 8,
-   
   },
   nameContainer: {
     flex: 1,
@@ -431,7 +406,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
- 
   },
   experienceBadge: {
     flex: 1,
@@ -467,17 +441,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     lineHeight: 20,
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 12,
-    backgroundColor: '#000',
-    borderTopWidth: 1,
-    borderTopColor: '#2C2C2C',
-  },
-  navItem: {
-    alignItems: 'center',
   },
   navText: {
     color: '#666',

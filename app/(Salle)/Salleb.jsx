@@ -48,42 +48,62 @@ const GymDetailsScreen = () => {
   }, []);
   
   // Mettre à jour l'index actuel lorsque les gyms sont chargés
-  useEffect(() => {
-    if (gyms.length > 0 && params.id) {
-      const index = gyms.findIndex(gym => String(gym.id) === String(params.id));
-      console.log("Found index:", index, "for ID:", params.id);
-      
-      if (index !== -1) {
-        setCurrentIndex(index);
-      }
+  // In the GymDetailsScreen component, add these lines at the top of the component
+  const gymId = params.id || params.idGym || params.gymId; // Check all possible parameter names
+  console.log("Received gymId:", gymId, "Params:", JSON.stringify(params));  // Get gymId from either id or idGym parameter
+// For debugging
+// Then update the useEffect that finds the gym index to use this value
+useEffect(() => {
+  if (gyms.length > 0 && gymId) {
+    const index = gyms.findIndex(gym => String(gym.id) === String(gymId));
+    console.log("Found index:", index, "for Gym ID:", gymId);
+    
+    if (index !== -1) {
+      setCurrentIndex(index);
     }
-  }, [gyms, params.id]);
+  }
+}, [gyms, gymId]);
   
   // Fonction pour récupérer tous les gyms
-  const fetchGyms = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        setGyms(data);
-      } else {
-        console.error('La réponse n\'est pas un tableau', data);
-        setError('Format de données incorrect');
-      }
-    } catch (err) {
-      console.error('Erreur lors du chargement des gyms:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+ // Fonction pour récupérer les gyms
+const fetchGyms = async () => {
+  try {
+    setLoading(true);
+    
+    // If gymId is available, we could fetch just that gym
+    // But since your current logic relies on having all gyms for swipe navigation,
+    // we'll keep fetching all gyms and then find the right index
+    const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+    
+    const data = await response.json();
+    
+    if (Array.isArray(data)) {
+      setGyms(data);
+      
+      // If we have a gymId, find the correct index right away
+      if (gymId && data.length > 0) {
+        const index = data.findIndex(gym => String(gym.id) === String(gymId));
+        console.log("Found index right after fetch:", index, "for Gym ID:", gymId);
+        
+        if (index !== -1) {
+          setCurrentIndex(index);
+        }
+      }
+    } else {
+      console.error('La réponse n\'est pas un tableau', data);
+      setError('Format de données incorrect');
+    }
+  } catch (err) {
+    console.error('Erreur lors du chargement des gyms:', err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   
   // Obtenir le gym actuel
   const gym = gyms.length > 0 && currentIndex >= 0 && currentIndex < gyms.length 

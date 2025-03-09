@@ -304,7 +304,8 @@ const CoachSearchScreen = () => {
                     pathname: "/Coachb",
                     params: { 
                       ...coach, 
-                      userId: userId
+                      userId: userId,
+                      coachId: coach.id
                     },
                   });
                 }}

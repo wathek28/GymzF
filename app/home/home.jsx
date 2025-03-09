@@ -711,7 +711,7 @@ try {
                         phoneNumber: phoneNumber,
                         photo: userPhoto,
                         email: userEmail,
-                        gymId: gym.id,
+                        gymId: gym.id, 
                         gymName: gym.firstName || "Nom non disponible",
                         gymEmail: gym.email || "Email non disponible"
                       }
