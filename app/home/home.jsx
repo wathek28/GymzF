@@ -262,18 +262,26 @@ const FitnessApp = () => {
         console.error("Erreur coaches:", err.message);
       }
       
-      try {
-        const gymsRes = await fetch("http://192.168.0.3:8082/api/auth/gyms");
-        if (gymsRes.ok) {
-          const gymsData = await gymsRes.json();
-          const validGyms = gymsData.filter((gym) => gym && gym.role === "GYM");
-          setGyms(validGyms);
-        } else {
-          console.log('Erreur lors de la récupération des gyms');
-        }
-      } catch (err) {
-        console.error("Erreur gyms:", err.message);
-      }
+     // Updated gym filtering in fetchAllData function
+try {
+  const gymsRes = await fetch("http://192.168.0.3:8082/api/auth/gyms");
+  if (gymsRes.ok) {
+    const gymsData = await gymsRes.json();
+    console.log('Gyms data from API:', gymsData); // Add this for debugging
+    
+    // Check if we have a valid array and keep all gym entries
+    // You might want to filter based on another property if needed
+    const validGyms = Array.isArray(gymsData) ? 
+      gymsData.filter(gym => gym && typeof gym === 'object') : [];
+    
+    console.log('Filtered gyms count:', validGyms.length); // Debug log
+    setGyms(validGyms);
+  } else {
+    console.log('Erreur lors de la récupération des gyms:', gymsRes.status);
+  }
+} catch (err) {
+  console.error("Erreur gyms:", err.message);
+}
       
       setError(null);
       console.log('Données chargées avec succès');

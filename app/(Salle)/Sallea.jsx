@@ -29,7 +29,7 @@ const CoachSearchScreen1 = () => {
   const [location, setLocation] = useState('');
   const [level, setLevel] = useState('');
   const [selectedCompetences, setSelectedCompetences] = useState([]);
-  const [gyms, setGyms] = useState([]);
+  const [coaches, setCoaches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -53,20 +53,20 @@ const CoachSearchScreen1 = () => {
   ];
 
   useEffect(() => {
-    fetchGyms();
+    fetchCoaches();
   }, []);
   
-  const fetchGyms = useCallback(async () => {
+  const fetchCoaches = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
       
       if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des gyms');
+        throw new Error('Erreur lors de la récupération des coachs');
       }
       
       const data = await response.json();
-      setGyms(data);
+      setCoaches(data);
       setError(null);
     } catch (err) {
       console.error('Fetch error:', err);
@@ -84,29 +84,29 @@ const CoachSearchScreen1 = () => {
     );
   }, []);
 
-  // Filtrage et recherche des gyms
-  const filteredGyms = useMemo(() => {
-    return gyms.filter(gym => {
+  // Filtrage et recherche des coachs
+  const filteredCoaches = useMemo(() => {
+    return coaches.filter(coach => {
       // Filtre par recherche (nom ou spécialité)
       const matchesSearch = !searchQuery.trim() || 
-        (gym.firstName && gym.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (gym.entrainementPhysique && gym.entrainementPhysique.toLowerCase().includes(searchQuery.toLowerCase()));
+        (coach.firstName && coach.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (coach.entrainementPhysique && coach.entrainementPhysique.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Filtre par localisation
-      const matchesLocation = !location || gym.location === location;
+      const matchesLocation = !location || coach.location === location;
 
       // Filtre par niveau
-      const matchesLevel = !level || gym.level === level;
+      const matchesLevel = !level || coach.level === level;
 
       // Filtre par compétences
       const matchesCompetences = selectedCompetences.length === 0 || 
         selectedCompetences.some(compId => 
-          gym.competences && gym.competences.includes(compId)
+          coach.competences && coach.competences.includes(compId)
         );
 
       return matchesSearch && matchesLocation && matchesLevel && matchesCompetences;
     });
-  }, [gyms, searchQuery, location, level, selectedCompetences]);
+  }, [coaches, searchQuery, location, level, selectedCompetences]);
 
   // Réinitialisation des filtres
   const resetFilters = useCallback(() => {
@@ -251,47 +251,7 @@ const CoachSearchScreen1 = () => {
     resetFilters
   ]);
 
-  const navigateToGymDetails = useCallback((gym) => {
-    if (!userId) {
-      console.warn('ID utilisateur manquant');
-      Alert.alert('Erreur', 'Impossible de continuer sans identification');
-      return;
-    }
-    
-    // Assurez-vous que toutes les propriétés sont des chaînes
-    const gymParams = {
-      id: gym.id?.toString() || "",
-      userId: userId?.toString() || "",
-      firstName: gym.firstName || gym.first_name || "",
-      entrainementPhysique: gym.entrainementPhysique || "",
-      photo: gym.photo || "",
-      email: gym.email || "",
-      disciplines: gym.disciplines || "",
-      typeCoaching: gym.typeCoaching || "",
-      niveauCours: gym.niveauCours || "",
-      dureeExperience: gym.dureeExperience || "",
-      dureeSeance: gym.dureeSeance || "",
-      prixSeance: gym.prixSeance?.toString() || "",
-      competencesGenerales: gym.competencesGenerales || "",
-      coursSpecifiques: gym.coursSpecifiques || "",
-      santeEtBienEtre: gym.santeEtBienEtre || "",
-      poste: gym.poste || "",
-      phoneNumber: gym.phoneNumber || "",
-      fb: gym.fb || "",
-      insta: gym.insta || "",
-      tiktok: gym.tiktok || "",
-      bio: gym.bio || ""
-    };
-    
-    console.log('Navigation vers Salleb avec gym ID:', gymParams.id);
-    
-    router.push({
-      pathname: "/Salleb",
-      params: gymParams
-    });
-  }, [userId, router]);
-
-  const renderGyms = useCallback(() => {
+  const renderCoaches = useCallback(() => {
     if (isLoading) {
       return (
         <View style={styles.messageContainer}>
@@ -304,58 +264,73 @@ const CoachSearchScreen1 = () => {
       return (
         <View style={styles.messageContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchGyms}>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCoaches}>
             <Text style={styles.retryButtonText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (!filteredGyms.length) {
+    if (!filteredCoaches.length) {
       return (
         <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>Aucun gym trouvé</Text>
+          <Text style={styles.messageText}>Aucun coach trouvé</Text>
         </View>
       );
     }
 
     const pairs = [];
-    for (let i = 0; i < filteredGyms.length; i += 2) {
-      pairs.push(filteredGyms.slice(i, i + 2));
+    for (let i = 0; i < filteredCoaches.length; i += 2) {
+      pairs.push(filteredCoaches.slice(i, i + 2));
     }
 
     return (
-      <View style={styles.gymsContainer}>
+      <View style={styles.coachesContainer}>
         {pairs.map((pair, index) => (
-          <View key={index} style={styles.gymRow}>
-            {pair.map((gym) => (
+          <View key={index} style={styles.coachRow}>
+            {pair.map((coach) => (
               <TouchableOpacity
-                key={`gym-${gym.id || Math.random().toString(36).substr(2, 9)}`}
-                style={styles.gymCard}
-                onPress={() => navigateToGymDetails(gym)}
+                key={`coach-${coach.id || Math.random().toString(36).substr(2, 9)}`}
+                style={styles.coachCard}
+                onPress={() => {
+                  if (!userId) {
+                    console.warn('ID utilisateur manquant');
+                    Alert.alert('Erreur', 'Impossible de continuer sans identification');
+                    return;
+                  }
+                
+                  console.log('Navigation vers Coachb avec userId:', userId);
+                  router.push({
+                    pathname: "/Salleb",
+                    params: { 
+                      ...coach, 
+                      userId: userId
+                    },
+                  });
+                }}
               >
                 <Image
-                  source={gym.photo 
-                    ? { uri: `data:image/jpeg;base64,${gym.photo}` }
+                  source={coach.photo 
+                    ? { uri: `data:image/jpeg;base64,${coach.photo}` }
                     : require('../../assets/images/F.png')
                   }
-                  style={styles.gymImage}
+                  style={styles.coachImage}
                   resizeMode="cover"
                 />
-                <View style={styles.gymInfo}>
-                  <Text style={styles.gymName} numberOfLines={1}>
+                <View style={styles.coachInfo}>
+                  <Text style={styles.coachName} numberOfLines={1}>
                     {highlightText(
-                      gym.firstName || gym.first_name || "Nom non disponible", 
+                      coach.firstName || coach.first_name || "Nom non disponible", 
                       searchQuery
                     )}
                   </Text>
-                  <Text style={styles.gymSpecialty} numberOfLines={1}>
+                  <Text style={styles.coachSpecialty} numberOfLines={1}>
                     {highlightText(
-                      gym.entrainementPhysique || gym.email || "Spécialité non disponible", 
+                      coach.entrainementPhysique || coach.email || "Spécialité non disponible", 
                       searchQuery
                     )}
                   </Text>
-                  {gym.verified && (
+                  {coach.verified && (
                     <View style={styles.verifiedBadge}>
                       <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
                       <Text style={styles.verifiedText}>Vérifié</Text>
@@ -364,12 +339,12 @@ const CoachSearchScreen1 = () => {
                 </View>
               </TouchableOpacity>
             ))}
-            {pair.length === 1 && <View style={[styles.gymCard, styles.emptyCard]} />}
+            {pair.length === 1 && <View style={[styles.coachCard, styles.emptyCard]} />}
           </View>
         ))}
       </View>
     );
-  }, [filteredGyms, navigateToGymDetails, highlightText, searchQuery]);
+  }, [filteredCoaches, userId, router, highlightText, searchQuery]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -378,7 +353,7 @@ const CoachSearchScreen1 = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          Gyms {userId ? `(ID: ${userId})` : ''}
+          Coachs {userId ? `(ID: ${userId})` : ''}
         </Text>
       </View>
 
@@ -403,7 +378,7 @@ const CoachSearchScreen1 = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {renderGyms()}
+        {renderCoaches()}
       </ScrollView>
 
       {renderFilterModal()}
@@ -412,6 +387,8 @@ const CoachSearchScreen1 = () => {
 };
 
 const styles = StyleSheet.create({
+
+  
   highlightText: {
     backgroundColor: '#CBFF06',
     color: 'black',
@@ -585,14 +562,14 @@ const styles = StyleSheet.create({
   competenceTextSelected: {
     color: 'black',
   },
-  gymsContainer: {
+  coachesContainer: {
     gap: 16,
   },
-  gymRow: {
+  coachRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  gymCard: {
+  coachCard: {
     width: cardWidth,
     borderRadius: 12,
     backgroundColor: '#FFF',
@@ -608,20 +585,20 @@ const styles = StyleSheet.create({
     shadowColor: 'transparent',
     elevation: 0,
   },
-  gymImage: {
+  coachImage: {
     width: '100%',
     height: cardWidth,
     backgroundColor: '#F5F5F5',
   },
-  gymInfo: {
+  coachInfo: {
     padding: 12,
   },
-  gymName: {
+  coachName: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  gymSpecialty: {
+  coachSpecialty: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
