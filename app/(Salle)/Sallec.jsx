@@ -470,47 +470,45 @@ const FitnessGymApp = () => {
         
       case 'emoji':
         return (
-          <View>
-            <Text style={styles.sectionTitle}>Avis et commentaires</Text>
-            <View style={styles.reviewSummary}>
-              <Text style={styles.ratingNumber}>4.8</Text>
-              <View style={styles.starsContainer}>
-                <Ionicons name="star" size={16} color="#FFC107" />
-                <Ionicons name="star" size={16} color="#FFC107" />
-                <Ionicons name="star" size={16} color="#FFC107" />
-                <Ionicons name="star" size={16} color="#FFC107" />
-                <Ionicons name="star-half" size={16} color="#FFC107" />
-              </View>
-              <Text style={styles.reviewCount}>(42 avis)</Text>
-            </View>
-            
+          <ScrollView style={styles.emojiScrollView}>
             <TouchableOpacity 
-              style={styles.addReviewButton} 
+              style={styles.shareExperienceButton}
               onPress={() => setIsReviewModalVisible(true)}
             >
-              <Text style={styles.addReviewButtonText}>Laisser un avis</Text>
+              <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
             </TouchableOpacity>
             
-            {/* Liste des avis */}
-            <View style={styles.reviewsList}>
-              <View style={styles.reviewItem}>
-                <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewerName}>Jean Dupont</Text>
-                  <View style={styles.reviewStars}>
-                    <Ionicons name="star" size={14} color="#FFC107" />
-                    <Ionicons name="star" size={14} color="#FFC107" />
-                    <Ionicons name="star" size={14} color="#FFC107" />
-                    <Ionicons name="star" size={14} color="#FFC107" />
-                    <Ionicons name="star" size={14} color="#FFC107" />
+            <View style={styles.existingReviews}>
+              <Text style={styles.reviewsSectionTitle}>Avis des clients</Text>
+              {sampleReviews.map((review) => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>{review.name}</Text>
+                    {renderStars(review.rating)}
+                  </View>
+                  <Text style={styles.reviewText}>{review.comment}</Text>
+                  <View style={styles.beforeAfterContainer}>
+                    <View style={styles.transformationImageWrapper}>
+                      <Image 
+                        source={review.beforeImage} 
+                        style={styles.beforeAfterImage} 
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.imageLabel}>Avant</Text>
+                    </View>
+                    <View style={styles.transformationImageWrapper}>
+                      <Image 
+                        source={review.afterImage} 
+                        style={styles.beforeAfterImage} 
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.imageLabel}>Après</Text>
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.reviewDate}>2 Mars 2023</Text>
-                <Text style={styles.reviewComment}>
-                  Super ambiance et coachs très professionnels. Je recommande !
-                </Text>
-              </View>
+              ))}
             </View>
-          </View>
+          </ScrollView>
         );
         
       default:
@@ -714,62 +712,189 @@ const FitnessGymApp = () => {
 };
 
 // Composants Modaux
-const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setComment, firstName }) => {
+const renderStars = (rating) => (
+  <View style={styles.starsContainer}>
+    {[1, 2, 3, 4, 5].map((star) => (
+      <MaterialIcons
+        key={star}
+        name={star <= rating ? "star" : "star-border"}
+        size={20}
+        color="#FFD700"
+      />
+    ))}
+  </View>
+);
+const ReviewModal = ({ 
+  isVisible, 
+  onClose, 
+  rating, 
+  setRating, 
+  comment, 
+  setComment, 
+  firstName 
+}) => {
+  const [beforeImage, setBeforeImage] = useState(null);
+  const [afterImage, setAfterImage] = useState(null);
+
+  const pickImage = async (setImage) => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+      if (!result.canceled) {
+        setImage(result.uri);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sélection de l\'image:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+    }
+  };
+
   return (
     <Modal
-      animationType="slide"
-      transparent={true}
       visible={isVisible}
+      transparent
+      animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Évaluer {firstName || 'ce gym'}</Text>
-          
-          <View style={styles.ratingContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => setRating(star)}
-              >
-                <Ionicons
-                  name={rating >= star ? "star" : "star-outline"}
-                  size={30}
-                  color="#FFC107"
-                  style={styles.starIcon}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <ScrollView>
+                <Text style={styles.modalTitle}>
+                  Partagez votre expérience{'\n'}
+                  {firstName ? `chez ${firstName}` : 'au gym'}
+                </Text>
+                <Text style={styles.fieldLabel}>Évaluation *</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setRating(star)}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons
+                        name={star <= rating ? "star" : "star-border"}
+                        size={32}
+                        color="#D4FF00"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.fieldLabel}>Commentaire *</Text>
+                <TextInput
+                  style={styles.commentInput}
+                  multiline
+                  placeholder="Partagez votre expérience"
+                  value={comment}
+                  onChangeText={setComment}
+                  textAlignVertical="top"
                 />
-              </TouchableOpacity>
-            ))}
+                <Text style={styles.fieldLabel}>Images de la transformation</Text>
+                <View style={styles.transformationImagesContainer}>
+                  <View style={styles.transformationImageWrapper}>
+                    <TouchableOpacity 
+                      style={styles.uploadImageButton}
+                      onPress={() => pickImage(setBeforeImage)}
+                    >
+                      {beforeImage ? (
+                        <Image source={{ uri: beforeImage }} style={styles.uploadedImage} />
+                      ) : (
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.imageLabel}>Avant</Text>
+                  </View>
+                  <View style={styles.transformationImageWrapper}>
+                    <TouchableOpacity 
+                      style={styles.uploadImageButton}
+                      onPress={() => pickImage(setAfterImage)}
+                    >
+                      {afterImage ? (
+                        <Image source={{ uri: afterImage }} style={styles.uploadedImage} />
+                      ) : (
+                        <MaterialIcons name="add-photo-alternate" size={32} color="#D4FF00" />
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.imageLabel}>Après</Text>
+                  </View>
+                </View>
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity 
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      onClose();
+                      setRating(0);
+                      setComment('');
+                      setBeforeImage(null);
+                      setAfterImage(null);
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submitButton}
+                    onPress={() => {
+                      if (!rating) {
+                        Alert.alert("Erreur", "Veuillez donner une évaluation");
+                        return;
+                      }
+                      if (!comment.trim()) {
+                        Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+                        return;
+                      }
+                      console.log("Publication de l'avis:", { rating, comment, beforeImage, afterImage });
+                      onClose();
+                      setRating(0);
+                      setComment('');
+                      setBeforeImage(null);
+                      setAfterImage(null);
+                    }}
+                  >
+                    <Text style={styles.submitButtonText}>Publier</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
           </View>
-          
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Partagez votre expérience..."
-            multiline
-            value={comment}
-            onChangeText={setComment}
-          />
-          
-          <View style={styles.modalButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.submitButton}
-              onPress={() => {
-                // Ici, vous pourriez envoyer l'avis à votre API
-                onClose();
-              }}
-            >
-              <Text style={styles.submitButtonText}>Soumettre</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
+// Sample reviews for the gym
+const sampleReviews = [
+  {
+    id: 1,
+    name: "Jean Dupont", 
+    rating: 5,
+    comment: "Super ambiance et équipements modernes. Les coachs sont très professionnels et à l'écoute. Je recommande vivement ce gym !",
+    beforeImage: require('../../assets/images/b.png'),
+    afterImage: require('../../assets/images/b.png')
+  },
+  {
+    id: 2,
+    name: "Sophie Martin", 
+    rating: 4,
+    comment: "Un excellent centre de fitness avec des cours variés et des équipements de qualité. L'ambiance est motivante et conviviale.",
+    beforeImage: require('../../assets/images/b.png'),
+    afterImage: require('../../assets/images/b.png')
+  }
+];
+//////////////////////
 
 
 
@@ -885,8 +1010,6 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
             }
           } catch (err) {
             console.error(`Error processing video ${video.id}:`, err);
-            // En cas d'erreur, utiliser directement la vidéo de secours
-            processedUris[video.id] = getFallbackVideoUrl();
           }
         }
       }
@@ -1027,12 +1150,12 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
                     onError={(error) => {
                       console.error(`Video playback error:`, error);
                       if (index === currentVideoIndex) {
-                        // Utiliser immédiatement la vidéo de secours
-                        console.log("Passer à la vidéo de secours après erreur");
+                        // En cas d'erreur, utiliser la vidéo de fallback
                         setLocalVideoUris(prev => ({
                           ...prev,
                           [video.id]: getFallbackVideoUrl()
                         }));
+                        setError('Erreur de lecture de la vidéo originale, chargement d\'une vidéo de test.');
                         setIsLoading(false);
                       }
                     }}
@@ -1726,6 +1849,161 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  //////////////////////////
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(19, 19, 19, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 24,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#333',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    gap: 8,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 15,
+    padding: 15,
+    height: 120,
+    marginBottom: 20,
+    backgroundColor: '#F8F8F8',
+    textAlignVertical: 'top',
+  },
+
+  // ==============================
+  // Styles des transformations d'images
+  // ==============================
+  transformationImagesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  transformationImageWrapper: {
+    alignItems: 'center',
+    width: '45%',
+  },
+  uploadImageButton: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    marginBottom: 8,
+  },
+  imageLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+
+  // ==============================
+  // Styles de la section des avis
+  // ==============================
+  emojiScrollView: {
+    flex: 1,
+  },
+  shareExperienceButton: {
+    backgroundColor: '#f5f5f5',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  shareExperienceText: {
+    color: '#666',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  existingReviews: {
+    marginTop: 20,
+  },
+  reviewCard: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  reviewerName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  reviewText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  beforeAfterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  beforeAfterImage: {
+    width: '48%',
+    height: 150,
+    borderRadius: 8,
+  },
+
+  // ==============================
+  // Styles des boutons du modal
+  // ==============================
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F8F8F8',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#000',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  submitButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
