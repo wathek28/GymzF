@@ -885,6 +885,8 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
             }
           } catch (err) {
             console.error(`Error processing video ${video.id}:`, err);
+            // En cas d'erreur, utiliser directement la vidéo de secours
+            processedUris[video.id] = getFallbackVideoUrl();
           }
         }
       }
@@ -1025,12 +1027,12 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
                     onError={(error) => {
                       console.error(`Video playback error:`, error);
                       if (index === currentVideoIndex) {
-                        // En cas d'erreur, utiliser la vidéo de fallback
+                        // Utiliser immédiatement la vidéo de secours
+                        console.log("Passer à la vidéo de secours après erreur");
                         setLocalVideoUris(prev => ({
                           ...prev,
                           [video.id]: getFallbackVideoUrl()
                         }));
-                        setError('Erreur de lecture de la vidéo originale, chargement d\'une vidéo de test.');
                         setIsLoading(false);
                       }
                     }}
