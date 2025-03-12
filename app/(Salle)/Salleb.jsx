@@ -172,22 +172,32 @@ const fetchGyms = async () => {
     </View>
   );
 
-  const renderLocationInfo = () => (
-    <View style={styles.locationContainer}>
-      <View style={styles.locationBox}>
-        <Text style={styles.locationText}>
-          Des Cours : En ligne, à domicile aux alentours de {gym.typeCoaching || 'N/A'}, ou à {gym.disciplines || 'N/A'}
-        </Text>
+  const renderLocationInfo = () => {
+    console.log("Vérification de gym:", gym);
+    console.log("Vérification de typeCoaching:", gym?.typeCoaching);
+  
+    if (!gym) return null; // Évite les erreurs si gym est indéfini
+  
+    const typeCoaching = gym?.typeCoaching ? gym.typeCoaching : "Non spécifié";
+  
+    return (
+      <View style={styles.locationContainer}>
+        <View style={styles.locationBox}>
+          <Text style={styles.locationText}>{typeCoaching}</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+  
+  
+  
   
   const handleProfilePress = () => {
     // Utiliser les données du gym actuel plutôt que les paramètres initiaux
     const currentGym = gyms.length > 0 ? gyms[currentIndex] : params;
     
     router.push({
-      pathname: '/',
+      pathname: '/Sallec',
       params: {
         userId: userId,
         idGym: currentGym.id, 
@@ -289,18 +299,18 @@ const fetchGyms = async () => {
                   </TouchableOpacity>
                 </View>
                 
-                <Text style={styles.title}>Salle de sport de {gym.entrainementPhysique || 'N/A'}</Text>
+                <Text style={styles.title}>7H - 21H</Text>
+                {renderLocationInfo()}
 
                 {/* Badges Section */}
                 <View style={styles.badgesContainer}>
-                  {renderBadge("stats-chart", "Niveau", gym.niveauCours)}
+                  {renderBadge("stats-chart", "Avantage", "WiFi, Parking")}
                   <View style={styles.experienceBadge}>
-                    {renderBadge("time", "Expérience", gym.dureeExperience)}
+                    {renderBadge("time", "Horaire", "7H-21H")}
                   </View>
                   {renderBadge("star", "Avis", "3.5/5")}
                 </View>
 
-                {renderLocationInfo()}
               </View>
             </ScrollView>
           </Animated.View>
@@ -313,7 +323,7 @@ const fetchGyms = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',  // Ajout d'une couleur de fond explicite
+    backgroundColor: 'black',  // Ajout d'une couleur de fond explicite
   },
   scrollView: {
     flex: 1,
@@ -380,7 +390,7 @@ const styles = StyleSheet.create({
   },
   infoOverlay: {
     padding: 20,
-    backgroundColor: '#FFF',  // Ajout d'une couleur de fond explicite
+    backgroundColor: 'black',  // Ajout d'une couleur de fond explicite
   },
   nameSection: {
     flexDirection: 'row',
@@ -396,7 +406,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: '600',
-    color: 'black',
+    color: 'white',
     marginRight: 8,
     flex: 1,
   },
@@ -461,6 +471,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: 'bold'
   },
 });
 

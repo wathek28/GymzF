@@ -738,7 +738,7 @@ try {
 
         {/* Événements - Section corrigée */}
 {/* Événements */}
-<View style={styles.section}>
+<View style={styles.section1}>
   <View style={styles.sectionHeader}>
     <Text style={styles.sectionTitle}>Événements</Text>
     <TouchableOpacity
@@ -754,7 +754,7 @@ try {
     showsHorizontalScrollIndicator={false}
   >
     {isLoading ? (
-      <View style={styles.loadingContainer}>
+      <View style={styles.loadingContainer1}>
         <ActivityIndicator size="small" color="#4CAF50" />
         <Text style={styles.loadingText}>Chargement...</Text>
       </View>
@@ -908,6 +908,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#000",
+  
   },
   seeMoreButton: {
     padding: 5,
@@ -982,6 +983,13 @@ const styles = StyleSheet.create({
   },
   section: {
     padding: 16,
+   
+  
+  },
+  section1: {
+    padding: 16,
+    marginBottom:50,
+  
   },
   sectionTitle: {
     fontSize: 18,

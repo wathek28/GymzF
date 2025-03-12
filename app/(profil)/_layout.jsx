@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '../Navbar/_layout';
 import { Slot, usePathname } from 'expo-router';
 import { View, StyleSheet, Animated } from 'react-native';
@@ -13,23 +13,30 @@ export default function Login() {
     extrapolate: 'clamp'
   });
   
-  // Vérifie si le chemin actuel est celui de CoachB
-  const isCoachB = pathname.includes('/(profil)/Coachb');
+  // Vérifie si le chemin actuel est celui de CoachB avec une vérification stricte
+  const isCoachB = pathname.includes('Coachb');
+  
+  // Débogage
+  useEffect(() => {
+    console.log('Chemin actuel:', pathname);
+    console.log('isCoachB:', isCoachB);
+  }, [pathname]);
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <Slot />
       </View>
-      <Animated.View 
-        style={[
-          styles.navbarContainer, 
-          { opacity: navbarOpacity },
-          isCoachB && styles.coachBNavbar
-        ]}
-      >
-        <Navbar />
-      </Animated.View>
+      {!isCoachB ? (
+        <Animated.View 
+          style={[
+            styles.navbarContainer, 
+            { opacity: navbarOpacity }
+          ]}
+        >
+          <Navbar />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -46,8 +53,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-  },
-  coachBNavbar: {
-    backgroundColor: 'black',
   }
 });

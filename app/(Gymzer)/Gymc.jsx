@@ -232,33 +232,37 @@ const VerificationCodeScreen = () => {
       console.log('(NOBRIDGE) LOG newPhoneNumber:', newPhoneNumber);
       console.log('(NOBRIDGE) LOG photo:', photo ? 'présente' : 'non présente');
       console.log('(NOBRIDGE) LOG verificationCode:', navigationVerificationCode);
-
+  
       // Utiliser directement les paramètres de navigation
       const currentPhone = currentPhoneNumber;
       const newPhone = newPhoneNumber;
-
+  
       // Vérifier que les numéros sont disponibles
       if (!currentPhone || !newPhone) {
         throw new Error('Impossible de récupérer les numéros de téléphone');
       }
-
+  
       // Appeler l'API pour réinitialiser le code
       const response = await PhoneChangeService.initiatePhoneChange(
         currentPhone, 
         newPhone
       );
-
-      // Log détaillé du code de vérification
-      console.log('(NOBRIDGE) LOG Code de vérification reçu:', response.code);
-      console.log('(NOBRIDGE) LOG Détails complets de la réponse:', JSON.stringify(response));
-
+  
+      // Stocker le code dans une variable pour s'assurer qu'il est accessible
+      const verificationCode = response.code;
+      
+      // Utiliser le même préfixe que les autres logs pour la cohérence
+      console.log('(NOBRIDGE) LOG ***** VERIFICATION CODE *****:', verificationCode);
+      console.log('(NOBRIDGE) LOG VERIFICATION_CODE=', verificationCode);
+      console.log('(NOBRIDGE) LOG VERIFICATION_CODE=', typeof verificationCode, verificationCode);
+      
       // Réinitialiser le code de vérification
       setVerificationCode(['', '', '', '', '', '']);
-
-      // Afficher un message de succès
+  
+      // Modifier l'alert pour afficher uniquement un message de confirmation
       Alert.alert(
         'Code renvoyé', 
-        `Un nouveau code de vérification a été envoyé. Code: ${response.code}`
+        'Un nouveau code de vérification a été envoyé. Consultez la console.'
       );
     } catch (error) {
       // Gérer les erreurs

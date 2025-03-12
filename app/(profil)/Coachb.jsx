@@ -294,6 +294,7 @@ const CoachDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'black',
   },
   scrollView: {
     flex: 1,
@@ -357,6 +358,7 @@ const styles = StyleSheet.create({
   },
   infoOverlay: {
     padding: 20,
+    backgroundColor: 'black',
   },
   nameSection: {
     flexDirection: 'row',
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: '600',
-    color: 'black',
+    color: 'white',
     marginRight: 8,
     flex: 1,
   },
