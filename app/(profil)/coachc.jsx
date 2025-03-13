@@ -1103,31 +1103,231 @@ const renderGalleryContent = () => {
   );
 };
 
-  const renderEmojiContent = () => (
-    <ScrollView style={styles.emojiScrollView}>
-      <TouchableOpacity 
-        style={styles.shareExperienceButton}
-        onPress={() => setIsReviewModalVisible(true)}
-      >
-        <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
-      </TouchableOpacity>
-      <View style={styles.existingReviews}>
-        <View style={styles.reviewCard}>
-          <View style={styles.reviewHeader}>
-            <Text style={styles.reviewerName}>Malek Raouff</Text>
-            {renderStars(3)}
-          </View>
-          <Text style={styles.reviewText}>
-            J'ai suivi des séances de musculation avec Coach Ahmed pendant 3 mois et les résultats sont incroyables ! Il est très professionnel, toujours à l'écoute.
-          </Text>
-          <View style={styles.beforeAfterContainer}>
-            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
-            <Image source={require('../../assets/images/b.png')} style={styles.beforeAfterImage} />
-          </View>
+////////////////////comentaire
+// Ajoutez ces états au début de votre composant CoachProfile1
+const [comments, setComments] = useState([]);
+const [loadingComments, setLoadingComments] = useState(false);
+const [commentsError, setCommentsError] = useState(null);
+
+// Ajoutez cette fonction pour récupérer les commentaires
+// Modifiez la fonction fetchComments pour éviter le problème de parsing JSON
+const fetchComments = useCallback(async (coachId) => {
+  if (!coachId) return;
+  
+  setLoadingComments(true);
+  setCommentsError(null);
+  
+  try {
+    const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${coachId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    // Récupérer le texte au lieu de JSON directement
+    const responseText = await response.text();
+    
+    // Puis essayez de parser manuellement avec une fonction personnalisée
+    // qui simplifie la structure des données
+    try {
+      // On va extraire les informations essentielles et ignorer les structures complexes
+      const data = parseAndSimplifyComments(responseText);
+      console.log("Commentaires récupérés et simplifiés:", data);
+      setComments(data);
+    } catch (parseError) {
+      console.error("Erreur lors du parsing des commentaires:", parseError);
+      setCommentsError("Format de données incorrect");
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des commentaires:", error);
+    setCommentsError(error.message);
+  } finally {
+    setLoadingComments(false);
+  }
+}, []);
+
+// Fonction helper pour extraire les informations essentielles et éviter les références circulaires
+const parseAndSimplifyComments = (jsonText) => {
+  // Recherche d'éléments essentiels par regex pour éviter le parsing complet
+  const commentPattern = /"id"\s*:\s*(\d+).*?"evaluation"\s*:\s*(\d+).*?"commentaire"\s*:\s*"([^"]*)".*?"dateCommentaire"\s*:\s*"([^"]*)"/g;
+  const userPattern = /"utilisateur"\s*:\s*{[^}]*"id"\s*:\s*(\d+).*?"firstName"\s*:\s*"([^"]*)"/g;
+  
+  const simplifiedComments = [];
+  let match;
+  
+  // Extraire les données essentielles avec regex 
+  // Cette méthode peut être imparfaite, mais elle évite les problèmes de récursion
+  let currentIndex = 0;
+  let commentText = jsonText;
+  
+  // Parcourir le texte JSON à la recherche de chaque commentaire
+  while (currentIndex < commentText.length) {
+    const idMatch = commentText.slice(currentIndex).match(/"id"\s*:\s*(\d+)/);
+    if (!idMatch) break;
+    
+    const commentId = parseInt(idMatch[1]);
+    const startPos = commentText.indexOf(idMatch[0], currentIndex);
+    
+    // Trouver la fin de l'objet
+    let objectLevel = 0;
+    let endPos = startPos;
+    let inString = false;
+    let escapeNext = false;
+    
+    for (let i = startPos; i < commentText.length; i++) {
+      const char = commentText[i];
+      
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '{') objectLevel++;
+        if (char === '}') {
+          objectLevel--;
+          if (objectLevel === 0) {
+            endPos = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Extraire le bloc du commentaire
+    const commentBlock = commentText.substring(startPos, endPos);
+    
+    // Extraire les informations de base
+    const evalMatch = commentBlock.match(/"evaluation"\s*:\s*(\d+)/);
+    const textMatch = commentBlock.match(/"commentaire"\s*:\s*"([^"]*)"/);
+    const dateMatch = commentBlock.match(/"dateCommentaire"\s*:\s*"([^"]*)"/);
+    
+    // Extraire les infos utilisateur
+    const userFirstNameMatch = commentBlock.match(/"firstName"\s*:\s*"([^"]*)"/);
+    
+    // Vérifier la présence d'images
+    const hasImageAvant = commentBlock.includes('"imageAvant"') && !commentBlock.includes('"imageAvant":null');
+    const hasImageApres = commentBlock.includes('"imageApres"') && !commentBlock.includes('"imageApres":null');
+    
+    if (commentId && evalMatch && textMatch) {
+      simplifiedComments.push({
+        id: commentId,
+        evaluation: parseInt(evalMatch[1]),
+        commentaire: textMatch[1],
+        dateCommentaire: dateMatch ? dateMatch[1] : new Date().toISOString(),
+        utilisateur: {
+          firstName: userFirstNameMatch ? userFirstNameMatch[1] : "Utilisateur"
+        },
+        hasImageAvant,
+        hasImageApres
+      });
+    }
+    
+    currentIndex = endPos;
+  }
+  
+  return simplifiedComments;
+};
+
+// Ajoutez cet useEffect pour charger les commentaires quand la page est chargée
+// ou quand l'onglet emoji est sélectionné
+useEffect(() => {
+  if (selectedTab === 'emoji' && idCoach) {
+    fetchComments(idCoach);
+  }
+}, [selectedTab, idCoach, fetchComments]);
+
+// Remplacez votre fonction renderEmojiContent par celle-ci
+const renderEmojiContent = () => (
+  <ScrollView style={styles.emojiScrollView}>
+    <TouchableOpacity 
+      style={styles.shareExperienceButton}
+      onPress={() => setIsReviewModalVisible(true)}
+    >
+      <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
+    </TouchableOpacity>
+    
+    <View style={styles.existingReviews}>
+      <Text style={styles.reviewsSectionTitle}>Avis des clients</Text>
+      
+      {loadingComments ? (
+        <ActivityIndicator size="large" color="#D4FF00" />
+      ) : commentsError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{commentsError}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => fetchComments(idCoach)}
+          >
+            <Text style={styles.retryButtonText}>Réessayer</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </ScrollView>
-  );
+      ) : comments.length === 0 ? (
+        <Text style={styles.noCommentsText}>Aucun avis pour le moment</Text>
+      ) : (
+        comments.map((comment) => (
+          <View key={comment.id} style={styles.reviewCard}>
+            <View style={styles.reviewHeader}>
+              <Text style={styles.reviewerName}>
+                {comment.utilisateur?.firstName || "Utilisateur"}
+              </Text>
+              {renderStars(comment.evaluation)}
+            </View>
+            <Text style={styles.reviewDate}>
+              {new Date(comment.dateCommentaire).toLocaleDateString()}
+            </Text>
+            <Text style={styles.reviewText}>
+              {comment.commentaire}
+            </Text>
+            {(comment.imageAvant || comment.imageApres) && (
+              <View style={styles.beforeAfterContainer}>
+                {comment.imageAvant ? (
+                  <Image 
+                    source={{ 
+                      uri: `http://192.168.0.3:8082/api/commentaires/${comment.id}/image-avant` 
+                    }} 
+                    style={styles.beforeAfterImage} 
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.emptyImagePlaceholder}>
+                    <Text style={styles.emptyImageText}>Pas d'image</Text>
+                  </View>
+                )}
+                {comment.imageApres ? (
+                  <Image 
+                    source={{ 
+                      uri: `http://192.168.0.3:8082/api/commentaires/${comment.id}/image-apres` 
+                    }} 
+                    style={styles.beforeAfterImage} 
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.emptyImagePlaceholder}>
+                    <Text style={styles.emptyImageText}>Pas d'image</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        ))
+      )}
+    </View>
+  </ScrollView>
+);
+
+
+//////////////////////////////
 
   const renderMainContent = () => {
     switch (selectedTab) {
@@ -1313,6 +1513,48 @@ const renderGalleryContent = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  /////////////////////////
+  reviewsSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  reviewDate: {
+    color: '#777',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  noCommentsText: {
+    textAlign: 'center',
+    color: '#777',
+    fontSize: 16,
+    marginVertical: 20,
+  },
+  emptyImagePlaceholder: {
+    width: '48%',
+    height: 150,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyImageText: {
+    color: '#777',
+    fontSize: 14,
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+  ///////////////////////////////
 
 
   uploadedImage: {
