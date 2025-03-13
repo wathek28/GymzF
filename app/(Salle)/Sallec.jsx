@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback ,useMemo} from 'react';
 import { 
   KeyboardAvoidingView, 
   Platform, 
@@ -15,6 +15,11 @@ import {
   Modal, 
   Keyboard,
   SafeAreaView,
+ 
+    
+   
+  
+  
   
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -30,7 +35,7 @@ import { Dimensions } from 'react-native';
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 
-const FitnessGymApp = () => {
+const SAlle = () => {
   // Récupérer les paramètres passés à la route
   const route = useRoute(); // Utiliser useRoute au lieu de useLocalSearchParams
   const params = route.params || {}; // Récupérer les paramètres de la route
@@ -121,7 +126,137 @@ const navigateToSalled = useCallback(() => {
     fetchCoaches();
   }, []);
  
+///////////////////////////////////////////////////////////////
+const enhancedProcessVideoData = async (videoData) => {
+  try {
+    // Detailed logging for video data
+    console.log('🔍 Video Data Diagnostic:');
+    console.log('Data Type:', typeof videoData);
+    
+    if (typeof videoData === 'string') {
+      console.log('String Length:', videoData.length);
+      console.log('First 50 chars:', videoData.substring(0, 50));
+      
+      // Check base64 validity
+      const base64Regex = /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$/;
+      console.log('Valid Base64:', base64Regex.test(videoData));
+    }
 
+    // Validate video data before processing
+    if (!videoData) {
+      throw new Error('No video data provided');
+    }
+
+    // Multiple validation and conversion strategies
+    let processedUri = null;
+
+    // Strategy 1: Direct URL
+    if (typeof videoData === 'string' && 
+        (videoData.startsWith('http') || videoData.startsWith('file://'))) {
+      return videoData;
+    }
+
+    // Strategy 2: Base64 to File
+    if (typeof videoData === 'string') {
+      // Remove potential data URI prefix
+      const base64Data = videoData.includes('base64,') 
+        ? videoData.split('base64,')[1] 
+        : videoData;
+
+      // Create unique filename
+      const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
+      
+      try {
+        await FileSystem.writeAsStringAsync(filename, base64Data, {
+          encoding: FileSystem.EncodingType.Base64
+        });
+
+        console.log('✅ Temporary video file created:', filename);
+        processedUri = filename;
+      } catch (writeError) {
+        console.error('❌ File Write Error:', writeError);
+        throw new Error('Cannot write video file');
+      }
+    }
+
+    // Strategy 3: Handle Blob/Object data
+    if (videoData && videoData.data) {
+      console.log('Processing blob/object video data');
+      
+      if (Array.isArray(videoData.data)) {
+        // Convert Uint8Array to base64
+        const uint8Array = new Uint8Array(videoData.data);
+        const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
+        
+        const filename = `${FileSystem.cacheDirectory}temp_video_blob_${Date.now()}.mp4`;
+        
+        try {
+          await FileSystem.writeAsStringAsync(filename, base64, {
+            encoding: FileSystem.EncodingType.Base64
+          });
+          
+          processedUri = filename;
+        } catch (blobError) {
+          console.error('❌ Blob Processing Error:', blobError);
+          throw new Error('Cannot process blob video data');
+        }
+      }
+    }
+
+    // Fallback strategy
+    if (!processedUri) {
+      console.warn('Falling back to default video');
+      processedUri = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
+    }
+
+    return processedUri;
+
+  } catch (overallError) {
+    console.error('🚨 Critical Video Processing Error:', overallError);
+    
+    // Final fallback
+    return 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
+  }
+};
+// Advanced Error Tracking in Video Component
+const VideoErrorHandler = ({ 
+  videoUri, 
+  onError, 
+  fallbackUri = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4' 
+}) => {
+  const [currentVideoUri, setCurrentVideoUri] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
+
+  useEffect(() => {
+    const processVideo = async () => {
+      try {
+        const processedUri = await enhancedProcessVideoData(videoUri);
+        setCurrentVideoUri(processedUri);
+      } catch (processingError) {
+        console.error('Video Processing Initialization Error:', processingError);
+        setCurrentVideoUri(fallbackUri);
+        setErrorDetails(processingError);
+        onError?.(processingError);
+      }
+    };
+
+    processVideo();
+  }, [videoUri]);
+
+  const handleVideoError = (error) => {
+    console.error('Video Playback Specific Error:', error);
+    setCurrentVideoUri(fallbackUri);
+    onError?.(error);
+  };
+
+  return (
+    <Video
+      source={{ uri: currentVideoUri }}
+      onError={handleVideoError}
+      // Autres props vidéo...
+    />
+  );
+};
   // Fonction pour récupérer et traiter les reels du gym
   const fetchReels = useCallback(async (gymId) => {
     if (!gymId) {
@@ -169,34 +304,7 @@ const navigateToSalled = useCallback(() => {
           let videoUri = null;
   
           if (videoField) {
-            console.log(`Found video data for reel ${reel.id}, type:`, typeof videoField);
-            
-            // Handle base64 string directly
-            if (typeof videoField === 'string') {
-              if (videoField.startsWith('data:')) {
-                videoUri = videoField;
-              } else {
-                videoUri = `data:video/mp4;base64,${videoField}`;
-              }
-              console.log(`Created URI from string for reel ${reel.id}`);
-            } 
-            // Handle blob object with data property
-            else if (videoField.data) {
-              if (Array.isArray(videoField.data)) {
-                // Convert Uint8Array to base64
-                const uint8Array = new Uint8Array(videoField.data);
-                let binary = '';
-                uint8Array.forEach(byte => {
-                  binary += String.fromCharCode(byte);
-                });
-                const base64 = btoa(binary);
-                videoUri = `data:video/mp4;base64,${base64}`;
-                console.log(`Created URI from byte array for reel ${reel.id}`);
-              } else if (typeof videoField.data === 'string') {
-                videoUri = `data:video/mp4;base64,${videoField.data}`;
-                console.log(`Created URI from data string for reel ${reel.id}`);
-              }
-            }
+            videoUri = await enhancedProcessVideoData(videoField);
           } else {
             console.warn(`⚠️ No video data found for reel ${reel.id}`);
           }
@@ -240,7 +348,6 @@ const navigateToSalled = useCallback(() => {
       return [];
     }
   }, []);
-
   // useEffect pour charger les reels
   useEffect(() => {
     let isActive = true;
@@ -1040,145 +1147,115 @@ const sampleReviews = [
 //////////////////////
 
 
-const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
+const VideoModal = ({ 
+  visible, 
+  onClose, 
+  videoUri, 
+  allVideos = [] 
+}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [localVideoUris, setLocalVideoUris] = useState({});
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const scrollViewRef = useRef(null);
   const videoRefs = useRef({});
+  const mountedRef = useRef(true);
 
-  // Détermine les vidéos à afficher
-  const videosToShow = allVideos.length > 0 && videoUri 
-    ? allVideos 
-    : videoUri ? [{ id: 'single', videoUri }] : [];
-
-  // Trouve l'index de la vidéo sélectionnée
-  const initialIndex = videoUri && allVideos.length > 0
-    ? allVideos.findIndex(video => video.videoUri === videoUri) 
-    : 0;
-
-  // Fonction pour traiter les données vidéo (convertit base64/blob en URI compatible)
-  const processVideoData = async (videoData) => {
+  // Fonction stable de traitement des URI
+  const processVideoUri = (videoData) => {
     if (!videoData) return null;
-    
+
     try {
-      console.log("Type de vidéo reçu:", typeof videoData);
-      if (typeof videoData === 'string') {
-        console.log("Début des données vidéo:", videoData.substring(0, 30) + '...');
+      // Vérification des différents types d'URI
+      if (typeof videoData !== 'string') {
+        console.error('❌ Type de données non valide');
+        return null;
       }
-      
-      // Si c'est déjà une URL directe (http ou file)
-      if (typeof videoData === 'string' && (videoData.startsWith('http') || videoData.startsWith('file://'))) {
+
+      // Cas 1: URI déjà valide
+      const validPrefixes = [
+        'http://', 
+        'https://', 
+        'file://', 
+        'content://'
+      ];
+
+      const isValidUri = validPrefixes.some(prefix => 
+        videoData.startsWith(prefix)
+      ) || videoData.endsWith('.mp4');
+
+      if (isValidUri) {
+        console.log('✅ URI valide détectée');
         return videoData;
       }
-      
-      // Créer un nom de fichier temporaire unique
-      const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
-      
-      // Si c'est une data URI (ex: "data:video/mp4;base64,...")
-      if (typeof videoData === 'string' && videoData.startsWith('data:')) {
-        try {
-          // Extraire la partie base64
-          const base64Data = videoData.split(',')[1];
-          
-          // Écrire les données dans un fichier
-          await FileSystem.writeAsStringAsync(filename, base64Data, {
-            encoding: FileSystem.EncodingType.Base64
-          });
-          
-          console.log("✅ Fichier temporaire créé:", filename);
-          return filename;
-        } catch (err) {
-          console.error("❌ Erreur lors de l'écriture du fichier temporaire:", err);
-          return null;
-        }
-      }
-      
-      // Si ce sont des données en base64 pures
-      if (typeof videoData === 'string' && videoData.match(/^[A-Za-z0-9+/=]+$/)) {
-        try {
-          // Écrire les données dans un fichier
-          await FileSystem.writeAsStringAsync(filename, videoData, {
-            encoding: FileSystem.EncodingType.Base64
-          });
-          
-          console.log("✅ Fichier temporaire créé:", filename);
-          return filename;
-        } catch (err) {
-          console.error("❌ Erreur lors de l'écriture du fichier temporaire:", err);
-          return null;
-        }
-      }
-      
-      console.log('❓ Format vidéo non supporté');
-      return null;
+
+      // Fallback
+      console.warn('⚠️ Aucun format d\'URI reconnu');
+      return 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
+
     } catch (error) {
-      console.error('❌ Error processing video data:', error);
+      console.error('🚨 Erreur de traitement vidéo:', error);
       return null;
     }
   };
 
-  // Prépare toutes les vidéos
+  // Préparer les vidéos - version simplifiée
   const prepareVideos = useCallback(async () => {
-    if (videosToShow.length === 0) return;
+    if (!visible) return;
     
-    setIsLoading(true);
-    setError(null);
-
     try {
-      // Prépare seulement la vidéo actuelle et les adjacentes pour optimiser les performances
-      const videosToProcess = videosToShow.filter((_, index) => {
-        return Math.abs(index - initialIndex) <= 1;
-      });
+      setIsLoading(true);
+      setError(null);
+
+      // Sélectionner les vidéos à traiter
+      const videosToProcess = allVideos.length > 0 
+        ? allVideos.slice(0, 5)  // Limiter à 5 vidéos max
+        : (videoUri ? [{ id: 'single', videoUri }] : []);
 
       const processedUris = {};
       
       for (const video of videosToProcess) {
+        if (!mountedRef.current) break;
+        
         const videoData = video.videoUri;
         if (videoData) {
-          try {
-            const processedUri = await processVideoData(videoData);
-            if (processedUri) {
-              processedUris[video.id] = processedUri;
-            }
-          } catch (err) {
-            console.error(`Error processing video ${video.id}:`, err);
+          const processedUri = processVideoUri(videoData);
+          if (processedUri) {
+            processedUris[video.id] = processedUri;
           }
         }
       }
       
-      setLocalVideoUris(processedUris);
+      if (mountedRef.current) {
+        setLocalVideoUris(processedUris);
+      }
       
     } catch (err) {
-      console.error('Error preparing videos:', err);
-      setError('Erreur lors de la préparation des vidéos');
-    } finally {
-      setIsLoading(false);
-    }
-    // Ajouter dans le prepareVideos
-for (const video of videosToProcess) {
-  const videoData = video.videoUri;
-  if (videoData) {
-    try {
-      const processedUri = await processVideoData(videoData);
-      if (processedUri) {
-        processedUris[video.id] = processedUri;
-      } else {
-        // Si le traitement échoue, utilisez une vidéo par défaut
-        console.log(`Utilisation d'une vidéo de secours pour ${video.id}`);
-        processedUris[video.id] = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
+      if (mountedRef.current) {
+        console.error('Erreur de préparation:', err);
+        setError('Impossible de préparer les vidéos');
       }
-    } catch (err) {
-      console.error(`Error processing video ${video.id}:`, err);
-      // Vidéo de secours en cas d'erreur
-      processedUris[video.id] = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }
-}
-  }, [videosToShow, initialIndex]);
+  }, [visible, allVideos, videoUri]);
 
-  // Gère le changement de vidéo lors du défilement
+  // Effet pour préparer les vidéos
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    if (visible) {
+      prepareVideos();
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [visible, prepareVideos]);
+
+  // Gestion du scroll
   const handleScroll = useCallback((event) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const width = Dimensions.get('window').width;
@@ -1186,41 +1263,23 @@ for (const video of videosToProcess) {
     
     if (newIndex !== currentVideoIndex) {
       // Pause toutes les vidéos
-      Object.keys(videoRefs.current).forEach(id => {
-        if (videoRefs.current[id]) {
-          videoRefs.current[id].pauseAsync().catch(console.error);
+      Object.values(videoRefs.current).forEach(ref => {
+        if (ref) {
+          ref.pauseAsync().catch(console.error);
         }
       });
       
       setCurrentVideoIndex(newIndex);
     }
-  }, [currentVideoIndex, videosToShow]);
+  }, [currentVideoIndex]);
 
-  // Initialisation au montage du composant
-  useEffect(() => {
-    if (visible) {
-      prepareVideos();
-      
-      // Définir l'index initial
-      if (initialIndex >= 0) {
-        setCurrentVideoIndex(initialIndex);
-      }
-    }
-    
-    return () => {
-      // Nettoyage des fichiers temporaires
-      Object.values(localVideoUris).forEach(uri => {
-        if (uri && uri.startsWith(FileSystem.cacheDirectory)) {
-          FileSystem.deleteAsync(uri, { idempotent: true })
-            .catch(error => console.log("Erreur lors du nettoyage:", error));
-        }
-      });
-      // Nettoyage des références  
-      videoRefs.current = {};
-    };
-  }, [visible, prepareVideos, initialIndex]);
-
+  // Ne rien afficher si le modal n'est pas visible
   if (!visible) return null;
+
+  // Déterminer les vidéos à afficher
+  const videosToShow = allVideos.length > 0 
+    ? allVideos.slice(0, 5)  // Limiter à 5 vidéos max
+    : (videoUri ? [{ id: 'single', videoUri }] : []);
 
   return (
     <Modal
@@ -1230,6 +1289,7 @@ for (const video of videosToProcess) {
       transparent={false}
     >
       <View style={styles.videoModalContainer}>
+        {/* Bouton de fermeture */}
         <TouchableOpacity 
           style={styles.videoModalCloseButton}
           onPress={onClose}
@@ -1237,6 +1297,7 @@ for (const video of videosToProcess) {
           <Text style={styles.videoModalCloseText}>Fermer</Text>
         </TouchableOpacity>
 
+        {/* Contenu des vidéos */}
         {videosToShow.length > 0 ? (
           <ScrollView
             ref={scrollViewRef}
@@ -1250,36 +1311,30 @@ for (const video of videosToProcess) {
             {videosToShow.map((video, index) => (
               <View key={video.id || index} style={styles.videoScrollItem}>
                 {localVideoUris[video.id] ? (
-                 // Dans le composant Video
-<Video
-  ref={ref => { videoRefs.current[video.id] = ref; }}
-  style={styles.videoPlayer}
-  source={{ uri: localVideoUris[video.id] }}
-  resizeMode="contain"
-  useNativeControls
-  shouldPlay={false}
-  isLooping={false}
-  onLoadStart={() => {
-    if (index === currentVideoIndex) setIsLoading(true);
-  }}
-  onLoad={() => {
-    if (index === currentVideoIndex) setIsLoading(false);
-  }}
-  onError={(error) => {
-    console.error(`Video playback error (ID: ${video.id}):`, error);
-    console.log("Problematic URI:", localVideoUris[video.id]);
-    
-    // Libérer les ressources vidéo
-    if (videoRefs.current[video.id]) {
-      videoRefs.current[video.id].unloadAsync().catch(console.error);
-    }
-    
-    if (index === currentVideoIndex) {
-      setError(`Erreur de lecture de la vidéo (${error.error?.code || 'inconnu'})`);
-      setIsLoading(false);
-    }
-  }}
-/>
+                  <Video
+                    ref={ref => { 
+                      if (ref) videoRefs.current[video.id] = ref; 
+                    }}
+                    style={styles.videoPlayer}
+                    source={{ uri: localVideoUris[video.id] }}
+                    resizeMode="contain"
+                    useNativeControls
+                    shouldPlay={false}
+                    isLooping={false}
+                    onLoadStart={() => {
+                      if (index === currentVideoIndex) setIsLoading(true);
+                    }}
+                    onLoad={() => {
+                      if (index === currentVideoIndex) setIsLoading(false);
+                    }}
+                    onError={(error) => {
+                      console.error(`Erreur de lecture vidéo:`, error);
+                      if (index === currentVideoIndex) {
+                        setError(`Erreur de lecture`);
+                        setIsLoading(false);
+                      }
+                    }}
+                  />
                 ) : (
                   <View style={styles.videoLoadingContainer}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
@@ -1298,6 +1353,7 @@ for (const video of videosToProcess) {
           </View>
         )}
 
+        {/* Indicateur de chargement */}
         {isLoading && currentVideoIndex >= 0 && (
           <View style={styles.videoLoadingOverlay}>
             <ActivityIndicator size="large" color="#FFFFFF" />
@@ -1305,6 +1361,7 @@ for (const video of videosToProcess) {
           </View>
         )}
 
+        {/* Gestion des erreurs */}
         {error && (
           <View style={styles.videoErrorContainer}>
             <Text style={styles.videoErrorText}>{error}</Text>
@@ -1317,7 +1374,7 @@ for (const video of videosToProcess) {
           </View>
         )}
         
-        {/* Indicateur de position */}
+        {/* Indicateur de position pour plusieurs vidéos */}
         {videosToShow.length > 1 && (
           <View style={styles.videoPageIndicator}>
             {videosToShow.map((_, index) => (
@@ -1335,6 +1392,8 @@ for (const video of videosToProcess) {
     </Modal>
   );
 };
+
+// N'oubliez pas d'ajouter ces imports en haut du fichier
 
 
 // Ajoutez ce composant après le composant VideoModal dans votre code
@@ -1470,138 +1529,6 @@ const processVideoData = async (videoData) => {
 };
 
 // Enhanced Video Error Handling
-const enhancedProcessVideoData = async (videoData) => {
-  try {
-    // Detailed logging for video data
-    console.log('🔍 Video Data Diagnostic:');
-    console.log('Data Type:', typeof videoData);
-    
-    if (typeof videoData === 'string') {
-      console.log('String Length:', videoData.length);
-      console.log('First 50 chars:', videoData.substring(0, 50));
-      
-      // Check base64 validity
-      const base64Regex = /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$/;
-      console.log('Valid Base64:', base64Regex.test(videoData));
-    }
-
-    // Validate video data before processing
-    if (!videoData) {
-      throw new Error('No video data provided');
-    }
-
-    // Multiple validation and conversion strategies
-    let processedUri = null;
-
-    // Strategy 1: Direct URL
-    if (typeof videoData === 'string' && 
-        (videoData.startsWith('http') || videoData.startsWith('file://'))) {
-      return videoData;
-    }
-
-    // Strategy 2: Base64 to File
-    if (typeof videoData === 'string') {
-      // Remove potential data URI prefix
-      const base64Data = videoData.includes('base64,') 
-        ? videoData.split('base64,')[1] 
-        : videoData;
-
-      // Create unique filename
-      const filename = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
-      
-      try {
-        await FileSystem.writeAsStringAsync(filename, base64Data, {
-          encoding: FileSystem.EncodingType.Base64
-        });
-
-        console.log('✅ Temporary video file created:', filename);
-        processedUri = filename;
-      } catch (writeError) {
-        console.error('❌ File Write Error:', writeError);
-        throw new Error('Cannot write video file');
-      }
-    }
-
-    // Strategy 3: Handle Blob/Object data
-    if (videoData && videoData.data) {
-      console.log('Processing blob/object video data');
-      
-      if (Array.isArray(videoData.data)) {
-        // Convert Uint8Array to base64
-        const uint8Array = new Uint8Array(videoData.data);
-        const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
-        
-        const filename = `${FileSystem.cacheDirectory}temp_video_blob_${Date.now()}.mp4`;
-        
-        try {
-          await FileSystem.writeAsStringAsync(filename, base64, {
-            encoding: FileSystem.EncodingType.Base64
-          });
-          
-          processedUri = filename;
-        } catch (blobError) {
-          console.error('❌ Blob Processing Error:', blobError);
-          throw new Error('Cannot process blob video data');
-        }
-      }
-    }
-
-    // Fallback strategy
-    if (!processedUri) {
-      console.warn('Falling back to default video');
-      processedUri = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
-    }
-
-    return processedUri;
-
-  } catch (overallError) {
-    console.error('🚨 Critical Video Processing Error:', overallError);
-    
-    // Final fallback
-    return 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
-  }
-};
-
-// Advanced Error Tracking in Video Component
-const VideoErrorHandler = ({ 
-  videoUri, 
-  onError, 
-  fallbackUri = 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4' 
-}) => {
-  const [currentVideoUri, setCurrentVideoUri] = useState(null);
-  const [errorDetails, setErrorDetails] = useState(null);
-
-  useEffect(() => {
-    const processVideo = async () => {
-      try {
-        const processedUri = await enhancedProcessVideoData(videoUri);
-        setCurrentVideoUri(processedUri);
-      } catch (processingError) {
-        console.error('Video Processing Initialization Error:', processingError);
-        setCurrentVideoUri(fallbackUri);
-        setErrorDetails(processingError);
-        onError?.(processingError);
-      }
-    };
-
-    processVideo();
-  }, [videoUri]);
-
-  const handleVideoError = (error) => {
-    console.error('Video Playback Specific Error:', error);
-    setCurrentVideoUri(fallbackUri);
-    onError?.(error);
-  };
-
-  return (
-    <Video
-      source={{ uri: currentVideoUri }}
-      onError={handleVideoError}
-      // Other video props...
-    />
-  );
-
-};
 
 
 const styles = StyleSheet.create({
@@ -2372,4 +2299,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FitnessGymApp;
+export default SAlle;
