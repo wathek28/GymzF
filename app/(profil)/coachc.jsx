@@ -152,10 +152,27 @@ const useGalleryImages = (id, selectedTab) => {
 //
 // Modal pour publier un avis (ReviewModal)
 //
-const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setComment, firstName }) => {
+//
+// Modal pour publier un avis (ReviewModal)
+//
+const ReviewModal = ({ 
+  isVisible, 
+  onClose, 
+  rating, 
+  setRating, 
+  comment, 
+  setComment, 
+  firstName,
+  // Ces props doivent être passées lors de l'utilisation du composant
+  utilisateurId,  // ID de l'utilisateur qui poste le commentaire
+  recepteurId     // ID du coach qui reçoit le commentaire
+}) => {
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de votre serveur backend
 
+  // Fonction pour sélectionner une image depuis la galerie
   const pickImage = async (setImage) => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -163,18 +180,131 @@ const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setCommen
         Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
         return;
       }
+      
+      // Utilisons la méthode qui fonctionne avec votre version
+      // Certaines versions utilisent encore MediaTypeOptions
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'Images', // Simplifié pour la compatibilité
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 1,
+        quality: 0.8,
       });
+      
+      // Vérifiez comment le résultat est structuré dans votre version
       if (!result.canceled) {
-        setImage(result.uri);
+        // Pour les versions récentes
+        if (result.assets && result.assets.length > 0) {
+          setImage(result.assets[0].uri);
+        } 
+        // Pour les versions plus anciennes
+        else if (result.uri) {
+          setImage(result.uri);
+        }
       }
     } catch (error) {
       console.error('Erreur lors de la sélection de l\'image:', error);
       Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+    }
+  };
+
+  // Fonction pour soumettre le commentaire à l'API
+  const submitReview = async () => {
+    // Validation...
+    if (!rating || !comment.trim() || !utilisateurId || !recepteurId) {
+      Alert.alert("Erreur", "Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+  
+    setIsSubmitting(true);
+  
+    try {
+      // Préparation du FormData
+      const formData = new FormData();
+      formData.append('evaluation', rating.toString());
+      formData.append('commentaire', comment);
+  
+      // Traitement des images...
+      if (beforeImage) {
+        const imageNameBefore = beforeImage.split('/').pop();
+        const mimeTypeBefore = getMimeType(imageNameBefore);
+        
+        formData.append('imageAvant', {
+          uri: Platform.OS === 'android' ? beforeImage : beforeImage.replace('file://', ''),
+          name: imageNameBefore,
+          type: mimeTypeBefore
+        });
+      }
+  
+      if (afterImage) {
+        const imageNameAfter = afterImage.split('/').pop();
+        const mimeTypeAfter = getMimeType(imageNameAfter);
+        
+        formData.append('imageApres', {
+          uri: Platform.OS === 'android' ? afterImage : afterImage.replace('file://', ''),
+          name: imageNameAfter,
+          type: mimeTypeAfter
+        });
+      }
+  
+      console.log(`Envoi du commentaire à l'URL: ${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`);
+  
+      // Simplifier la gestion de la réponse
+      const response = await fetch(`${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+        },
+        body: formData
+      });
+  
+      // Vérifier uniquement le statut HTTP
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+  
+      // Ne pas traiter la réponse JSON pour éviter le problème de parsing
+      console.log("Commentaire publié avec succès");
+      
+      // Réinitialiser le formulaire
+      setRating(0);
+      setComment('');
+      setBeforeImage(null);
+      setAfterImage(null);
+      
+      // Fermer le modal
+      onClose();
+      
+      // Message de succès
+      Alert.alert(
+        "Succès",
+        "Votre avis a été publié avec succès !",
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la publication de l\'avis:', error);
+      Alert.alert(
+        "Erreur",
+        `Impossible de publier votre avis. ${error.message}`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Fonction utilitaire pour déterminer le type MIME
+  const getMimeType = (filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'image/jpeg'; // Par défaut
     }
   };
 
@@ -190,7 +320,6 @@ const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setCommen
         style={styles.modalOverlay}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <ScrollView>
@@ -263,29 +392,20 @@ const ReviewModal = ({ isVisible, onClose, rating, setRating, comment, setCommen
                       setBeforeImage(null);
                       setAfterImage(null);
                     }}
+                    disabled={isSubmitting}
                   >
                     <Text style={styles.cancelButtonText}>Annuler</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    style={styles.submitButton}
-                    onPress={() => {
-                      if (!rating) {
-                        Alert.alert("Erreur", "Veuillez donner une évaluation");
-                        return;
-                      }
-                      if (!comment.trim()) {
-                        Alert.alert("Erreur", "Veuillez ajouter un commentaire");
-                        return;
-                      }
-                      console.log("Publication de l'avis:", { rating, comment, beforeImage, afterImage });
-                      onClose();
-                      setRating(0);
-                      setComment('');
-                      setBeforeImage(null);
-                      setAfterImage(null);
-                    }}
+                    style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]}
+                    onPress={submitReview}
+                    disabled={isSubmitting}
                   >
-                    <Text style={styles.submitButtonText}>Publier</Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Publier</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -1153,14 +1273,16 @@ const renderGalleryContent = () => {
         </View>
       </ScrollView>
       <ReviewModal 
-        isVisible={isReviewModalVisible}
-        onClose={() => setIsReviewModalVisible(false)}
-        rating={rating}
-        setRating={setRating}
-        comment={comment}
-        setComment={setComment}
-        firstName={firstName}
-      />
+  isVisible={isReviewModalVisible}
+  onClose={() => setIsReviewModalVisible(false)}
+  rating={rating}
+  setRating={setRating}
+  comment={comment}
+  setComment={setComment}
+  firstName={firstName}
+  utilisateurId={userId} // ID de l'utilisateur connecté
+  recepteurId={idCoach} // ID du coach qui reçoit le commentaire
+/>
       <VideoModal 
   visible={videoModalVisible}
   onClose={() => {
@@ -1191,6 +1313,13 @@ const renderGalleryContent = () => {
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+
+
+  uploadedImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 15,
+  },
   /////////vedio 
   videoScrollItem: {
     width: Dimensions.get('window').width,
