@@ -1124,20 +1124,9 @@ const fetchComments = useCallback(async (coachId) => {
       throw new Error(`Erreur HTTP: ${response.status}`);
     }
     
-    // Récupérer le texte au lieu de JSON directement
-    const responseText = await response.text();
-    
-    // Puis essayez de parser manuellement avec une fonction personnalisée
-    // qui simplifie la structure des données
-    try {
-      // On va extraire les informations essentielles et ignorer les structures complexes
-      const data = parseAndSimplifyComments(responseText);
-      console.log("Commentaires récupérés et simplifiés:", data);
-      setComments(data);
-    } catch (parseError) {
-      console.error("Erreur lors du parsing des commentaires:", parseError);
-      setCommentsError("Format de données incorrect");
-    }
+    const data = await response.json();
+    console.log("Commentaires récupérés:", data);
+    setComments(data);
   } catch (error) {
     console.error("Erreur lors de la récupération des commentaires:", error);
     setCommentsError(error.message);
@@ -1248,6 +1237,47 @@ useEffect(() => {
 }, [selectedTab, idCoach, fetchComments]);
 
 // Remplacez votre fonction renderEmojiContent par celle-ci
+const CommentImage = ({ imageUrl, label }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  // L'URL complète de l'image
+  const fullImageUrl = `http://192.168.0.3:8082${imageUrl}`;
+  
+  return (
+    <View style={styles.imageContainer}>
+      {error ? (
+        <View style={styles.emptyImagePlaceholder}>
+          <Text style={styles.emptyImageText}>Erreur d'image</Text>
+          <Text style={styles.imageLabel}>{label}</Text>
+        </View>
+      ) : (
+        <>
+          <Image 
+            source={{ uri: fullImageUrl }} 
+            style={styles.beforeAfterImage} 
+            resizeMode="cover"
+            onLoadStart={() => setLoading(true)}
+            onLoad={() => setLoading(false)}
+            onError={() => {
+              console.error(`Erreur chargement image: ${fullImageUrl}`);
+              setError(true);
+              setLoading(false);
+            }}
+          />
+          {loading && (
+            <View style={styles.imageLoadingOverlay}>
+              <ActivityIndicator size="small" color="#FFF" />
+            </View>
+          )}
+          <Text style={styles.imageLabel}>{label}</Text>
+        </>
+      )}
+    </View>
+  );
+};
+
+// Fonction pour rendre le contenu Emoji (commentaires)
 const renderEmojiContent = () => (
   <ScrollView style={styles.emojiScrollView}>
     <TouchableOpacity 
@@ -1289,32 +1319,28 @@ const renderEmojiContent = () => (
             <Text style={styles.reviewText}>
               {comment.commentaire}
             </Text>
-            {(comment.imageAvant || comment.imageApres) && (
+            {(comment.hasImageAvant || comment.hasImageApres) && (
               <View style={styles.beforeAfterContainer}>
-                {comment.imageAvant ? (
-                  <Image 
-                    source={{ 
-                      uri: `http://192.168.0.3:8082/api/commentaires/${comment.id}/image-avant` 
-                    }} 
-                    style={styles.beforeAfterImage} 
-                    resizeMode="cover"
+                {comment.hasImageAvant ? (
+                  <CommentImage 
+                    imageUrl={comment.imageAvantUrl} 
+                    label="Avant" 
                   />
                 ) : (
                   <View style={styles.emptyImagePlaceholder}>
                     <Text style={styles.emptyImageText}>Pas d'image</Text>
+                    <Text style={styles.imageLabel}>Avant</Text>
                   </View>
                 )}
-                {comment.imageApres ? (
-                  <Image 
-                    source={{ 
-                      uri: `http://192.168.0.3:8082/api/commentaires/${comment.id}/image-apres` 
-                    }} 
-                    style={styles.beforeAfterImage} 
-                    resizeMode="cover"
+                {comment.hasImageApres ? (
+                  <CommentImage 
+                    imageUrl={comment.imageApresUrl} 
+                    label="Après" 
                   />
                 ) : (
                   <View style={styles.emptyImagePlaceholder}>
                     <Text style={styles.emptyImageText}>Pas d'image</Text>
+                    <Text style={styles.imageLabel}>Après</Text>
                   </View>
                 )}
               </View>
@@ -1325,7 +1351,6 @@ const renderEmojiContent = () => (
     </View>
   </ScrollView>
 );
-
 
 //////////////////////////////
 
@@ -1513,6 +1538,67 @@ const renderEmojiContent = () => (
 // Styles                                         //
 //////////////////////////////////////////////////
 const styles = StyleSheet.create({
+  /////////////////
+
+  // Styles pour les images et leur affichage
+imageContainer: {
+  width: '48%',
+  height: 150,
+  position: 'relative',
+  borderRadius: 8,
+  overflow: 'hidden',
+},
+imageLoadingOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  backgroundColor: 'rgba(0,0,0,0.3)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+beforeAfterImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 8,
+},
+imageLabel: {
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  color: '#FFF',
+  textAlign: 'center',
+  padding: 4,
+  fontSize: 12,
+  fontWeight: 'bold',
+},
+emptyImagePlaceholder: {
+  width: '48%',
+  height: 150,
+  borderRadius: 8,
+  backgroundColor: '#f0f0f0',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+emptyImageText: {
+  color: '#777',
+  fontSize: 14,
+},
+reviewsSectionTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  marginBottom: 15,
+},
+reviewDate: {
+  color: '#777',
+  fontSize: 12,
+  marginBottom: 8,
+},
+noCommentsText: {
+  textAlign: 'center',
+  color: '#777',
+  fontSize: 16,
+  marginVertical: 20,
+},
   /////////////////////////
   reviewsSectionTitle: {
     fontSize: 18,
