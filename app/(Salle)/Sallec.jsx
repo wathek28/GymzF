@@ -381,6 +381,142 @@ const VideoErrorHandler = ({
     };
   }, [idGym, fetchReels]);
 
+
+  ///////////////////////////////
+ // Ajoutez ces états à l'intérieur du composant principal
+ const [comments, setComments] = useState([]);
+ const [loadingComments, setLoadingComments] = useState(false);
+ const [commentsError, setCommentsError] = useState(null);
+ 
+ // ... vos autres états et hooks ...
+ 
+ // Fonction pour récupérer les commentaires, à l'intérieur du composant
+ const fetchComments = useCallback(async (gymId) => {
+   if (!gymId) return;
+   
+   setLoadingComments(true);
+   setCommentsError(null);
+   
+   try {
+     const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${gymId}`);
+     
+     if (!response.ok) {
+       throw new Error(`Erreur HTTP: ${response.status}`);
+     }
+     
+     const data = await response.json();
+     console.log("Commentaires récupérés:", data);
+     setComments(data);
+   } catch (error) {
+     console.error("Erreur lors de la récupération des commentaires:", error);
+     setCommentsError(error.message);
+     
+     // Fallback aux données statiques en cas d'erreur
+     setComments(sampleReviews.map(review => ({
+       id: review.id,
+       evaluation: review.rating,
+       commentaire: review.comment,
+       dateCommentaire: new Date().toISOString(),
+       utilisateur: { firstName: review.name },
+       hasImageAvant: true,
+       hasImageApres: true,
+       imageAvantUrl: review.beforeImage,
+       imageApresUrl: review.afterImage
+     })));
+   } finally {
+     setLoadingComments(false);
+   }
+ }, []);
+ 
+ // useEffect pour charger les commentaires, à l'intérieur du composant
+ useEffect(() => {
+   if (selectedTab === 'emoji' && idGym) {
+     fetchComments(idGym);
+   }
+ }, [selectedTab, idGym, fetchComments]);
+ 
+ // Fonction renderEmoji à l'intérieur du composant
+ const renderEmoji = () => {
+   return (
+     <ScrollView style={styles.emojiScrollView}>
+       <TouchableOpacity 
+         style={styles.shareExperienceButton}
+         onPress={() => setIsReviewModalVisible(true)}
+       >
+         <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
+       </TouchableOpacity>
+       
+       <View style={styles.existingReviews}>
+         <Text style={styles.reviewsSectionTitle}>Avis des clients</Text>
+         
+         {loadingComments ? (
+           <View style={styles.loaderContainer}>
+             <ActivityIndicator size="large" color="#D4FF00" />
+             <Text style={styles.loaderText}>Chargement des avis...</Text>
+           </View>
+         ) : commentsError ? (
+           <View style={styles.errorContainer}>
+             <Text style={styles.errorText}>{commentsError}</Text>
+             <TouchableOpacity 
+               style={styles.retryButton}
+               onPress={() => fetchComments(idGym)}
+             >
+               <Text style={styles.retryButtonText}>Réessayer</Text>
+             </TouchableOpacity>
+           </View>
+         ) : comments.length === 0 ? (
+           <Text style={styles.noCommentsText}>Aucun avis pour le moment</Text>
+         ) : (
+           comments.map((comment) => (
+             <View key={comment.id} style={styles.reviewCard}>
+               <View style={styles.reviewHeader}>
+                 <Text style={styles.reviewerName}>
+                   {comment.utilisateur?.firstName || "Utilisateur"}
+                 </Text>
+                 {renderStars(comment.evaluation)}
+               </View>
+               <Text style={styles.reviewDate}>
+                 {new Date(comment.dateCommentaire).toLocaleDateString()}
+               </Text>
+               <Text style={styles.reviewText}>{comment.commentaire}</Text>
+               <View style={styles.beforeAfterContainer}>
+                 <View style={styles.transformationImageWrapper}>
+                   <Image 
+                     source={
+                       comment.hasImageAvant
+                         ? { uri: `http://192.168.0.3:8082${comment.imageAvantUrl}` }
+                         : require('../../assets/images/b.png')
+                     } 
+                     style={styles.beforeAfterImage} 
+                     resizeMode="cover"
+                   />
+                   <Text style={styles.imageLabel}>Avant</Text>
+                 </View>
+                 <View style={styles.transformationImageWrapper}>
+                   <Image 
+                     source={
+                       comment.hasImageApres
+                         ? { uri: `http://192.168.0.3:8082${comment.imageApresUrl}` }
+                         : require('../../assets/images/b.png')
+                     } 
+                     style={styles.beforeAfterImage} 
+                     resizeMode="cover"
+                   />
+                   <Text style={styles.imageLabel}>Après</Text>
+                 </View>
+               </View>
+             </View>
+           ))
+         )}
+       </View>
+     </ScrollView>
+   );
+ };
+ 
+
+
+  ////////////////////////////
+
   // Fonction pour rendre le contenu vidéo
   const renderVideoContent = () => {
     if (reelsLoading) {
@@ -549,219 +685,181 @@ const VideoErrorHandler = ({
   };
 
   // Fonction pour rendre le contenu en fonction de l'onglet sélectionné
-  const renderMainContent = () => {
-    switch (selectedTab) {
-      case 'document':
-       
-case 'document':
-  return (
-    <View>
-      <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
-      <Text style={styles.aboutText}>
-        Découvrez nos différents programmes d'entraînement adaptés à tous les niveaux.
-      </Text>
-      
-      <View style={styles.scheduleContainer}>
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Lundi - Force & Musculation</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Haut du Corps</Text>
-              <Text style={styles.scheduleItemTime}>06:00 - 08:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Bas du Corps</Text>
-              <Text style={styles.scheduleItemTime}>18:00 - 20:00</Text>
-            </View>
-          </View>
-        </View>
+ // Function to render emoji content
 
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Mardi - Cardio & Endurance</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="run" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Course & Intervalles</Text>
-              <Text style={styles.scheduleItemTime}>07:00 - 09:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="bike" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Spinning</Text>
-              <Text style={styles.scheduleItemTime}>19:00 - 20:30</Text>
-            </View>
-          </View>
-        </View>
 
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Mercredi - Fitness Mixte</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="yoga" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Yoga</Text>
-              <Text style={styles.scheduleItemTime}>07:30 - 09:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="dumbbell" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Circuit Training</Text>
-              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Jeudi - Musculation Intensive</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>CrossFit</Text>
-              <Text style={styles.scheduleItemTime}>06:30 - 08:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="arm-flex" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Ciblée</Text>
-              <Text style={styles.scheduleItemTime}>19:00 - 21:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Vendredi - Cardio & Bien-être</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Pilates</Text>
-              <Text style={styles.scheduleItemTime}>07:00 - 08:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="boxing-glove" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Boxe Fitness</Text>
-              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Samedi - Cours Collectifs</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="human-female-dance" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Zumba</Text>
-              <Text style={styles.scheduleItemTime}>09:00 - 10:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Body Pump</Text>
-              <Text style={styles.scheduleItemTime}>11:00 - 12:30</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Dimanche - Récupération</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="relaxed" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Stretching</Text>
-              <Text style={styles.scheduleItemTime}>10:00 - 11:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Cours de Relaxation</Text>
-              <Text style={styles.scheduleItemTime}>11:45 - 13:00</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-        
-      case 'gallery':
-        return (
-            <View>
-              <Text style={styles.sectionTitle}>Galerie photos</Text>
-              {galleryLoading ? (
-                <ActivityIndicator size="large" color="#111" />
-              ) : galleryError ? (
-                <Text style={styles.errorText}>Erreur de chargement des images: {galleryError}</Text>
-              ) : (
-                <ScrollView>
-                  {renderGalleryGrid()}
-                </ScrollView>
-              )}
-            </View>
-          );
-        
-      case 'video':
-        return (
-          <View>
-            <Text style={styles.sectionTitle}>Vidéos</Text>
-            {renderVideoContent()}
-          </View>
-        );
-        
-      case 'emoji':
-        return (
-          <ScrollView style={styles.emojiScrollView}>
-            <TouchableOpacity 
-              style={styles.shareExperienceButton}
-              onPress={() => setIsReviewModalVisible(true)}
-            >
-              <Text style={styles.shareExperienceText}>Partagez votre expérience</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.existingReviews}>
-              <Text style={styles.reviewsSectionTitle}>Avis des clients</Text>
-              {sampleReviews.map((review) => (
-                <View key={review.id} style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <Text style={styles.reviewerName}>{review.name}</Text>
-                    {renderStars(review.rating)}
-                  </View>
-                  <Text style={styles.reviewText}>{review.comment}</Text>
-                  <View style={styles.beforeAfterContainer}>
-                    <View style={styles.transformationImageWrapper}>
-                      <Image 
-                        source={review.beforeImage} 
-                        style={styles.beforeAfterImage} 
-                        resizeMode="cover"
-                      />
-                      <Text style={styles.imageLabel}>Avant</Text>
-                    </View>
-                    <View style={styles.transformationImageWrapper}>
-                      <Image 
-                        source={review.afterImage} 
-                        style={styles.beforeAfterImage} 
-                        resizeMode="cover"
-                      />
-                      <Text style={styles.imageLabel}>Après</Text>
-                    </View>
-                  </View>
+// Modify the renderMainContent function to use renderEmoji
+const renderMainContent = () => {
+  switch (selectedTab) {
+    case 'document':
+      return (
+        <View>
+          <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
+          <Text style={styles.aboutText}>
+            Découvrez nos différents programmes d'entraînement adaptés à tous les niveaux.
+          </Text>
+          
+          <View style={styles.scheduleContainer}>
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Lundi - Force & Musculation</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Musculation Haut du Corps</Text>
+                  <Text style={styles.scheduleItemTime}>06:00 - 08:00</Text>
                 </View>
-              ))}
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="weight" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Musculation Bas du Corps</Text>
+                  <Text style={styles.scheduleItemTime}>18:00 - 20:00</Text>
+                </View>
+              </View>
             </View>
-          </ScrollView>
-        );
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Mardi - Cardio & Endurance</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="run" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Course & Intervalles</Text>
+                  <Text style={styles.scheduleItemTime}>07:00 - 09:00</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="bike" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Spinning</Text>
+                  <Text style={styles.scheduleItemTime}>19:00 - 20:30</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Mercredi - Fitness Mixte</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="yoga" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Yoga</Text>
+                  <Text style={styles.scheduleItemTime}>07:30 - 09:00</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="dumbbell" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Circuit Training</Text>
+                  <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Jeudi - Musculation Intensive</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>CrossFit</Text>
+                  <Text style={styles.scheduleItemTime}>06:30 - 08:00</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="arm-flex" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Musculation Ciblée</Text>
+                  <Text style={styles.scheduleItemTime}>19:00 - 21:00</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Vendredi - Cardio & Bien-être</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="meditation" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Pilates</Text>
+                  <Text style={styles.scheduleItemTime}>07:00 - 08:30</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="boxing-glove" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Boxe Fitness</Text>
+                  <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Samedi - Cours Collectifs</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="human-female-dance" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Zumba</Text>
+                  <Text style={styles.scheduleItemTime}>09:00 - 10:30</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="weight" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Body Pump</Text>
+                  <Text style={styles.scheduleItemTime}>11:00 - 12:30</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.scheduleDay}>
+              <View style={styles.scheduleDayHeader}>
+                <Text style={styles.scheduleDayTitle}>Dimanche - Récupération</Text>
+              </View>
+              <View style={styles.scheduleDetails}>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="relaxed" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Stretching</Text>
+                  <Text style={styles.scheduleItemTime}>10:00 - 11:30</Text>
+                </View>
+                <View style={styles.scheduleItem}>
+                  <MaterialCommunityIcons name="meditation" size={24} color="#000" />
+                  <Text style={styles.scheduleItemText}>Cours de Relaxation</Text>
+                  <Text style={styles.scheduleItemTime}>11:45 - 13:00</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      );
         
-      default:
-        return null;
-    }
-  };
+    case 'gallery':
+      return (
+        <View>
+          <Text style={styles.sectionTitle}>Galerie photos</Text>
+          {galleryLoading ? (
+            <ActivityIndicator size="large" color="#111" />
+          ) : galleryError ? (
+            <Text style={styles.errorText}>Erreur de chargement des images: {galleryError}</Text>
+          ) : (
+            <ScrollView>
+              {renderGalleryGrid()}
+            </ScrollView>
+          )}
+        </View>
+      );
+        
+    case 'video':
+      return (
+        <View>
+          <Text style={styles.sectionTitle}>Vidéos</Text>
+          {renderVideoContent()}
+        </View>
+      );
+        
+    case 'emoji':
+      return renderEmoji();
+        
+    default:
+      return null;
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -974,6 +1072,7 @@ const renderStars = (rating) => (
     ))}
   </View>
 );
+//////////////////////commentaire  
 const ReviewModal = ({ 
   isVisible, 
   onClose, 
@@ -981,10 +1080,21 @@ const ReviewModal = ({
   setRating, 
   comment, 
   setComment, 
-  firstName 
+  firstName
 }) => {
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Utilisateur connecté (à remplacer par votre logique d'authentification)
+  const utilisateurId = 4; // ID de l'utilisateur connecté (gymzer)
+  
+  // Paramètres du composant parent
+  const route = useRoute();
+  const params = route.params || {};
+  const recepteurId = params.idGym; // ID du gym qui reçoit le commentaire
+
+  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de l'API
 
   const pickImage = async (setImage) => {
     try {
@@ -1000,11 +1110,125 @@ const ReviewModal = ({
         quality: 1,
       });
       if (!result.canceled) {
-        setImage(result.uri);
+        setImage(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Erreur lors de la sélection de l\'image:', error);
       Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+    }
+  };
+
+  // Fonction pour soumettre le commentaire à l'API
+  const submitReview = async () => {
+    // Validation
+    if (!rating) {
+      Alert.alert("Erreur", "Veuillez donner une évaluation");
+      return;
+    }
+    if (!comment.trim()) {
+      Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+      return;
+    }
+    
+    // Vérifier que les IDs requis sont disponibles
+    if (!utilisateurId || !recepteurId) {
+      Alert.alert("Erreur", "Information utilisateur manquante");
+      console.error("utilisateurId ou recepteurId manquant", { utilisateurId, recepteurId });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Préparation du FormData
+      const formData = new FormData();
+      formData.append('evaluation', rating.toString());
+      formData.append('commentaire', comment);
+
+      // Traitement de l'image "avant" si disponible
+      if (beforeImage) {
+        const imageNameBefore = beforeImage.split('/').pop();
+        const mimeTypeBefore = getMimeType(imageNameBefore);
+        
+        formData.append('imageAvant', {
+          uri: Platform.OS === 'android' ? beforeImage : beforeImage.replace('file://', ''),
+          name: imageNameBefore,
+          type: mimeTypeBefore
+        });
+      }
+
+      // Traitement de l'image "après" si disponible
+      if (afterImage) {
+        const imageNameAfter = afterImage.split('/').pop();
+        const mimeTypeAfter = getMimeType(imageNameAfter);
+        
+        formData.append('imageApres', {
+          uri: Platform.OS === 'android' ? afterImage : afterImage.replace('file://', ''),
+          name: imageNameAfter,
+          type: mimeTypeAfter
+        });
+      }
+
+      // Log pour le debug
+      console.log(`Envoi du commentaire à l'URL: ${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`);
+
+      // Appel API
+      const response = await fetch(`${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          // Ne pas définir Content-Type pour un FormData multipart
+        },
+        body: formData
+      });
+
+      // Vérifier uniquement le statut HTTP
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      console.log("Commentaire publié avec succès");
+      
+      // Réinitialiser le formulaire
+      setRating(0);
+      setComment('');
+      setBeforeImage(null);
+      setAfterImage(null);
+      
+      // Fermer le modal
+      onClose();
+      
+      // Message de succès
+      Alert.alert(
+        "Succès",
+        "Votre avis a été publié avec succès !",
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la publication de l\'avis:', error);
+      Alert.alert(
+        "Erreur",
+        `Impossible de publier votre avis. ${error.message}`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Fonction utilitaire pour déterminer le type MIME
+  const getMimeType = (filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'image/jpeg'; // Par défaut
     }
   };
 
@@ -1091,29 +1315,20 @@ const ReviewModal = ({
                       setBeforeImage(null);
                       setAfterImage(null);
                     }}
+                    disabled={isSubmitting}
                   >
                     <Text style={styles.cancelButtonText}>Annuler</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    style={styles.submitButton}
-                    onPress={() => {
-                      if (!rating) {
-                        Alert.alert("Erreur", "Veuillez donner une évaluation");
-                        return;
-                      }
-                      if (!comment.trim()) {
-                        Alert.alert("Erreur", "Veuillez ajouter un commentaire");
-                        return;
-                      }
-                      console.log("Publication de l'avis:", { rating, comment, beforeImage, afterImage });
-                      onClose();
-                      setRating(0);
-                      setComment('');
-                      setBeforeImage(null);
-                      setAfterImage(null);
-                    }}
+                    style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]}
+                    onPress={submitReview}
+                    disabled={isSubmitting}
                   >
-                    <Text style={styles.submitButtonText}>Publier</Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Publier</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -1126,24 +1341,8 @@ const ReviewModal = ({
 };
 
 // Sample reviews for the gym
-const sampleReviews = [
-  {
-    id: 1,
-    name: "Jean Dupont", 
-    rating: 5,
-    comment: "Super ambiance et équipements modernes. Les coachs sont très professionnels et à l'écoute. Je recommande vivement ce gym !",
-    beforeImage: require('../../assets/images/b.png'),
-    afterImage: require('../../assets/images/b.png')
-  },
-  {
-    id: 2,
-    name: "Sophie Martin", 
-    rating: 4,
-    comment: "Un excellent centre de fitness avec des cours variés et des équipements de qualité. L'ambiance est motivante et conviviale.",
-    beforeImage: require('../../assets/images/b.png'),
-    afterImage: require('../../assets/images/b.png')
-  }
-];
+
+
 //////////////////////
 
 
@@ -1532,6 +1731,14 @@ const processVideoData = async (videoData) => {
 
 
 const styles = StyleSheet.create({
+  //////////////////////commentaire 
+  uploadedImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 15,
+  },
+
+  /////////////////////
   container: {
     flex: 1,
     backgroundColor: '#fff',
