@@ -33,11 +33,39 @@ const ReelsScreen = () => {
   
   // Récupérer les paramètres de navigation
   const params = useLocalSearchParams();
-  const { userId, firstName, phoneNumber } = params;
+  const { userId, firstName, phoneNumber, photo } = params;
+
+  // Log des paramètres reçus pour vérification
+  useEffect(() => {
+    console.log("Paramètres reçus dans ReelsScreen:", { 
+      userId, 
+      firstName, 
+      phoneNumber, 
+      photoAvailable: photo ? "oui" : "non" 
+    });
+  }, [userId, firstName, phoneNumber, photo]);
 
   // Fonction de retour
   const handleGoBack = () => {
     router.back();
+  };
+  
+  // Fonction pour gérer les likes avec mise à jour directe
+  const handleLike = (reelId) => {
+    setReels(currentReels => 
+      currentReels.map(reel => {
+        if (reel.id === reelId) {
+          // Si c'est le reel que nous voulons modifier
+          const newIsLiked = !reel.isLiked;
+          return {
+            ...reel,
+            isLiked: newIsLiked,
+            likes: newIsLiked ? 1 : 0
+          };
+        }
+        return reel;
+      })
+    );
   };
 
   // Fonction pour mettre en pause/reprendre la vidéo
@@ -177,8 +205,8 @@ const ReelsScreen = () => {
             name: reel.author?.firstName || 'Utilisateur',
             profilePic: reel.author?.photo ? `data:image/jpeg;base64,${reel.author.photo}` : null
           },
-          likes: 0,
-          isLiked: false
+          likes: 0, // Toujours initialiser à 0
+          isLiked: false // Toujours initialiser à false pour le frontend uniquement
         };
       }));
       
@@ -313,16 +341,7 @@ const ReelsScreen = () => {
         <View style={styles.rightActions}>
           <TouchableOpacity 
             style={styles.actionButton} 
-            onPress={() => {
-              const updatedReels = [...reels];
-              updatedReels[index].isLiked = !updatedReels[index].isLiked;
-              if (updatedReels[index].isLiked) {
-                updatedReels[index].likes += 1;
-              } else {
-                updatedReels[index].likes -= 1;
-              }
-              setReels(updatedReels);
-            }}
+            onPress={() => handleLike(item.id)}
           >
             <FontAwesome 
               name="star" 
@@ -332,18 +351,25 @@ const ReelsScreen = () => {
             <Text style={styles.actionText}>{item.likes}</Text>
           </TouchableOpacity>
           
-          {/* Profil utilisateur - ne s'affiche que pour la vidéo courante pour améliorer les performances */}
+          {/* Profil utilisateur - avec photo passée en paramètre */}
           {shouldRenderFullContent && (
             <TouchableOpacity style={styles.profileAction}>
               <Image
-                source={item.user.profilePic ? { uri: item.user.profilePic } : require('../../assets/images/b.png')}
+                source={
+                  photo 
+                    ? { uri: photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}` } 
+                    : (item.user.profilePic 
+                        ? { uri: item.user.profilePic } 
+                        : require('../../assets/images/b.png')
+                      )
+                }
                 style={styles.profilePic}
               />
               <View style={styles.profileBadge}>
                 <FontAwesome name="plus" size={10} color="white" />
               </View>
               <Text style={styles.profileActionText}>S'abonner</Text>
-              <Text style={styles.profileActionSubtext}>@{item.user.name.toLowerCase()}</Text>
+              <Text style={styles.profileActionSubtext}>@{firstName ? firstName.toLowerCase() : item.user.name.toLowerCase()}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -481,6 +507,8 @@ const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
     marginBottom: 20,
+    minHeight: 50, // Pour éviter le saut lors du chargement
+    justifyContent: 'center',
   },
   actionText: {
     color: 'white',

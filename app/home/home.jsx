@@ -869,15 +869,25 @@ try {
               });
             } else if (item.id === 'calendar') {
               
-              
+            
                 console.log("✅ Tentative de navigation vers Reels");
                 console.log("🔍 Chemin utilisé:", "Reels");
-                console.log("📋 Paramètres:", { userId, firstName, phoneNumber });
+                console.log("📋 Paramètres:", { 
+                  userId, 
+                  firstName, 
+                  phoneNumber,
+                  photo: userPhoto // Changed from 'photo' to 'userPhoto'
+                });
                 
                 try {
                   router.push({
-                    pathname: "/(Reels)/Reels", // Sans parenthèses et sans slash
-                    params: { userId, firstName, phoneNumber }
+                    pathname: "/(Reels)/Reels",
+                    params: { 
+                      userId, 
+                      firstName, 
+                      phoneNumber, 
+                      photo: userPhoto // Changed from 'photo' to 'userPhoto'
+                    }
                   });
                   console.log("✅ Navigation terminée");
                 } catch (error) {
