@@ -25,36 +25,7 @@ import { router } from 'expo-router';
 
 const { width } = Dimensions.get("window");
 
-const navItems = [
-  {
-    id: "home",
-    icon: "home",
-    name: "Accueil",
-    color: "#4CAF50",
-    Component: MaterialCommunityIcons,
-  },
-  {
-    id: "heart",
-    icon: "heart",
-    name: "Mes envies",
-    color: "#666",
-    Component: Feather,
-  },
-  {
-    id: "calendar",
-    icon: "calendar",
-    name: "Plans",
-    color: "#666",
-    Component: Feather,
-  },
-  {
-    id: "user",
-    icon: "user",
-    name: "Profil",
-    color: "#666",
-    Component: Feather,
-  },
-];
+
 
 const FitnessApp = () => {
   const navigation = useNavigation();
@@ -838,85 +809,15 @@ try {
       </ScrollView>
 
       {/* Navigation */}
-      <View style={styles.bottomNav}>
-      {navItems.map((item, index) => (
-        <TouchableOpacity
-          key={`nav-${item.id}-${index}`}
-          style={styles.navItem}
-          onPress={() => {
-            if (item.id === 'home') {
-              // Rester sur la page actuelle ou rafraîchir
-              console.log('Restez sur la page d\'accueil avec userId:', userId);
-            } else if (item.id === 'user') {
-              // Vérifier les données avant navigation
-              console.log('=== NAVIGATION VERS GYM ===');
-              console.log('userId à transmettre:', userId);
-              console.log('firstName à transmettre:', firstName);
-              console.log('phoneNumber à transmettre:', phoneNumber);
-              console.log('photo à transmettre:', userPhoto ? `présente (longueur: ${userPhoto.length})` : 'non définie');
-              console.log('email à transmettre:', userEmail || 'non défini');
-              
-              // Rediriger vers la page Gym avec toutes les données utilisateur, y compris l'email
-              router.push({
-                pathname: "/(Gymzer)/Gym",
-                params: { 
-                  userId: userId,
-                  firstName: firstName,
-                  phoneNumber: phoneNumber,
-                  photo: userPhoto,
-                  email: userEmail
-                }
-              });
-            } else if (item.id === 'calendar') {
-              
-            
-                console.log("✅ Tentative de navigation vers Reels");
-                console.log("🔍 Chemin utilisé:", "Reels");
-                console.log("📋 Paramètres:", { 
-                  userId, 
-                  firstName, 
-                  phoneNumber,
-                  photo: userPhoto // Changed from 'photo' to 'userPhoto'
-                });
-                
-                try {
-                  router.push({
-                    pathname: "/(Reels)/Reels",
-                    params: { 
-                      userId, 
-                      firstName, 
-                      phoneNumber, 
-                      photo: userPhoto // Changed from 'photo' to 'userPhoto'
-                    }
-                  });
-                  console.log("✅ Navigation terminée");
-                } catch (error) {
-                  console.error("❌ Erreur de navigation:", error);
-                }
-              
-              
-            } else if (item.id === 'heart') {
-              navigateWithUserData('favorites');
-            }
-          }}
-        >
-          <item.Component name={item.icon} size={24} color={item.color} />
-          <Text
-            style={[
-              styles.navText,
-              item.color === "#4CAF50" && styles.activeNavText,
-            ]}
-          >
-            {item.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      </View>
+      
     </SafeAreaView>
   );
 };
 const styles = StyleSheet.create({
-  
+  scrollView: {
+    flex: 1,
+    paddingBottom: 70, // Ajout d'un espace en bas pour ne pas que le contenu soit caché par la navbar
+  },
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
@@ -1014,7 +915,7 @@ const styles = StyleSheet.create({
   },
   section1: {
     padding: 16,
-    marginBottom:50,
+    marginBottom: 80, 
   
   },
   sectionTitle: {

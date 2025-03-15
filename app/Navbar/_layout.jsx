@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Animated,
+  Dimensions
 } from "react-native";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { router } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const { width } = Dimensions.get('window');
+const TAB_WIDTH = width / 4; // 4 onglets dans la barre
 
 export default function _layout() {
   const [userData, setUserData] = useState({
@@ -17,6 +22,12 @@ export default function _layout() {
     userPhoto: '',
     userEmail: ''
   });
+  
+  // Suivre l'onglet actif
+  const [activeTab, setActiveTab] = useState('home');
+  
+  // Animation pour l'indicateur coulissant
+  const slideAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -41,45 +52,55 @@ export default function _layout() {
 
     loadUserData();
   }, []);
+  
+  // Effet pour animer le changement d'onglet
+  useEffect(() => {
+    const indexMap = { home: 0, heart: 1, reels: 2, user: 3 };
+    const tabIndex = indexMap[activeTab];
+    
+    Animated.timing(slideAnimation, {
+      toValue: tabIndex * TAB_WIDTH,
+      duration: 300,
+      useNativeDriver: true
+    }).start();
+  }, [activeTab]);
 
+  // Éléments de la barre de navigation
   const navItems = [
     {
       id: "home",
       icon: "home",
       name: "Accueil",
-      color: "#666",
       Component: MaterialCommunityIcons,
     },
     {
       id: "heart",
       icon: "heart",
       name: "Mes envies",
-      color: "#666",
       Component: Feather,
     },
     {
-      id: "calendar",
-      icon: "calendar",
-      name: "Plans",
-      color: "#666",
+      id: "reels",
+      icon: "play-circle",
+      name: "Reels",
       Component: Feather,
     },
     {
       id: "user",
       icon: "user",
       name: "Profil",
-      color: "#666",
       Component: Feather,
     },
   ];
 
-  const navigateWithUserData = (route) => {
+  const navigateWithUserData = (route, tabId) => {
     if (!userData.userId) {
       console.warn('No user data available for navigation');
       return;
     }
 
-    console.log('Navigating with user data:', userData);
+    console.log('Navigating to', route, 'with user data:', userData);
+    setActiveTab(tabId);
 
     router.push({
       pathname: route,
@@ -96,39 +117,57 @@ export default function _layout() {
   return (
     <View style={styles.container}>
       <View style={styles.bottomNav}>
-        {navItems.map((item, index) => (
-          <TouchableOpacity
-            key={`nav-${item.id}-${index}`}
-            style={styles.navItem}
-            onPress={() => {
-              switch (item.id) {
-                case 'home':
-                  navigateWithUserData("/home");
-                  console.log('Staying on home page');
-                  break;
-                case 'user':
-                  navigateWithUserData("/(Gymzer)/Gym");
-                  break;
-                case 'calendar':
-                  navigateWithUserData("/(event)");
-                  break;
-                case 'heart':
-                  navigateWithUserData("favorites");
-                  break;
-              }
-            }}
-          >
-            <item.Component name={item.icon} size={24} color={item.color} />
-            <Text
-              style={[
-                styles.navText,
-                item.color === "#4CAF50" && styles.activeNavText,
-              ]}
+        {/* Indicateur coulissant */}
+        <Animated.View
+          style={[
+            styles.slidingIndicator,
+            {
+              transform: [{ translateX: slideAnimation }]
+            }
+          ]}
+        />
+        
+        {navItems.map((item, index) => {
+          const isActive = activeTab === item.id;
+          
+          return (
+            <TouchableOpacity
+              key={`nav-${item.id}-${index}`}
+              style={styles.navItem}
+              onPress={() => {
+                switch (item.id) {
+                  case 'home':
+                    navigateWithUserData("/home", 'home');
+                    break;
+                  case 'user':
+                    navigateWithUserData("/(Gymzer)/Gym", 'user');
+                    break;
+                  case 'heart':
+                    navigateWithUserData("favorites", 'heart');
+                    break;
+                  case 'reels':
+                    console.log("Navigation vers Reels");
+                    navigateWithUserData("/(Reels)/Reels", 'reels'); 
+                    break;
+                }
+              }}
             >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <item.Component 
+                name={item.icon} 
+                size={24} 
+                color={isActive ? "#CBFF06" : "#666"} 
+              />
+              <Text
+                style={[
+                  styles.navText,
+                  isActive && styles.activeNavText,
+                ]}
+              >
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -136,24 +175,31 @@ export default function _layout() {
 
 const styles = StyleSheet.create({
   container: {
- flex:1,
-   
+    flex: 1,
   },
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 15,
+    alignItems: "center",
+    paddingVertical: 10,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#eee",
     position: "absolute",
     bottom: 2, 
     width: "100%",
-    borderRadius: 25, // Ajout d'un borderRadius pour arrondir les coins
-   // Ajout de marges horizontales
-    
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    height: 65,
   },
   navItem: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "center",
     alignItems: "center",
   },
   navText: {
@@ -163,5 +209,14 @@ const styles = StyleSheet.create({
   },
   activeNavText: {
     color: "#CBFF06",
+    fontWeight: "bold",
+  },
+  slidingIndicator: {
+    position: "absolute",
+    width: TAB_WIDTH,
+    height: 3,
+    backgroundColor: "#CBFF06",
+    bottom: 0,
+    borderRadius: 1.5,
   }
 });

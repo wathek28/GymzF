@@ -15,6 +15,7 @@ import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get('window');
 const API_BASE_URL = 'http://192.168.0.3:8082';
@@ -35,6 +36,21 @@ const ReelsScreen = () => {
   const params = useLocalSearchParams();
   const { userId, firstName, phoneNumber, photo } = params;
 
+  // Fonction pour stocker les paramètres utilisateur si nécessaire
+  const saveUserDataToStorage = async () => {
+    if (userId && !await AsyncStorage.getItem('userId')) {
+      try {
+        await AsyncStorage.setItem('userId', userId);
+        if (firstName) await AsyncStorage.setItem('firstName', firstName);
+        if (phoneNumber) await AsyncStorage.setItem('phoneNumber', phoneNumber);
+        if (photo) await AsyncStorage.setItem('userPhoto', photo);
+        console.log('Données utilisateur sauvegardées dans AsyncStorage');
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde des données utilisateur:', error);
+      }
+    }
+  };
+
   // Log des paramètres reçus pour vérification
   useEffect(() => {
     console.log("Paramètres reçus dans ReelsScreen:", { 
@@ -43,6 +59,9 @@ const ReelsScreen = () => {
       phoneNumber, 
       photoAvailable: photo ? "oui" : "non" 
     });
+    
+    // Sauvegarder les données utilisateur si nécessaire
+    saveUserDataToStorage();
   }, [userId, firstName, phoneNumber, photo]);
 
   // Fonction de retour
@@ -60,7 +79,7 @@ const ReelsScreen = () => {
           return {
             ...reel,
             isLiked: newIsLiked,
-            likes: newIsLiked ? 1 : 0
+            likes: newIsLiked ? reel.likes + 1 : Math.max(0, reel.likes - 1)
           };
         }
         return reel;
@@ -441,6 +460,9 @@ const ReelsScreen = () => {
           setCurrentIndex(index);
         }}
       />
+      
+      {/* Espace réservé pour la barre de navigation */}
+      <View style={styles.navSpacerBottom} />
     </SafeAreaView>
   );
 };
@@ -619,6 +641,9 @@ const styles = StyleSheet.create({
     color: 'black',
     fontWeight: 'bold',
   },
+  navSpacerBottom: {
+    height: 60, // Hauteur pour la barre de navigation
+  }
 });
 
 export default ReelsScreen;

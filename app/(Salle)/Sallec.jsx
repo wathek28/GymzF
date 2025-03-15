@@ -39,7 +39,7 @@ const SAlle = () => {
   // Récupérer les paramètres passés à la route
   const route = useRoute(); // Utiliser useRoute au lieu de useLocalSearchParams
   const params = route.params || {}; // Récupérer les paramètres de la route
-  
+  const navigation = useNavigation();
   console.log("Tous les paramètres:", params);
   
   // Log des paramètres pour débogage
@@ -687,144 +687,252 @@ const VideoErrorHandler = ({
   // Fonction pour rendre le contenu en fonction de l'onglet sélectionné
  // Function to render emoji content
 // 1. Créez cette fonction à l'intérieur de votre composant SAlle
+const [selectedDay, setSelectedDay] = useState('Lundi');
+const [plannings, setPlannings] = useState([]);
+const [planningLoading, setPlanningLoading] = useState(true);
+const [planningError, setPlanningError] = useState(null);
+const [scheduleData, setScheduleData] = useState({});
+
+// Effet pour charger les plannings - DÉPLACÉ AU NIVEAU RACINE
+useEffect(() => {
+  if (!idGym || selectedTab !== 'document') return;
+
+  const fetchPlannings = async () => {
+    try {
+      setPlanningLoading(true);
+      console.log(`Récupération des plannings pour le gym ID: ${idGym}`);
+
+      // URL de l'API
+      const apiUrl = `http://192.168.0.3:8082/api/plannings/user/${idGym}`;
+      console.log('Appel API:', apiUrl);
+
+      // Faire la requête GET
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Statut de la réponse:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`Erreur lors de la récupération des plannings (${response.status})`);
+      }
+
+      // Convertir la réponse en JSON
+      const data = await response.json();
+      console.log('Plannings récupérés:', data);
+
+      if (!Array.isArray(data)) {
+        console.error('Format de données non valide:', data);
+        throw new Error('Format de données non valide');
+      }
+
+      setPlannings(data);
+
+      // Transformer les données pour l'affichage
+      const formattedData = transformPlanningsForDisplay(data);
+      setScheduleData(formattedData);
+
+      // Si aucun jour n'est sélectionné, sélectionner le premier jour disponible
+      if (Object.keys(formattedData).length > 0 && !formattedData[selectedDay]) {
+        setSelectedDay(Object.keys(formattedData)[0]);
+      }
+
+      setPlanningError(null);
+    } catch (err) {
+      console.error('Erreur lors de la récupération des plannings:', err);
+      setPlanningError(err.message);
+      
+      // En cas d'erreur, utiliser les données statiques
+      setScheduleData(getStaticScheduleData());
+    } finally {
+      setPlanningLoading(false);
+    }
+  };
+
+  fetchPlannings();
+}, [idGym, selectedTab, selectedDay]); // Ajout de selectedTab comme dépendance
+
+// Fonction pour transformer les données reçues de l'API en format d'affichage
+const transformPlanningsForDisplay = useCallback((planningsData) => {
+  const formattedData = {};
+
+  planningsData.forEach(planning => {
+    // Vérifier que le planning contient toutes les données nécessaires
+    if (!planning.dayName || !planning.dayTitle || !planning.activity1 || !planning.time1 || !planning.activity2 || !planning.time2) {
+      console.warn('Planning incomplet ignoré:', planning);
+      return;
+    }
+
+    // Créer ou mettre à jour l'entrée pour ce jour
+    if (!formattedData[planning.dayName]) {
+      formattedData[planning.dayName] = {
+        title: planning.dayTitle,
+        activities: []
+      };
+    }
+
+    // Ajouter les activités
+    formattedData[planning.dayName].activities.push(
+      { name: planning.activity1, time: planning.time1 },
+      { name: planning.activity2, time: planning.time2 }
+    );
+  });
+
+  return formattedData;
+}, []);
+
+// Données statiques à utiliser en cas d'erreur ou pendant le chargement
+const getStaticScheduleData = useCallback(() => {
+  return {
+    'Lundi': {
+      title: 'Force & Musculation',
+      activities: [
+        { name: 'Musculation Haut du Corps', time: '06:00 - 08:00' },
+        { name: 'Musculation Bas du Corps', time: '18:00 - 20:00' }
+      ]
+    },
+    'Mardi': {
+      title: 'Cardio & Endurance',
+      activities: [
+        { name: 'Course & Intervalles', time: '07:00 - 09:00' },
+        { name: 'Spinning', time: '19:00 - 20:30' }
+      ]
+    },
+    'Mercredi': {
+      title: 'Fitness Mixte',
+      activities: [
+        { name: 'Yoga', time: '07:30 - 09:00' },
+        { name: 'Circuit Training', time: '18:30 - 20:00' }
+      ]
+    },
+    'Jeudi': {
+      title: 'Musculation Intensive',
+      activities: [
+        { name: 'CrossFit', time: '06:30 - 08:00' },
+        { name: 'Musculation Ciblée', time: '19:00 - 21:00' }
+      ]
+    },
+    'Vendredi': {
+      title: 'Cardio & Bien-être',
+      activities: [
+        { name: 'Pilates', time: '07:00 - 08:30' },
+        { name: 'Boxe Fitness', time: '18:30 - 20:00' }
+      ]
+    },
+    'Samedi': {
+      title: 'Cours Collectifs',
+      activities: [
+        { name: 'Zumba', time: '09:00 - 10:30' },
+        { name: 'Body Pump', time: '11:00 - 12:30' }
+      ]
+    },
+    'Dimanche': {
+      title: 'Récupération',
+      activities: [
+        { name: 'Stretching', time: '10:00 - 11:30' },
+        { name: 'Cours de Relaxation', time: '11:45 - 13:00' }
+      ]
+    }
+  };
+}, []);
+
+// Jours disponibles dans les données récupérées
+const days = useMemo(() => Object.keys(scheduleData), [scheduleData]);
+
+// Fonction pour rafraîchir les données
+const refreshPlannings = useCallback(() => {
+  setPlanningLoading(true);
+  setPlanningError(null);
+  // Forcer la réexécution de l'useEffect
+  setPlannings([]);
+}, []);
+
+// Remplacer la fonction renderPlanning qui ne contient maintenant QUE l'affichage, pas d'états ou d'effets
 const renderPlanning = () => {
   return (
-    <View>
-      <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
+    <View style={styles.container}>
+      <View style={styles.headerSection}>
+        <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
+        {planningError && (
+          <TouchableOpacity style={styles.refreshButton} onPress={refreshPlannings}>
+            <Text style={styles.refreshButtonText}>Rafraîchir</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      
       <Text style={styles.aboutText}>
         Découvrez nos différents programmes d'entraînement adaptés à tous les niveaux.
       </Text>
       
-      <View style={styles.scheduleContainer}>
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Lundi - Force & Musculation</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Haut du Corps</Text>
-              <Text style={styles.scheduleItemTime}>06:00 - 08:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Bas du Corps</Text>
-              <Text style={styles.scheduleItemTime}>18:00 - 20:00</Text>
-            </View>
-          </View>
+      {planningLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#CBFF06" />
+          <Text style={styles.loadingText}>Chargement du planning...</Text>
         </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Mardi - Cardio & Endurance</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="run" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Course & Intervalles</Text>
-              <Text style={styles.scheduleItemTime}>07:00 - 09:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="bike" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Spinning</Text>
-              <Text style={styles.scheduleItemTime}>19:00 - 20:30</Text>
-            </View>
-          </View>
+      ) : planningError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{planningError}</Text>
+          <Text style={styles.normalText}>Affichage des données par défaut</Text>
         </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Mercredi - Fitness Mixte</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="yoga" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Yoga</Text>
-              <Text style={styles.scheduleItemTime}>07:30 - 09:00</Text>
+      ) : (
+        <>
+          {/* Sélecteur de jours */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
+            {days.map((day) => (
+              <TouchableOpacity 
+                key={day} 
+                style={[
+                  styles.dayButton, 
+                  selectedDay === day && styles.selectedDayButton
+                ]}
+                onPress={() => setSelectedDay(day)}
+              >
+                <Text style={[
+                  styles.dayButtonText,
+                  selectedDay === day && styles.selectedDayButtonText
+                ]}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          
+          {/* Contenu du jour sélectionné */}
+          {scheduleData[selectedDay] && (
+            <View style={styles.dayContent}>
+              <View style={styles.dayHeader}>
+                <Text style={styles.dayTitle}>{selectedDay}</Text>
+                <Text style={styles.daySubtitle}>{scheduleData[selectedDay].title}</Text>
+              </View>
+              
+              <View style={styles.activitiesTable}>
+                <View style={styles.tableHeader}>
+                  <Text style={styles.tableHeaderActivity}>Activité</Text>
+                  <Text style={styles.tableHeaderTime}>Horaire</Text>
+                </View>
+                
+                {scheduleData[selectedDay].activities.map((activity, index) => (
+                  <View key={index} style={[
+                    styles.tableRow,
+                    index % 2 === 0 ? styles.evenRow : styles.oddRow
+                  ]}>
+                    <Text style={styles.activityName}>{activity.name}</Text>
+                    <Text style={styles.activityTime}>{activity.time}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="dumbbell" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Circuit Training</Text>
-              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Jeudi - Musculation Intensive</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>CrossFit</Text>
-              <Text style={styles.scheduleItemTime}>06:30 - 08:00</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="arm-flex" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Musculation Ciblée</Text>
-              <Text style={styles.scheduleItemTime}>19:00 - 21:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Vendredi - Cardio & Bien-être</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Pilates</Text>
-              <Text style={styles.scheduleItemTime}>07:00 - 08:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="boxing-glove" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Boxe Fitness</Text>
-              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Samedi - Cours Collectifs</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="human-female-dance" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Zumba</Text>
-              <Text style={styles.scheduleItemTime}>09:00 - 10:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="weight" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Body Pump</Text>
-              <Text style={styles.scheduleItemTime}>11:00 - 12:30</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scheduleDay}>
-          <View style={styles.scheduleDayHeader}>
-            <Text style={styles.scheduleDayTitle}>Dimanche - Récupération</Text>
-          </View>
-          <View style={styles.scheduleDetails}>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="relaxed" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Stretching</Text>
-              <Text style={styles.scheduleItemTime}>10:00 - 11:30</Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-              <Text style={styles.scheduleItemText}>Cours de Relaxation</Text>
-              <Text style={styles.scheduleItemTime}>11:45 - 13:00</Text>
-            </View>
-          </View>
-        </View>
-      </View>
+          )}
+        </>
+      )}
     </View>
   );
 };
+
 
 // Modify the renderMainContent function to use renderEmoji
 const renderMainContent = () => {
@@ -870,17 +978,26 @@ const renderMainContent = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         {/* Header avec l'image des haltères */}
-        <View style={styles.headerImageContainer}>
-          <Image 
-            source={
-              photo 
-                ? { uri: `data:image/jpeg;base64,${photo}` }
-                : require('../../assets/images/b.png')
-            } 
-            style={styles.headerImage}
-            resizeMode="cover"
-          />
-        </View>
+       {/* Header avec l'image des haltères */}
+<View style={styles.headerImageContainer}>
+  <Image 
+    source={
+      photo 
+        ? { uri: `data:image/jpeg;base64,${photo}` }
+        : require('../../assets/images/b.png')
+    } 
+    style={styles.headerImage}
+    resizeMode="cover"
+  />
+  
+  {/* Bouton de retour */}
+  <TouchableOpacity 
+    style={styles.backButton}
+    onPress={() => navigation.goBack()}
+  >
+    <Ionicons name="chevron-back" size={24} color="#fff" />
+  </TouchableOpacity>
+</View>
 
         {/* Section profil du gym */}
         <View style={styles.profileSection}>
@@ -953,34 +1070,39 @@ const renderMainContent = () => {
           )}
 
           {/* Coachs section */}
-          <View style={styles.coachesSection}>
-            <Text style={styles.sectionTitle}>Nos Coachs</Text>
-            
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#111" />
-                <Text style={styles.loadingText}>Chargement des coachs...</Text>
-              </View>
-            ) : error ? (
-              <Text style={styles.errorText}>Erreur: {error}</Text>
-            ) : (
-              <View style={styles.coachesGrid}>
-                {coaches.map((coach) => (
-                  <View key={coach.id} style={styles.coachItem}>
-                    <Image 
-                      source={
-                        coach.photo 
-                          ? { uri: `data:image/jpeg;base64,${coach.photo}` }
-                          : require('../../assets/images/b.png')
-                      } 
-                      style={styles.coachImage} 
-                    />
-                    <Text style={styles.coachName}>{coach.firstName}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+          {/* Coachs section */}
+<View style={styles.coachesSection}>
+  <Text style={styles.sectionTitle}>Nos Coachs</Text>
+  
+  {loading ? (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#111" />
+      <Text style={styles.loadingText}>Chargement des coachs...</Text>
+    </View>
+  ) : error ? (
+    <Text style={styles.errorText}>Erreur: {error}</Text>
+  ) : (
+    <ScrollView 
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.coachesScrollContainer}
+    >
+      {coaches.map((coach) => (
+        <View key={coach.id} style={styles.coachScrollItem}>
+          <Image 
+            source={
+              coach.photo 
+                ? { uri: `data:image/jpeg;base64,${coach.photo}` }
+                : require('../../assets/images/b.png')
+            } 
+            style={styles.coachScrollImage} 
+          />
+          <Text style={styles.coachName}>{coach.firstName}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  )}
+</View>
 
           {/* Barre de navigation intérieure */}
           <View style={styles.innerNavBar}>
@@ -1736,6 +1858,138 @@ const processVideoData = async (videoData) => {
 
 
 const styles = StyleSheet.create({
+
+
+  ////////////////////
+
+
+  headerSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  normalText: {
+    fontSize: 14, 
+    color: '#777',
+    marginTop: 5,
+  },
+  ////////////////////////
+
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#000',
+  },
+  aboutText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  daySelector: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  dayButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  selectedDayButton: {
+    backgroundColor: '#CBFF06',
+  },
+  dayButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedDayButtonText: {
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  dayContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
+  dayHeader: {
+    backgroundColor: '#CBFF06',
+    padding: 16,
+  },
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  daySubtitle: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 4,
+  },
+  activitiesTable: {
+    padding: 16,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  tableHeaderActivity: {
+    flex: 2,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  tableHeaderTime: {
+    flex: 1,
+    fontWeight: 'bold',
+    color: '#000',
+    textAlign: 'right',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  evenRow: {
+    backgroundColor: '#f9f9f9',
+  },
+  oddRow: {
+    backgroundColor: '#fff',
+  },
+  activityName: {
+    flex: 2,
+    fontSize: 14,
+    color: '#333',
+  },
+  activityTime: {
+    flex: 1,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
+  },
+  //////////////////////////
+  backButton: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   //////////////////////commentaire 
   uploadedImage: {
     width: '100%',
@@ -1850,29 +2104,32 @@ const styles = StyleSheet.create({
   },
 
   // ===== Styles coach section =====
-  coachesSection: {
-    marginBottom: 20,
-  },
-  coachesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-  },
-  coachItem: {
-    alignItems: 'center',
-    width: '25%',
-    marginBottom: 15,
-  },
-  coachImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 5,
-  },
-  coachName: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  // ===== Updated coach section styles =====
+coachesSection: {
+  marginBottom: 0
+},
+coachesScrollContainer: {
+  paddingVertical: 10,
+  paddingHorizontal: 5,
+},
+coachScrollItem: {
+  alignItems: 'center',
+  marginHorizontal: 12,
+  width: 80,
+},
+coachScrollImage: {
+  width: 70,
+  height: 70,
+  borderRadius: 35,
+  marginBottom: 1,
+  borderWidth: 2,
+  borderColor: '#D4FF00',
+},
+coachName: {
+  fontSize: 14,
+  textAlign: 'center',
+  fontWeight: '500',
+},
 
   // ===== Styles navigation intérieure =====
   innerNavBar: {
