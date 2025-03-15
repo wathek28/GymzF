@@ -686,147 +686,152 @@ const VideoErrorHandler = ({
 
   // Fonction pour rendre le contenu en fonction de l'onglet sélectionné
  // Function to render emoji content
+// 1. Créez cette fonction à l'intérieur de votre composant SAlle
+const renderPlanning = () => {
+  return (
+    <View>
+      <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
+      <Text style={styles.aboutText}>
+        Découvrez nos différents programmes d'entraînement adaptés à tous les niveaux.
+      </Text>
+      
+      <View style={styles.scheduleContainer}>
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Lundi - Force & Musculation</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Musculation Haut du Corps</Text>
+              <Text style={styles.scheduleItemTime}>06:00 - 08:00</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="weight" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Musculation Bas du Corps</Text>
+              <Text style={styles.scheduleItemTime}>18:00 - 20:00</Text>
+            </View>
+          </View>
+        </View>
 
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Mardi - Cardio & Endurance</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="run" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Course & Intervalles</Text>
+              <Text style={styles.scheduleItemTime}>07:00 - 09:00</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="bike" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Spinning</Text>
+              <Text style={styles.scheduleItemTime}>19:00 - 20:30</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Mercredi - Fitness Mixte</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="yoga" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Yoga</Text>
+              <Text style={styles.scheduleItemTime}>07:30 - 09:00</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="dumbbell" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Circuit Training</Text>
+              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Jeudi - Musculation Intensive</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>CrossFit</Text>
+              <Text style={styles.scheduleItemTime}>06:30 - 08:00</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="arm-flex" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Musculation Ciblée</Text>
+              <Text style={styles.scheduleItemTime}>19:00 - 21:00</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Vendredi - Cardio & Bien-être</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Pilates</Text>
+              <Text style={styles.scheduleItemTime}>07:00 - 08:30</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="boxing-glove" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Boxe Fitness</Text>
+              <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Samedi - Cours Collectifs</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="human-female-dance" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Zumba</Text>
+              <Text style={styles.scheduleItemTime}>09:00 - 10:30</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="weight" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Body Pump</Text>
+              <Text style={styles.scheduleItemTime}>11:00 - 12:30</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.scheduleDay}>
+          <View style={styles.scheduleDayHeader}>
+            <Text style={styles.scheduleDayTitle}>Dimanche - Récupération</Text>
+          </View>
+          <View style={styles.scheduleDetails}>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="relaxed" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Stretching</Text>
+              <Text style={styles.scheduleItemTime}>10:00 - 11:30</Text>
+            </View>
+            <View style={styles.scheduleItem}>
+              <MaterialCommunityIcons name="meditation" size={24} color="#000" />
+              <Text style={styles.scheduleItemText}>Cours de Relaxation</Text>
+              <Text style={styles.scheduleItemTime}>11:45 - 13:00</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 // Modify the renderMainContent function to use renderEmoji
 const renderMainContent = () => {
   switch (selectedTab) {
     case 'document':
       return (
-        <View>
-          <Text style={styles.sectionTitle}>Planning d'entraînement</Text>
-          <Text style={styles.aboutText}>
-            Découvrez nos différents programmes d'entraînement adaptés à tous les niveaux.
-          </Text>
-          
-          <View style={styles.scheduleContainer}>
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Lundi - Force & Musculation</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Musculation Haut du Corps</Text>
-                  <Text style={styles.scheduleItemTime}>06:00 - 08:00</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="weight" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Musculation Bas du Corps</Text>
-                  <Text style={styles.scheduleItemTime}>18:00 - 20:00</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Mardi - Cardio & Endurance</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="run" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Course & Intervalles</Text>
-                  <Text style={styles.scheduleItemTime}>07:00 - 09:00</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="bike" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Spinning</Text>
-                  <Text style={styles.scheduleItemTime}>19:00 - 20:30</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Mercredi - Fitness Mixte</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="yoga" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Yoga</Text>
-                  <Text style={styles.scheduleItemTime}>07:30 - 09:00</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="dumbbell" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Circuit Training</Text>
-                  <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Jeudi - Musculation Intensive</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="weight-lifter" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>CrossFit</Text>
-                  <Text style={styles.scheduleItemTime}>06:30 - 08:00</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="arm-flex" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Musculation Ciblée</Text>
-                  <Text style={styles.scheduleItemTime}>19:00 - 21:00</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Vendredi - Cardio & Bien-être</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Pilates</Text>
-                  <Text style={styles.scheduleItemTime}>07:00 - 08:30</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="boxing-glove" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Boxe Fitness</Text>
-                  <Text style={styles.scheduleItemTime}>18:30 - 20:00</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Samedi - Cours Collectifs</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="human-female-dance" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Zumba</Text>
-                  <Text style={styles.scheduleItemTime}>09:00 - 10:30</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="weight" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Body Pump</Text>
-                  <Text style={styles.scheduleItemTime}>11:00 - 12:30</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.scheduleDay}>
-              <View style={styles.scheduleDayHeader}>
-                <Text style={styles.scheduleDayTitle}>Dimanche - Récupération</Text>
-              </View>
-              <View style={styles.scheduleDetails}>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="relaxed" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Stretching</Text>
-                  <Text style={styles.scheduleItemTime}>10:00 - 11:30</Text>
-                </View>
-                <View style={styles.scheduleItem}>
-                  <MaterialCommunityIcons name="meditation" size={24} color="#000" />
-                  <Text style={styles.scheduleItemText}>Cours de Relaxation</Text>
-                  <Text style={styles.scheduleItemTime}>11:45 - 13:00</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+        renderPlanning()
       );
         
     case 'gallery':

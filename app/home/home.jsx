@@ -868,7 +868,23 @@ try {
                 }
               });
             } else if (item.id === 'calendar') {
-              navigateWithUserData('(event)');
+              
+              
+                console.log("✅ Tentative de navigation vers Reels");
+                console.log("🔍 Chemin utilisé:", "Reels");
+                console.log("📋 Paramètres:", { userId, firstName, phoneNumber });
+                
+                try {
+                  router.push({
+                    pathname: "/(Reels)/Reels", // Sans parenthèses et sans slash
+                    params: { userId, firstName, phoneNumber }
+                  });
+                  console.log("✅ Navigation terminée");
+                } catch (error) {
+                  console.error("❌ Erreur de navigation:", error);
+                }
+              
+              
             } else if (item.id === 'heart') {
               navigateWithUserData('favorites');
             }
