@@ -258,128 +258,176 @@ const VideoErrorHandler = ({
   );
 };
   // Fonction pour récupérer et traiter les reels du gym
-  const fetchReels = useCallback(async (gymId) => {
-    if (!gymId) {
-      console.error('🚨 gymId is required');
-      return [];
-    }
-  
+ // Fonction améliorée de récupération des reels avec une meilleure gestion des erreurs
+const fetchReels = useCallback(async (gymId) => {
+  if (!gymId) {
+    console.log('⚠️ Aucun ID de gym fourni');
+    return [];
+  }
+
+  let retryCount = 0;
+  const MAX_RETRIES = 2;
+
+  // Fonction interne pour les tentatives
+  const attemptFetch = async () => {
     try {
-      console.log(`🔄 Fetching reels for gym ID: ${gymId}`);
-      // Add timeout to the fetch to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      console.log(`🔄 Tentative ${retryCount + 1}/${MAX_RETRIES + 1} de récupération des reels pour le gym ID: ${gymId}`);
       
-      const response = await fetch(`http://192.168.0.3:8082/api/reels/user/${gymId}`, {
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout dépassé')), 20000); // 8 secondes de timeout
+      });
+      
+      // Create the fetch promise
+      const fetchPromise = fetch(`http://192.168.0.3:8082/api/reels/user/${gymId}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        signal: controller.signal
+        // Pas besoin d'AbortController ici car nous utilisons Promise.race
       });
       
-      clearTimeout(timeoutId);
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const reels = await response.json();
-      console.log(`📊 Received ${reels.length} reels from API`);
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
       
-      // Debug the first reel structure
-      if (reels.length > 0) {
-        console.log('First reel structure:', Object.keys(reels[0]));
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
       }
-  
+      
+      // Utilisation d'un try/catch dédié pour le parsing JSON
+      let reels;
+      try {
+        const text = await response.text(); // Récupérer d'abord le texte brut
+        console.log('Réponse brute:', text.substring(0, 100) + "..."); // Log pour le débogage
+        
+        // Vérifier si la réponse est vide
+        if (!text || text.trim() === '') {
+          console.log('⚠️ Réponse vide de l\'API');
+          return [];
+        }
+        
+        reels = JSON.parse(text);
+      } catch (parseError) {
+        console.error('❌ Erreur lors du parsing JSON:', parseError);
+        throw new Error('Format de réponse invalide');
+      }
+      
+      console.log(`📊 ${reels.length} reels récupérés`);
+      
       if (!Array.isArray(reels)) {
-        console.error('⚠️ Invalid response format - expected array');
+        console.error('⚠️ Format de réponse invalide - tableau attendu');
         return [];
       }
-  
-      const processedReels = await Promise.all(reels.map(async (reel) => {
+      
+      // Simplifier le traitement des reels pour réduire les risques d'erreur
+      const processedReels = reels.map(reel => {
         try {
-          // Vérifier les différentes possibilités de stockage des données vidéo
-          const videoField = reel.video_data || reel.videoData || reel.video;
-          let videoUri = null;
-  
-          if (videoField) {
-            videoUri = await enhancedProcessVideoData(videoField);
-          } else {
-            console.warn(`⚠️ No video data found for reel ${reel.id}`);
-          }
-  
-          // Process thumbnail with fallback
-          let thumbnailUri;
-          try {
-            thumbnailUri = reel.thumbnail 
-              ? `data:image/jpeg;base64,${reel.thumbnail}`
-              : require('../../assets/images/b.png');
-          } catch (thumbnailError) {
-            console.warn(`Cannot load thumbnail for reel ${reel.id}:`, thumbnailError);
-            thumbnailUri = require('../../assets/images/b.png');
-          }
-  
+          // Récupérer les données vidéo (peu importe leur format)
+          const videoData = reel.videoData || reel.video_data || reel.video;
+          
+          // Construire l'objet reel de façon sécurisée avec des valeurs par défaut
           return {
-            ...reel,
-            videoUri,
-            thumbnailUri,
+            id: reel.id || `reel_${Date.now()}_${Math.random()}`,
+            videoUri: videoData || null,
+            thumbnailUri: reel.thumbnail 
+              ? `data:image/jpeg;base64,${reel.thumbnail}`
+              : require('../../assets/images/b.png'),
             title: reel.title || 'Vidéo sans titre',
             duration: reel.duration || ''
           };
         } catch (error) {
-          console.error(`❌ Error processing reel ${reel.id}:`, error);
+          console.warn(`⚠️ Erreur lors du traitement du reel ${reel.id || 'inconnu'}:`, error);
+          // Retourner un reel avec des valeurs par défaut en cas d'erreur
           return {
-            ...reel,
+            id: `error_${Date.now()}_${Math.random()}`,
             videoUri: null,
-            error: true,
-            errorMessage: error.message,
             thumbnailUri: require('../../assets/images/b.png'),
-            title: reel.title || 'Vidéo sans titre',
-            duration: reel.duration || ''
+            title: 'Vidéo non disponible',
+            duration: '',
+            error: true
           };
         }
-      }));
-  
+      });
+      
       return processedReels;
+      
     } catch (error) {
-      console.error('❌ Error fetching reels:', error);
-      // Return an empty array instead of throwing to prevent app crash
-      return [];
+      // Si l'erreur est liée au réseau et qu'il reste des tentatives, réessayer
+      if ((error.message.includes('Network') || error.message.includes('Timeout')) && 
+          retryCount < MAX_RETRIES) {
+        retryCount++;
+        console.log(`🔄 Nouvelle tentative ${retryCount}/${MAX_RETRIES}...`);
+        
+        // Attendre un court délai avant de réessayer (backoff exponentiel)
+        const delay = 1000 * Math.pow(2, retryCount);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Tentative récursive
+        return attemptFetch();
+      }
+      
+      console.error('❌ Erreur finale lors de la récupération des reels:', error.message);
+      throw error;
     }
-  }, []);
-  // useEffect pour charger les reels
-  useEffect(() => {
-    let isActive = true;
+  };
   
-    const loadReels = async () => {
-      if (!idGym) return;
+  // Démarrer le processus de tentatives
+  try {
+    return await attemptFetch();
+  } catch (finalError) {
+    console.error('❌ Toutes les tentatives ont échoué:', finalError.message);
+    // Retourner un tableau vide au lieu de propager l'erreur pour éviter les crashs
+    return [];
+  }
+}, []);
+
+// Utilisation de la fonction dans un effet pour charger les reels
+useEffect(() => {
+  let isMounted = true;
+
+  const loadReels = async () => {
+    if (!idGym) return;
+    
+    setReelsLoading(true);
+    setReelsError(null);
+    
+    try {
+      const processedReels = await fetchReels(idGym);
       
-      setReelsLoading(true);
-      setReelsError(null);
-      
-      try {
-        const processedReels = await fetchReels(idGym);
-        if (isActive) {
+      // Vérifier si le composant est toujours monté avant de mettre à jour l'état
+      if (isMounted) {
+        if (processedReels && processedReels.length > 0) {
           setReels(processedReels);
-        }
-      } catch (error) {
-        if (isActive) {
-          setReelsError(error.message);
-        }
-      } finally {
-        if (isActive) {
-          setReelsLoading(false);
+          setReelsError(null);
+        } else {
+          // Si aucun reel n'a été récupéré, c'est peut-être une erreur
+          console.log('⚠️ Aucun reel trouvé');
+          setReels([]);
         }
       }
-    };
+    } catch (error) {
+      if (isMounted) {
+        console.error('❌ Erreur dans loadReels:', error.message);
+        setReelsError(error.message || "Impossible de charger les vidéos");
+        
+        // Même en cas d'erreur, on définit reels comme tableau vide pour éviter les undefined
+        setReels([]);
+      }
+    } finally {
+      if (isMounted) {
+        setReelsLoading(false);
+      }
+    }
+  };
   
-    loadReels();
-    
-    return () => {
-      isActive = false;
-    };
-  }, [idGym, fetchReels]);
+  // Chargement initial
+  loadReels();
+  
+  // Nettoyage pour éviter les fuites de mémoire
+  return () => {
+    isMounted = false;
+  };
+}, [idGym, fetchReels]);
 
 
   ///////////////////////////////
@@ -687,6 +735,7 @@ const VideoErrorHandler = ({
   // Fonction pour rendre le contenu en fonction de l'onglet sélectionné
  // Function to render emoji content
 // 1. Créez cette fonction à l'intérieur de votre composant SAlle
+// Au niveau des states du composant principal SAlle
 const [selectedDay, setSelectedDay] = useState('Lundi');
 const [plannings, setPlannings] = useState([]);
 const [planningLoading, setPlanningLoading] = useState(true);
@@ -694,6 +743,8 @@ const [planningError, setPlanningError] = useState(null);
 const [scheduleData, setScheduleData] = useState({});
 
 // Effet pour charger les plannings - DÉPLACÉ AU NIVEAU RACINE
+// Modifiez la section dans useEffect qui gère le chargement des plannings
+
 useEffect(() => {
   if (!idGym || selectedTab !== 'document') return;
 
@@ -736,10 +787,10 @@ useEffect(() => {
       const formattedData = transformPlanningsForDisplay(data);
       setScheduleData(formattedData);
 
-      // Si aucun jour n'est sélectionné, sélectionner le premier jour disponible
-      if (Object.keys(formattedData).length > 0 && !formattedData[selectedDay]) {
-        setSelectedDay(Object.keys(formattedData)[0]);
-      }
+      // SUPPRIMEZ CETTE PARTIE qui remplace automatiquement le jour sélectionné
+      // if (Object.keys(formattedData).length > 0 && !formattedData[selectedDay]) {
+      //   setSelectedDay(Object.keys(formattedData)[0]);
+      // }
 
       setPlanningError(null);
     } catch (err) {
@@ -754,7 +805,7 @@ useEffect(() => {
   };
 
   fetchPlannings();
-}, [idGym, selectedTab, selectedDay]); // Ajout de selectedTab comme dépendance
+}, [idGym, selectedTab, selectedDay]); // Vous pouvez aussi retirer selectedDay de la dépendance si ce n'est pas nécessaire// Ajout de selectedTab comme dépendance
 
 // Fonction pour transformer les données reçues de l'API en format d'affichage
 const transformPlanningsForDisplay = useCallback((planningsData) => {
@@ -840,8 +891,19 @@ const getStaticScheduleData = useCallback(() => {
   };
 }, []);
 
-// Jours disponibles dans les données récupérées
-const days = useMemo(() => Object.keys(scheduleData), [scheduleData]);
+// Liste ordonnée des jours de la semaine
+const orderedDays = useMemo(() => {
+  // Ordre fixe des jours de la semaine
+  const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+  
+  // Si aucune donnée n'est disponible, afficher tous les jours
+  if (Object.keys(scheduleData).length === 0) {
+    return weekDays;
+  }
+  
+  // Filtrer pour garder l'ordre tout en affichant uniquement les jours présents dans scheduleData
+  return weekDays;
+}, [scheduleData]);
 
 // Fonction pour rafraîchir les données
 const refreshPlannings = useCallback(() => {
@@ -851,7 +913,27 @@ const refreshPlannings = useCallback(() => {
   setPlannings([]);
 }, []);
 
+// Fonction pour obtenir un titre et des activités par défaut pour un jour sans données
+const getDefaultDayData = useCallback((day) => {
+  const defaultTitles = {
+    'Lundi': 'Jour de repos',
+    'Mardi': 'Jour de repos',
+    'Mercredi': 'Jour de repos',
+    'Jeudi': 'Jour de repos',
+    'Vendredi': 'Jour de repos',
+    'Samedi': 'Jour de repos',
+    'Dimanche': 'Jour de repos'
+  };
+
+  return {
+    title: defaultTitles[day] || 'Jour de repos',
+    activities: []
+  };
+}, []);
+
 // Remplacer la fonction renderPlanning qui ne contient maintenant QUE l'affichage, pas d'états ou d'effets
+// Modifiez la fonction renderPlanning pour mieux gérer l'affichage des jours sans planning
+
 const renderPlanning = () => {
   return (
     <View style={styles.container}>
@@ -882,7 +964,7 @@ const renderPlanning = () => {
         <>
           {/* Sélecteur de jours */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
-            {days.map((day) => (
+            {orderedDays.map((day) => (
               <TouchableOpacity 
                 key={day} 
                 style={[
@@ -902,20 +984,24 @@ const renderPlanning = () => {
           </ScrollView>
           
           {/* Contenu du jour sélectionné */}
-          {scheduleData[selectedDay] && (
-            <View style={styles.dayContent}>
-              <View style={styles.dayHeader}>
-                <Text style={styles.dayTitle}>{selectedDay}</Text>
-                <Text style={styles.daySubtitle}>{scheduleData[selectedDay].title}</Text>
+          <View style={styles.dayContent}>
+            <View style={styles.dayHeader}>
+              <Text style={styles.dayTitle}>{selectedDay}</Text>
+              <Text style={styles.daySubtitle}>
+                {scheduleData[selectedDay] ? scheduleData[selectedDay].title : 'Aucun cours programmé'}
+              </Text>
+            </View>
+            
+            <View style={styles.activitiesTable}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableHeaderActivity}>Activité</Text>
+                <Text style={styles.tableHeaderTime}>Horaire</Text>
               </View>
               
-              <View style={styles.activitiesTable}>
-                <View style={styles.tableHeader}>
-                  <Text style={styles.tableHeaderActivity}>Activité</Text>
-                  <Text style={styles.tableHeaderTime}>Horaire</Text>
-                </View>
-                
-                {scheduleData[selectedDay].activities.map((activity, index) => (
+              {/* Vérifier si le jour sélectionné a des activités planifiées */}
+              {scheduleData[selectedDay] && scheduleData[selectedDay].activities && scheduleData[selectedDay].activities.length > 0 ? (
+                // Afficher les activités si disponibles
+                scheduleData[selectedDay].activities.map((activity, index) => (
                   <View key={index} style={[
                     styles.tableRow,
                     index % 2 === 0 ? styles.evenRow : styles.oddRow
@@ -923,16 +1009,23 @@ const renderPlanning = () => {
                     <Text style={styles.activityName}>{activity.name}</Text>
                     <Text style={styles.activityTime}>{activity.time}</Text>
                   </View>
-                ))}
-              </View>
+                ))
+              ) : (
+                // Afficher le message "aucune activité" si pas d'activités pour ce jour
+                <View style={styles.noScheduleContainer}>
+                  <Text style={styles.noScheduleText}>Aucune activité programmée pour ce jour</Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
+          
+          {/* Ajout d'un espace en bas pour éviter que la navbar cache le contenu */}
+          <View style={{ height: 150 }} />
         </>
       )}
     </View>
   );
 };
-
 
 // Modify the renderMainContent function to use renderEmoji
 const renderMainContent = () => {
@@ -1071,6 +1164,7 @@ const renderMainContent = () => {
 
           {/* Coachs section */}
           {/* Coachs section */}
+              {/* Coachs section */}
 <View style={styles.coachesSection}>
   <Text style={styles.sectionTitle}>Nos Coachs</Text>
   
@@ -1088,7 +1182,26 @@ const renderMainContent = () => {
       contentContainerStyle={styles.coachesScrollContainer}
     >
       {coaches.map((coach) => (
-        <View key={coach.id} style={styles.coachScrollItem}>
+        <TouchableOpacity 
+          key={coach.id} 
+          style={styles.coachScrollItem}
+          onPress={() => {
+            console.log(`Coach ${coach.firstName} sélectionné`);
+            // Navigate to SAlle screen with coach details
+            router.push({
+              pathname: '/(Salle)/Sallee',
+              params: {
+                firstName: coach.firstName,
+                photo: coach.photo,
+                bio: coach.bio || "Aucune biographie disponible pour ce coach.",
+                phoneNumber: coach.phoneNumber,
+                poste: "Coach personnel",
+                typeCoaching: "Fitness et remise en forme",
+                idGym: idGym // Pass the current gym ID if needed
+              }
+            });
+          }}
+        >
           <Image 
             source={
               coach.photo 
@@ -1098,11 +1211,12 @@ const renderMainContent = () => {
             style={styles.coachScrollImage} 
           />
           <Text style={styles.coachName}>{coach.firstName}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </ScrollView>
   )}
 </View>
+
 
           {/* Barre de navigation intérieure */}
           <View style={styles.innerNavBar}>
@@ -1858,7 +1972,17 @@ const processVideoData = async (videoData) => {
 
 
 const styles = StyleSheet.create({
-
+  noScheduleContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noScheduleText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic'
+  },
 
   ////////////////////
 
@@ -1918,6 +2042,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1,
+    marginBottom: 80,
   },
   dayHeader: {
     backgroundColor: '#CBFF06',
@@ -2115,15 +2240,15 @@ coachesScrollContainer: {
 coachScrollItem: {
   alignItems: 'center',
   marginHorizontal: 12,
-  width: 80,
+  
+  marginHorizontal: 6, // Réduit de 12 à 6 pour diminuer l'espace entre les coachs
+  width: 90, 
 },
 coachScrollImage: {
-  width: 70,
-  height: 70,
-  borderRadius: 35,
-  marginBottom: 1,
-  borderWidth: 2,
-  borderColor: '#D4FF00',
+  width: 95, // Taille carrée
+  height: 95, // Même hauteur que la largeur
+  borderRadius: 12, // Coins légèrement arrondis au lieu d'un cercle
+  marginBottom: 5,
 },
 coachName: {
   fontSize: 14,
@@ -2172,6 +2297,7 @@ coachName: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 5,
+    paddingBottom: 80, 
   },
   galleryImage: {
     width: 100,
@@ -2247,7 +2373,8 @@ coachName: {
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     padding: 1,
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
+    marginBottom: 80,
   },
   videoGridItem: {
     width: '33%', // Pour une grille 3x3
@@ -2638,6 +2765,7 @@ coachName: {
   // ==============================
   emojiScrollView: {
     flex: 1,
+    marginBottom: 80, 
   },
   shareExperienceButton: {
     backgroundColor: '#f5f5f5',

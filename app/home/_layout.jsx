@@ -158,7 +158,7 @@ export default function RootLayout() {
               <item.Component 
                 name={item.icon} 
                 size={24} 
-                color={isActive ? "#CBFF06" : "#666"} 
+                color={isActive ? "black" : "#666"} 
               />
               <Text
                 style={[
@@ -215,14 +215,14 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   activeNavText: {
-    color: "#CBFF06",
+    color: "balck",
     fontWeight: "bold",
   },
   slidingIndicator: {
     position: "absolute",
     width: TAB_WIDTH,
     height: 3,
-    backgroundColor: "#CBFF06",
+    backgroundColor: "black",
     bottom: 0,
     borderRadius: 1.5,
   }

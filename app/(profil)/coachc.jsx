@@ -1664,6 +1664,7 @@ noCommentsText: {
     backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    
   },
   videoPlayer: {
     width: Dimensions.get('window').width,
@@ -1753,6 +1754,7 @@ noCommentsText: {
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     paddingHorizontal: 2,
+    marginBottom: 80,
   },
   galleryImageWrapper1: {
     width: '32.5%',
@@ -1872,7 +1874,8 @@ videoGridContainer: {
   flexWrap: 'wrap',
   justifyContent: 'space-between',
   padding: 1,
-  backgroundColor: 'transparent'   
+  backgroundColor: 'transparent'  ,
+  marginBottom: 80,  
 },
 videoGridItem: {
   width: '33%', // Pour une grille 3x3
@@ -1925,7 +1928,7 @@ playIconContainer: {
     // ==============================
     backButton: {
       position: 'absolute',
-      top: 30,
+      top: 80,
       left: 10,
       padding: 10,
       zIndex: 1,
@@ -2366,6 +2369,7 @@ playIconContainer: {
     // ==============================
     emojiScrollView: {
       flex: 1,
+       marginBottom: 80,
     },
     shareExperienceButton: {
       backgroundColor: '#f5f5f5',

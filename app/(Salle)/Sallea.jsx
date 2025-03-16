@@ -416,6 +416,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
+    paddingHorizontal: 16, 
   },
   modalHeader: {
     flexDirection: 'row',
@@ -519,6 +520,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    paddingRight: 16,
   },
   optionButton: {
     paddingHorizontal: 16,
@@ -542,6 +544,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    paddingRight: 16,
   },
   competenceButton: {
     paddingHorizontal: 16,

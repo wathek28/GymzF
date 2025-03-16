@@ -1,7 +1,9 @@
+// Modifiez votre fichier _layout.js comme suit:
+
 import React, { useEffect } from 'react';
 import Navbar from '../Navbar/_layout';
 import { Slot, usePathname } from 'expo-router';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 
 export default function Login() {
   const scrollY = new Animated.Value(0);
@@ -22,9 +24,15 @@ export default function Login() {
     console.log('isCoachB:', isCoachB);
   }, [pathname]);
 
+  // Calculer la hauteur approximative de la navbar
+  const navbarHeight = 70; // Ajustez cette valeur selon la hauteur réelle de votre navbar
+
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
+      <View style={[
+        styles.content,
+        !isCoachB && { paddingBottom: navbarHeight } // Ajoute un padding en bas seulement si la navbar est visible
+      ]}>
         <Slot />
       </View>
       {!isCoachB ? (
@@ -53,5 +61,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    backgroundColor: '#fff', // Assurez-vous que la navbar a un fond
+    borderTopWidth: 1,       // Optionnel: ajoute une bordure au top
+    borderTopColor: '#eee',  // Optionnel: couleur de la bordure
+    elevation: 8,            // Pour Android
+    shadowColor: '#000',     // Pour iOS
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   }
 });
