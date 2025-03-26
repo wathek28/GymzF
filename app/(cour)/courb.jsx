@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,7 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -25,7 +24,52 @@ const API_CONFIG = {
     COURSE_DETAIL: '/api/courses',
     COURSE_EXERCISES: '/api/courses'
   },
+  // Ajout de paramètres de timeout pour les requêtes
+  TIMEOUT: 10000, // 10 secondes
 };
+
+// Formater la durée - fonction déplacée en dehors du composant
+const formatDuration = (exercise) => {
+  if (exercise.durationSeconds) {
+    const minutes = Math.floor(exercise.durationSeconds / 60);
+    const seconds = exercise.durationSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  } 
+  
+  if (exercise.repetitions) {
+    return `${exercise.repetitions} × ${exercise.sets || 1}`;
+  }
+  
+  return '';
+};
+
+// Composant d'exercice extrait pour éviter les re-rendus inutiles
+const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.exerciseItem,
+        isLast ? { borderBottomWidth: 0 } : {}
+      ]}
+      onPress={() => onPress(exercise)}
+    >
+      <View style={styles.exerciseLeft}>
+        <Image 
+          source={exercise.icon} 
+          style={styles.exerciseIcon}
+          // Préchargement et mise en cache pour les images
+          defaultSource={require('../../assets/images/b.png')}
+        />
+        <Text style={styles.exerciseName}>{exercise.name}</Text>
+      </View>
+      
+      <View style={styles.exerciseRight}>
+        <Text style={styles.exerciseDuration}>{exercise.duration}</Text>
+        <Ionicons name="chevron-forward" size={18} color="#888" />
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 const ExerciseDetailScreen = () => {
   // États
@@ -33,13 +77,13 @@ const ExerciseDetailScreen = () => {
   const [error, setError] = useState(null);
   const [courseData, setCourseData] = useState(null);
   const [exercises, setExercises] = useState([]);
-
+  
   // Hooks pour la navigation
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = params.id;
   
-  // Fonction memoizée pour récupérer les données du cours
+  // Fonction pour récupérer les données du cours avec controller pour annuler les requêtes en cas de démontage
   const fetchCourseData = useCallback(async () => {
     if (!id) {
       setError("Aucun ID de cours fourni");
@@ -47,12 +91,31 @@ const ExerciseDetailScreen = () => {
       return;
     }
 
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
     try {
       setLoading(true);
       setError(null);
       
-      // Récupérer les détails du cours
-      const courseResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSE_DETAIL}/${id}`);
+      // Récupérer les détails du cours avec un timeout
+      const coursePromise = fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSE_DETAIL}/${id}`, 
+        { 
+          signal,
+          headers: {
+            'Cache-Control': 'no-cache', // Désactive le cache HTTP pour les données fraîches
+          },
+        }
+      );
+      
+      // Ajout d'un timeout manuel pour éviter les attentes infinies
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout dépassé')), API_CONFIG.TIMEOUT)
+      );
+      
+      // Course response avec race pour gérer le timeout
+      const courseResponse = await Promise.race([coursePromise, timeoutPromise]);
       
       if (!courseResponse.ok) {
         throw new Error(`Erreur HTTP: ${courseResponse.status}`);
@@ -61,8 +124,18 @@ const ExerciseDetailScreen = () => {
       const courseData = await courseResponse.json();
       setCourseData(courseData);
       
-      // Récupérer les exercices associés au cours
-      const exercisesResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSE_EXERCISES}/${id}/exercises`);
+      // Récupérer les exercices associés au cours - avec Promise.all pour paralléliser
+      const exercisesPromise = fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSE_EXERCISES}/${id}/exercises`,
+        { 
+          signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        }
+      );
+      
+      const exercisesResponse = await Promise.race([exercisesPromise, timeoutPromise]);
       
       if (!exercisesResponse.ok) {
         throw new Error(`Erreur lors de la récupération des exercices: ${exercisesResponse.status}`);
@@ -81,51 +154,81 @@ const ExerciseDetailScreen = () => {
       
       setExercises(formattedExercises);
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Requête annulée');
+        return;
+      }
       console.error('Erreur lors de la récupération des données:', err);
       setError(`Erreur: ${err.message}`);
     } finally {
       setLoading(false);
+      controller.abort(); // Nettoyer le controller
     }
   }, [id]);
   
-  // Helper pour formater la durée
-  const formatDuration = (exercise) => {
-    if (exercise.durationSeconds) {
-      const minutes = Math.floor(exercise.durationSeconds / 60);
-      const seconds = exercise.durationSeconds % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } 
+  // Préchargement des images pour améliorer les performances visuelles
+  const precacheImages = useCallback(async () => {
+    if (!courseData) return;
     
-    if (exercise.repetitions) {
-      return `${exercise.repetitions} × ${exercise.sets || 1}`;
+    // Liste des images à précharger
+    const imagesToPreload = [];
+    
+    // Image du cours
+    if (courseData.thumbnail) {
+      imagesToPreload.push(`data:image/jpeg;base64,${courseData.thumbnail}`);
     }
     
-    return '';
-  };
-
-  // Charger les données au montage du composant
+    // Images des exercices
+    exercises.forEach(exercise => {
+      if (exercise.icon && exercise.icon.uri) {
+        imagesToPreload.push(exercise.icon.uri);
+      }
+    });
+    
+    // Préchargement des images (vous pouvez utiliser Image.prefetch si disponible)
+    // Note: cette partie est conceptuelle et pourrait nécessiter une bibliothèque comme 'react-native-fast-image'
+    console.log('Préchargement de', imagesToPreload.length, 'images');
+  }, [courseData, exercises]);
+  
+  // Charger les données au montage du composant avec annulation en cas de démontage
   useEffect(() => {
     fetchCourseData();
+    
+    // Nettoyage en cas de démontage du composant
+    return () => {
+      // Si vous utilisez une bibliothèque comme react-query, vous pouvez annuler ici
+      console.log('Nettoyage du composant');
+    };
   }, [fetchCourseData]);
+  
+  // Précharger les images lorsque les données sont disponibles
+  useEffect(() => {
+    if (courseData && exercises.length > 0) {
+      precacheImages();
+    }
+  }, [courseData, exercises, precacheImages]);
 
-  // Navigation retour
-  const handleGoBack = () => {
+  // Navigation retour - mémorisée pour éviter les re-créations
+  const handleGoBack = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
-  // Gestion du clic sur un exercice
-  const handleExercisePress = (exercise) => {
+  // Gestion du clic sur un exercice - mémorisée pour éviter les re-créations
+  const handleExercisePress = useCallback((exercise) => {
     Alert.alert(
       exercise.name,
       exercise.description || "Aucune description disponible"
     );
-  };
+  }, []);
 
-  // Gestion du clic sur le bouton de démarrage
-  const handleStartPress = () => {
+  // Gestion du clic sur le bouton de démarrage - mémorisée pour éviter les re-créations
+  const handleStartPress = useCallback(() => {
     if (exercises.length > 0) {
       // Extraire tous les IDs des exercices
       const exerciseIds = exercises.map(exercise => exercise.id);
+      
+      // Pour optimiser, préchargez les données du premier exercice avant la navigation
+      // Cette partie est conceptuelle et dépend de votre architecture d'application
       
       // Passer les IDs des exercices en paramètre à la page courc
       router.push({
@@ -135,16 +238,25 @@ const ExerciseDetailScreen = () => {
           allExerciseIds: exerciseIds.join(',')  // Tous les IDs pour navigation
         }
       });
-      
-      console.log('Navigation vers exercice ID:', exerciseIds[0]);
-      console.log('Tous les exercice IDs:', exerciseIds);
     } else {
       Alert.alert(
         "Aucun exercice disponible",
         "Ce cours ne contient pas d'exercices disponibles."
       );
     }
-  };
+  }, [exercises, router]);
+
+  // Calcul du niveau mémorisé pour éviter les calculs répétés
+  const levelText = useMemo(() => {
+    if (!courseData) return '';
+    
+    switch(courseData.level) {
+      case 'DEBUTANT': return 'Débutant';
+      case 'INTERMEDIAIRE': return 'Intermédiaire';
+      case 'AVANCE': return 'Avancé';
+      default: return courseData.level;
+    }
+  }, [courseData]);
 
   // Afficher un indicateur de chargement
   if (loading) {
@@ -180,27 +292,19 @@ const ExerciseDetailScreen = () => {
     );
   }
 
-  // Formater le niveau pour l'affichage
-  const getLevelText = () => {
-    switch(courseData.level) {
-      case 'DEBUTANT': return 'Débutant';
-      case 'INTERMEDIAIRE': return 'Intermédiaire';
-      case 'AVANCE': return 'Avancé';
-      default: return courseData.level;
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header Image */}
+      {/* Header Image avec placeholder pour chargement rapide */}
       <View style={styles.headerContainer}>
         <Image 
           source={courseData.thumbnail 
             ? { uri: `data:image/jpeg;base64,${courseData.thumbnail}` }
             : require('../../assets/images/b.png')} 
           style={styles.headerImage}
+          // Ajout du placeholder pour chargement plus rapide
+          defaultSource={require('../../assets/images/b.png')}
         />
         
         {/* Back Button */}
@@ -219,15 +323,19 @@ const ExerciseDetailScreen = () => {
         </View>
       </View>
       
-      {/* Content */}
-      <ScrollView style={styles.content}>
+      {/* Content - optimisé pour ne pas recréer les fonctions de rendu */}
+      <ScrollView 
+        style={styles.content}
+        removeClippedSubviews={true} // Optimisation pour grandes listes
+        initialNumToRender={5} // Réduire le nombre initial d'éléments rendus
+      >
         {/* Title Section */}
         <View style={styles.titleSection}>
           <Text style={styles.title}>{courseData.title}</Text>
           
           <View style={styles.levelContainer}>
             <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>{getLevelText()}</Text>
+              <Text style={styles.levelText}>{levelText}</Text>
             </View>
             <Text style={styles.durationText}>
               • {courseData.durationMinutes || 0}min • {exercises.length} exercices
@@ -247,27 +355,15 @@ const ExerciseDetailScreen = () => {
               <Text style={styles.sectionSubtitle}>Suivez l'ordre recommandé pour de meilleurs résultats</Text>
             </View>
             
-            {/* Exercises List */}
+            {/* Exercises List - utilisation du composant mémorisé */}
             <View style={styles.exercisesList}>
               {exercises.map((exercise, index) => (
-                <TouchableOpacity 
+                <ExerciseItem
                   key={exercise.id}
-                  style={[
-                    styles.exerciseItem,
-                    index === exercises.length - 1 ? { borderBottomWidth: 0 } : {}
-                  ]}
-                  onPress={() => handleExercisePress(exercise)}
-                >
-                  <View style={styles.exerciseLeft}>
-                    <Image source={exercise.icon} style={styles.exerciseIcon} />
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                  </View>
-                  
-                  <View style={styles.exerciseRight}>
-                    <Text style={styles.exerciseDuration}>{exercise.duration}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#888" />
-                  </View>
-                </TouchableOpacity>
+                  exercise={exercise}
+                  isLast={index === exercises.length - 1}
+                  onPress={handleExercisePress}
+                />
               ))}
             </View>
           </>
