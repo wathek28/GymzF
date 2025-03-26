@@ -653,59 +653,79 @@ useEffect(() => {
   };
 
   // Render the gallery grid manually instead of using FlatList
-  const useGymGalleryImages = (gymId) => {
-    const [galleryImages, setGalleryImages] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-  
-    useEffect(() => {
-      const fetchGalleryImages = async () => {
-        if (!gymId) return;
-  
-        setIsLoading(true);
-        try {
-          const response = await fetch(`http://192.168.0.3:8082/api/photos/user/${gymId}`);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-  
-          const data = await response.json();
-          
-          // Process images similar to coach profile
-          const processedImages = data.map(photo => ({
-            id: photo.id,
-            source: photo.content 
-              ? { uri: `data:image/jpeg;base64,${photo.content}` }
-              : require('../../assets/images/b.png')
-          }));
-  
-          setGalleryImages(processedImages);
-        } catch (err) {
-          console.error('Error fetching gym gallery images:', err);
-          setError(err.message);
-          
-          // Fallback images if fetch fails
-          setGalleryImages([
-            { id: '1', source: require('../../assets/images/b.png') },
-            { id: '2', source: require('../../assets/images/b.png') },
-            { id: '3', source: require('../../assets/images/b.png') },
-          ]);
-        } finally {
-          setIsLoading(false);
+ // Then use the hook
+const useGymGalleryImages = (gymId) => {
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchGalleryImages = async () => {
+      if (!gymId) {
+        // Early return if no gymId
+        setGalleryImages([]);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(`http://192.168.0.3:8082/api/photos/user/${gymId}`);
+        
+        if (!response.ok) {
+          // Instead of throwing an error, just log it and handle gracefully
+          console.warn(`HTTP error! status: ${response.status}`);
+          setGalleryImages([]);
+          return;
         }
-      };
-  
-      fetchGalleryImages();
-    }, [gymId]);
-  
-    return { galleryImages, isLoading, error };
-  };
+
+        const data = await response.json();
+        
+        // Check if data is valid and not empty
+        if (!data || data.length === 0) {
+          console.log('No gallery images found');
+          setGalleryImages([]);
+          return;
+        }
+        
+        // Process images similar to coach profile
+        const processedImages = data.map(photo => ({
+          id: photo.id || `img_${Math.random().toString(36).substr(2, 9)}`,
+          source: photo.content 
+            ? { uri: `data:image/jpeg;base64,${photo.content}` }
+            : require('../../assets/images/b.png')
+        }));
+
+        setGalleryImages(processedImages);
+      } catch (err) {
+        console.error('Error fetching gym gallery images:', err);
+        // Just set empty gallery instead of fallback images or error
+        setGalleryImages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGalleryImages();
+  }, [gymId]);
+
+  return { galleryImages, isLoading, error };
+};
 
   // Then use the hook
   const { galleryImages, isLoading: galleryLoading, error: galleryError } = useGymGalleryImages(idGym);
 
   const renderGalleryGrid = () => {
+    // Check if gallery is empty
+    if (!galleryImages || galleryImages.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <MaterialIcons name="photo-library" size={50} color="#CCCCCC" />
+          <Text style={styles.noImagesText}>Aucune photo disponible</Text>
+        </View>
+      );
+    }
+  
+    // Otherwise render the gallery grid
     const rows = [];
     for (let i = 0; i < galleryImages.length; i += 3) {
       const rowImages = galleryImages.slice(i, i + 3);
@@ -983,13 +1003,14 @@ const renderPlanning = () => {
             ))}
           </ScrollView>
           
-          {/* Contenu du jour sélectionné */}
+          {/* Contenu du jour sélectionné - Focus sur les activités */}
           <View style={styles.dayContent}>
             <View style={styles.dayHeader}>
-              <Text style={styles.dayTitle}>{selectedDay}</Text>
-              <Text style={styles.daySubtitle}>
-                {scheduleData[selectedDay] ? scheduleData[selectedDay].title : 'Aucun cours programmé'}
-              </Text>
+              {scheduleData[selectedDay] && (
+                <Text style={styles.daySubtitle}>
+                  {scheduleData[selectedDay].title}
+                </Text>
+              )}
             </View>
             
             <View style={styles.activitiesTable}>
@@ -1013,7 +1034,7 @@ const renderPlanning = () => {
               ) : (
                 // Afficher le message "aucune activité" si pas d'activités pour ce jour
                 <View style={styles.noScheduleContainer}>
-                  <Text style={styles.noScheduleText}>Aucune activité programmée pour ce jour</Text>
+                  <Text style={styles.noScheduleText}>Pas de cours disponible</Text>
                 </View>
               )}
             </View>
@@ -1038,17 +1059,19 @@ const renderMainContent = () => {
     case 'gallery':
       return (
         <View>
-          <Text style={styles.sectionTitle}>Galerie photos</Text>
-          {galleryLoading ? (
-            <ActivityIndicator size="large" color="#111" />
-          ) : galleryError ? (
-            <Text style={styles.errorText}>Erreur de chargement des images: {galleryError}</Text>
-          ) : (
-            <ScrollView>
-              {renderGalleryGrid()}
-            </ScrollView>
-          )}
-        </View>
+        <Text style={styles.sectionTitle}>Galerie photos</Text>
+        {galleryLoading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#D4FF00" />
+            <Text style={styles.loadingText}>Chargement des images...</Text>
+          </View>
+        ) : (
+          // Even if there's an error, just show "Aucune photo disponible"
+          <ScrollView>
+            {renderGalleryGrid()}
+          </ScrollView>
+        )}
+      </View>
       );
         
     case 'video':

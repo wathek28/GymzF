@@ -152,7 +152,10 @@ const useGalleryImages = (id, selectedTab) => {
 //
 // Modal pour publier un avis (ReviewModal)
 //
-//
+//const handleDiscoverCourses = () => {
+  // Naviguer vers la page coura.jsx dans le dossier (cour)
+
+
 // Modal pour publier un avis (ReviewModal)
 //
 const ReviewModal = ({ 
@@ -474,6 +477,18 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
       params: {
         idCoach: idCoach,
         userId: userId
+      }
+    });
+  };
+
+  const handleDiscoverCourses = () => {
+    // Naviguer vers la page coura.jsx dans le dossier (cour)
+    router.push({
+      pathname: '/(cour)/coura',
+      params: {
+        idCoach: idCoach,
+        userId: userId,
+        firstName: firstName // Ajout du prénom du coach
       }
     });
   };
@@ -1075,9 +1090,31 @@ const PhotoViewerModal = ({ visible, onClose, imageUri, allImages = [] }) => {
   );
 };
 const renderGalleryContent = () => {
-  if (isLoading) return <ActivityIndicator size="large" color="#000" />;
-  if (error) return <Text style={styles.errorText}>{error}</Text>;
-  if (!galleryImages || galleryImages.length === 0) return <Text style={styles.noImagesText}>Aucune image disponible</Text>;
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#D4FF00" />
+        <Text style={styles.loaderText}>Chargement des images...</Text>
+      </View>
+    );
+  }
+  
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.noImagesText}>Aucune photo disponible</Text>
+      </View>
+    );
+  }
+  
+  if (!galleryImages || galleryImages.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <MaterialIcons name="photo-library" size={50} color="#CCCCCC" />
+        <Text style={styles.noImagesText}>Aucune photo disponible</Text>
+      </View>
+    );
+  }
   
   return (
     <View style={styles.galleryContainer1}>
@@ -1102,7 +1139,6 @@ const renderGalleryContent = () => {
     </View>
   );
 };
-
 ////////////////////comentaire
 // Ajoutez ces états au début de votre composant CoachProfile1
 const [comments, setComments] = useState([]);
@@ -1433,9 +1469,12 @@ const renderEmojiContent = () => (
     <Text style={styles.highlight}>{typeCoaching || 'N/A'}</Text>, Ou à{' '}
     <Text style={styles.highlight}>{disciplines || 'N/A'}</Text>
 </Text>
-          <TouchableOpacity style={styles.buttonYellow}>
-            <Text style={styles.buttonText}>Découvrez mes cours</Text>
-          </TouchableOpacity>
+<TouchableOpacity 
+  style={styles.buttonYellow}
+  onPress={handleDiscoverCourses}
+>
+  <Text style={styles.buttonText}>Découvrez mes cours</Text>
+</TouchableOpacity>
           <TouchableOpacity style={styles.buttonBlack}
              onPress={handleContactCoach}
           >

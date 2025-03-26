@@ -9,34 +9,44 @@ import {
   StatusBar,
   SafeAreaView,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated
 } from 'react-native';
-import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, AntDesign } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Screen dimensions
 const { width, height } = Dimensions.get('window');
+
+// API Configuration 
 const API_BASE_URL = 'http://192.168.0.3:8082';
 
 const ReelsScreen = () => {
+  // State management
   const [reels, setReels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [videoFiles, setVideoFiles] = useState({});
   const [pausedVideos, setPausedVideos] = useState({});
+  const [likedReels, setLikedReels] = useState({});
+  const [likeCounts, setLikeCounts] = useState({});
   
-  // Référence pour accéder aux composants vidéo
+  // Animation pour l'effet du like
+  const likeAnimation = useRef({});
+  
+  // Refs for video and flatlist management
   const videoRefs = useRef({});
   const flatListRef = useRef(null);
   
-  // Récupérer les paramètres de navigation
+  // Navigation parameters
   const params = useLocalSearchParams();
   const { userId, firstName, phoneNumber, photo } = params;
 
-  // Fonction pour stocker les paramètres utilisateur si nécessaire
+  // Save user data to local storage
   const saveUserDataToStorage = async () => {
     if (userId && !await AsyncStorage.getItem('userId')) {
       try {
@@ -44,50 +54,107 @@ const ReelsScreen = () => {
         if (firstName) await AsyncStorage.setItem('firstName', firstName);
         if (phoneNumber) await AsyncStorage.setItem('phoneNumber', phoneNumber);
         if (photo) await AsyncStorage.setItem('userPhoto', photo);
-        console.log('Données utilisateur sauvegardées dans AsyncStorage');
+        console.log('User data saved to AsyncStorage');
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde des données utilisateur:', error);
+        console.error('Error saving user data:', error);
       }
     }
   };
 
-  // Log des paramètres reçus pour vérification
+  // Load liked reels from AsyncStorage
+  const loadLikedReels = async () => {
+    try {
+      const savedLikedReels = await AsyncStorage.getItem('likedReels');
+      if (savedLikedReels) {
+        setLikedReels(JSON.parse(savedLikedReels));
+      }
+    } catch (error) {
+      console.error('Error loading liked reels:', error);
+    }
+  };
+
+  // Save liked reels to AsyncStorage
+  const saveLikedReels = async (newLikedReels) => {
+    try {
+      await AsyncStorage.setItem('likedReels', JSON.stringify(newLikedReels));
+    } catch (error) {
+      console.error('Error saving liked reels:', error);
+    }
+  };
+
+  // Fonction pour gérer les likes (frontend uniquement)
+  const handleLike = async (reelId) => {
+    // Créer une nouvelle copie de l'état actuel des likes
+    const newLikedReels = { ...likedReels };
+    const isLiked = !newLikedReels[reelId];
+    
+    // Mettre à jour l'état local
+    newLikedReels[reelId] = isLiked;
+    setLikedReels(newLikedReels);
+    
+    // Mettre à jour le compteur de likes
+    setLikeCounts(prev => ({
+      ...prev,
+      [reelId]: isLiked ? (prev[reelId] || 0) + 1 : Math.max(0, (prev[reelId] || 0) - 1)
+    }));
+    
+    // Animer le cœur
+    if (isLiked && likeAnimation.current[reelId]) {
+      Animated.sequence([
+        Animated.timing(likeAnimation.current[reelId], {
+          toValue: 1.3,
+          duration: 200,
+          useNativeDriver: true
+        }),
+        Animated.timing(likeAnimation.current[reelId], {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start();
+    }
+    
+    // Sauvegarder dans AsyncStorage pour persistance locale
+    saveLikedReels(newLikedReels);
+    
+    console.log(`Reel ${reelId} ${isLiked ? 'liked' : 'unliked'} locally`);
+  };
+
+  // Double-tap pour like
+  const lastTap = useRef({});
+  const handleDoubleTap = (reelId) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    
+    if (lastTap.current[reelId] && (now - lastTap.current[reelId]) < DOUBLE_TAP_DELAY) {
+      if (!likedReels[reelId]) {
+        handleLike(reelId);
+      }
+      lastTap.current[reelId] = 0;
+    } else {
+      lastTap.current[reelId] = now;
+    }
+  };
+
+  // Log received parameters and save to storage
   useEffect(() => {
-    console.log("Paramètres reçus dans ReelsScreen:", { 
+    console.log("Parameters received in ReelsScreen:", { 
       userId, 
       firstName, 
       phoneNumber, 
-      photoAvailable: photo ? "oui" : "non" 
+      photoAvailable: photo ? "yes" : "no" 
     });
     
-    // Sauvegarder les données utilisateur si nécessaire
     saveUserDataToStorage();
+    loadLikedReels();
   }, [userId, firstName, phoneNumber, photo]);
 
-  // Fonction de retour
+  // Navigation back handler
   const handleGoBack = () => {
     router.back();
   };
-  
-  // Fonction pour gérer les likes avec mise à jour directe
-  const handleLike = (reelId) => {
-    setReels(currentReels => 
-      currentReels.map(reel => {
-        if (reel.id === reelId) {
-          // Si c'est le reel que nous voulons modifier
-          const newIsLiked = !reel.isLiked;
-          return {
-            ...reel,
-            isLiked: newIsLiked,
-            likes: newIsLiked ? reel.likes + 1 : Math.max(0, reel.likes - 1)
-          };
-        }
-        return reel;
-      })
-    );
-  };
 
-  // Fonction pour mettre en pause/reprendre la vidéo
+  // Toggle play/pause for videos
   const togglePlayPause = async (index) => {
     const ref = videoRefs.current[index.toString()];
     if (!ref) return;
@@ -102,56 +169,41 @@ const ReelsScreen = () => {
         setPausedVideos(prev => ({ ...prev, [index]: false }));
       }
     } catch (e) {
-      console.error('Erreur lors du changement de l\'état de lecture:', e);
+      console.error('Error changing playback state:', e);
     }
   };
 
-  // Fonction pour convertir les données blob en URI vidéo locale
+  // Create local video file from base64 data
   const createVideoFile = async (videoData, reelId) => {
     try {
       if (!videoData) {
-        console.log(`Pas de données vidéo pour le reel ${reelId}`);
+        console.log(`No video data for reel ${reelId}`);
         return null;
       }
       
-      // Créer un fichier temporaire pour la vidéo
       const filename = `${FileSystem.cacheDirectory}temp_video_${reelId}_${Date.now()}.mp4`;
       
-      console.log(`Création du fichier vidéo pour le reel ${reelId} à ${filename}`);
+      console.log(`Creating video file for reel ${reelId} at ${filename}`);
       
-      // Enregistrer les données base64 dans un fichier
       await FileSystem.writeAsStringAsync(filename, videoData, {
         encoding: FileSystem.EncodingType.Base64
       });
       
-      console.log(`Fichier vidéo créé avec succès pour le reel ${reelId}`);
+      console.log(`Video file created successfully for reel ${reelId}`);
       return filename;
     } catch (error) {
-      console.error(`Erreur lors de la création du fichier vidéo pour le reel ${reelId}:`, error);
+      console.error(`Error creating video file for reel ${reelId}:`, error);
       return null;
     }
   };
 
-  // Tester la validité de l'URL vidéo
-  const testVideoUrl = async (url) => {
-    try {
-      console.log(`Vérification de l'URL vidéo: ${url}`);
-      const response = await fetch(url, { method: 'HEAD' });
-      return response.ok;
-    } catch (error) {
-      console.error(`Erreur lors de la vérification de l'URL vidéo: ${url}`, error);
-      return false;
-    }
-  };
-
-  // Fonction pour récupérer les reels depuis l'API
+  // Fetch reels from API
   const fetchReels = async () => {
     try {
-      console.log('Récupération des reels depuis l\'API...');
+      console.log('Fetching reels from API...');
       setIsLoading(true);
       setError(null);
       
-      // Récupérer la liste des reels
       const response = await fetch(`${API_BASE_URL}/api/reels/all`, {
         method: 'GET',
         headers: {
@@ -161,17 +213,16 @@ const ReelsScreen = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
+        throw new Error(`HTTP Error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`Récupération de ${data.length} reels réussie`);
+      console.log(`Retrieved ${data.length} reels`);
       
-      // Créer des fichiers vidéo pour chaque reel si videoData est disponible
+      // Create local video files
       const videoFilesMap = {};
       for (const reel of data) {
         if (reel.videoData) {
-          console.log(`Traitement des données vidéo pour le reel ${reel.id}`);
           const videoPath = await createVideoFile(reel.videoData, reel.id);
           if (videoPath) {
             videoFilesMap[reel.id] = videoPath;
@@ -180,78 +231,75 @@ const ReelsScreen = () => {
       }
       
       if (Object.keys(videoFilesMap).length > 0) {
-        console.log(`${Object.keys(videoFilesMap).length} fichiers vidéo créés localement`);
+        console.log(`${Object.keys(videoFilesMap).length} video files created locally`);
         setVideoFiles(videoFilesMap);
       }
       
-      // Traiter chaque reel
-      const processedReels = await Promise.all(data.map(async (reel) => {
-        // Essayer d'utiliser le fichier vidéo local si disponible
-        let videoUri;
-        
-        if (videoFilesMap[reel.id]) {
-          // Utiliser le fichier local si créé avec succès
-          videoUri = videoFilesMap[reel.id];
-          console.log(`Utilisation du fichier vidéo local pour le reel ${reel.id}: ${videoUri}`);
-        } else {
-          // Sinon, essayer d'utiliser l'URL du serveur
-          videoUri = `${API_BASE_URL}/api/reels/video/${reel.id}`;
-          
-          // Vérifier si l'URL est valide
-          const isValid = await testVideoUrl(videoUri);
-          if (!isValid) {
-            console.warn(`L'URL vidéo n'est pas valide pour le reel ${reel.id}: ${videoUri}`);
-          } else {
-            console.log(`URL vidéo valide pour le reel ${reel.id}: ${videoUri}`);
-          }
+      // Initialize like animations for each reel
+      data.forEach(reel => {
+        if (!likeAnimation.current[reel.id]) {
+          likeAnimation.current[reel.id] = new Animated.Value(1);
         }
         
-        // Créer l'URL de la vignette ou utiliser l'image par défaut
-        let thumbnailUri;
-        if (reel.thumbnail) {
-          thumbnailUri = `data:image/jpeg;base64,${reel.thumbnail}`;
-        } else {
-          thumbnailUri = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
-        }
+        // Initialize like counts
+        setLikeCounts(prev => ({
+          ...prev,
+          [reel.id]: reel.likesCount || 0
+        }));
+      });
+      
+      // Process reels
+      const processedReels = data.map((reel) => {
+        // Use local video file or server URL
+        const videoUri = videoFilesMap[reel.id] 
+          ? videoFilesMap[reel.id] 
+          : `${API_BASE_URL}/api/reels/video/${reel.id}`;
+        
+        // Thumbnail or default image
+        const thumbnailUri = reel.thumbnail
+          ? `data:image/jpeg;base64,${reel.thumbnail}`
+          : Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
         
         return {
           id: reel.id,
           videoUri,
           thumbnailUri,
-          title: reel.title || 'Sans titre',
+          title: reel.title || 'Untitled',
           description: reel.description || '',
+          likesCount: reel.likesCount || 0,
+          isLiked: reel.isLiked || false,
           user: {
-            name: reel.author?.firstName || 'Utilisateur',
-            profilePic: reel.author?.photo ? `data:image/jpeg;base64,${reel.author.photo}` : null
-          },
-          likes: 0, // Toujours initialiser à 0
-          isLiked: false // Toujours initialiser à false pour le frontend uniquement
+            name: reel.author?.firstName || 'User',
+            profilePic: reel.author?.photo 
+              ? `data:image/jpeg;base64,${reel.author.photo}` 
+              : null
+          }
         };
-      }));
+      });
       
       setReels(processedReels);
-      console.log(`${processedReels.length} reels traités avec succès`);
+      console.log(`${processedReels.length} reels processed successfully`);
       
     } catch (error) {
-      console.error('Erreur lors de la récupération des reels:', error);
+      console.error('Error fetching reels:', error);
       setError(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Récupération des reels au chargement
+  // Fetch reels on component mount
   useEffect(() => {
     fetchReels();
     
-    // Nettoyage des références et fichiers temporaires lors du démontage
+    // Cleanup on unmount
     return () => {
-      // Arrêter et décharger toutes les vidéos
+      // Unload all videos
       Object.values(videoRefs.current).forEach(videoRef => {
         if (videoRef) videoRef.unloadAsync().catch(() => {});
       });
       
-      // Supprimer les fichiers vidéo temporaires
+      // Remove temporary video files
       Object.values(videoFiles).forEach(filePath => {
         if (filePath && filePath.startsWith(FileSystem.cacheDirectory)) {
           FileSystem.deleteAsync(filePath, { idempotent: true }).catch(() => {});
@@ -260,25 +308,25 @@ const ReelsScreen = () => {
     };
   }, []);
 
-  // Gestion de la lecture des vidéos lors du changement d'index
+  // Manage video playback on index change
   useEffect(() => {
     const playCurrentVideo = async () => {
-      // Mettre en pause toutes les vidéos
+      // Pause all videos
       for (const [id, ref] of Object.entries(videoRefs.current)) {
         if (ref && id !== currentIndex.toString()) {
           try {
             await ref.pauseAsync();
-            // Décharger les vidéos non visibles pour économiser de la mémoire
+            // Unload distant videos to save memory
             if (Math.abs(parseInt(id) - currentIndex) > 1) {
               await ref.unloadAsync();
             }
           } catch (e) {
-            console.log(`Erreur lors de la mise en pause de la vidéo ${id}:`, e);
+            console.log(`Error pausing video ${id}:`, e);
           }
         }
       }
       
-      // Lecture de la vidéo actuelle si elle n'est pas explicitement mise en pause
+      // Play current video
       const currentRef = videoRefs.current[currentIndex.toString()];
       if (currentRef && !pausedVideos[currentIndex]) {
         try {
@@ -290,26 +338,29 @@ const ReelsScreen = () => {
             await currentRef.playAsync();
           }
         } catch (e) {
-          console.log(`Erreur lors de la lecture de la vidéo ${currentIndex}:`, e);
+          console.log(`Error playing video ${currentIndex}:`, e);
         }
       }
     };
     
     playCurrentVideo();
     
-    // Réinitialiser l'état de pause lors du changement d'index
+    // Reset pause state on index change
     setPausedVideos(prev => ({ ...prev, [currentIndex]: false }));
   }, [currentIndex]);
 
-  // Rendu d'un reel individuel
+  // Render individual reel
   const renderReel = ({ item, index }) => {
-    // N'afficher que la vidéo courante et les vidéos adjacentes pour économiser des ressources
     const shouldRenderFullContent = Math.abs(index - currentIndex) <= 1;
     const isPaused = pausedVideos[index] || false;
+    const isLiked = likedReels[item.id] || false;
+    
+    // Animation scale pour le bouton like
+    const likeScale = likeAnimation.current[item.id] || new Animated.Value(1);
     
     return (
       <View style={styles.reelContainer}>
-        {/* Vidéo en arrière-plan */}
+        {/* Video Background */}
         <Video
           ref={ref => { videoRefs.current[index.toString()] = ref; }}
           source={{ uri: item.videoUri }}
@@ -317,14 +368,14 @@ const ReelsScreen = () => {
           usePoster={true}
           posterStyle={{ resizeMode: 'cover' }}
           style={styles.videoBackground}
-          resizeMode="cover"
+          resizeMode="contain"
           shouldPlay={index === currentIndex && !isPaused}
           isLooping
           volume={1.0}
           isMuted={false}
           useNativeControls={false}
           onError={(error) => {
-            console.error(`Erreur de lecture vidéo pour le reel ${item.id}:`, error);
+            console.error(`Video playback error for reel ${item.id}:`, error);
           }}
           onPlaybackStatusUpdate={(status) => {
             if (status.isLoaded && index === currentIndex && !status.isPlaying && !isPaused) {
@@ -333,114 +384,119 @@ const ReelsScreen = () => {
           }}
         />
         
-        {/* Overlay pour assombrir légèrement la vidéo */}
+        {/* Video Overlay */}
         <View style={styles.overlay} />
         
-        {/* Bouton de retour en haut à gauche */}
+        {/* Double Tap Area for Like */}
+        <TouchableOpacity 
+          style={styles.doubleTapArea}
+          activeOpacity={1}
+          onPress={() => handleDoubleTap(item.id)}
+        />
+        
+        {/* Back Button */}
         <TouchableOpacity 
           style={styles.backButton} 
           onPress={handleGoBack}
         >
-          <Ionicons name="arrow-back" size={28} color="white" />
+          <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
         
-        {/* Bouton central pour mettre en pause/reprendre la vidéo */}
+        {/* Like Button */}
+        <View style={styles.interactionButtons}>
+          <TouchableOpacity
+            style={styles.likeButton}
+            onPress={() => handleLike(item.id)}
+          >
+            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+              <AntDesign 
+                name={isLiked ? "heart" : "hearto"} 
+                size={28} 
+                color={isLiked ? "#CBFF06" : "white"} 
+              />
+            </Animated.View>
+            <Text style={styles.likeCount}>
+              {likeCounts[item.id] || 0}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Play/Pause Button */}
         <TouchableOpacity 
           style={styles.playPauseContainer}
           onPress={() => togglePlayPause(index)}
         >
           {isPaused && (
             <View style={styles.playButton}>
-              <MaterialIcons name="play-arrow" size={50} color="white" />
+              <MaterialIcons name="play-arrow" size={50} color="#CBFF06" />
             </View>
           )}
         </TouchableOpacity>
         
-        {/* Actions à droite - plus haut dans l'écran */}
-        <View style={styles.rightActions}>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => handleLike(item.id)}
-          >
-            <FontAwesome 
-              name="star" 
-              size={24} 
-              color={item.isLiked ? "#CCFF00" : "white"} 
-            />
-            <Text style={styles.actionText}>{item.likes}</Text>
-          </TouchableOpacity>
-          
-          {/* Profil utilisateur - avec photo passée en paramètre */}
-          {shouldRenderFullContent && (
-            <TouchableOpacity style={styles.profileAction}>
+        {/* Unified Creator and Description Card */}
+        {shouldRenderFullContent && (
+          <View style={styles.unifiedCard}>
+            <View style={styles.cardHeader}>
               <Image
                 source={
-                  photo 
-                    ? { uri: photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}` } 
-                    : (item.user.profilePic 
-                        ? { uri: item.user.profilePic } 
-                        : require('../../assets/images/b.png')
-                      )
+                  item.user.profilePic 
+                    ? { uri: item.user.profilePic } 
+                    : require('../../assets/images/b.png')
                 }
-                style={styles.profilePic}
+                style={styles.creatorProfilePic}
               />
-              <View style={styles.profileBadge}>
-                <FontAwesome name="plus" size={10} color="white" />
-              </View>
-              <Text style={styles.profileActionText}>S'abonner</Text>
-              <Text style={styles.profileActionSubtext}>@{firstName ? firstName.toLowerCase() : item.user.name.toLowerCase()}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        {/* Description en bas - ne s'affiche que pour la vidéo courante pour améliorer les performances */}
-        {shouldRenderFullContent && (
-          <View style={styles.bottomContent}>
-            <Text style={styles.reelTitle}>{item.title}</Text>
-            <Text style={styles.reelDescription}>{item.description}</Text>
+              <Text style={styles.creatorName}>{item.user.name}</Text>
+            </View>
+            
+            <View style={styles.cardContent}>
+              <Text style={styles.reelDescription}>{item.description}</Text>
+            </View>
           </View>
         )}
       </View>
     );
   };
 
-  // Gestion de l'affichage du chargement et des erreurs
+  // Loading state
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loaderContainer}>
+      <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#CCFF00" />
-        <Text style={styles.loaderText}>Chargement des reels...</Text>
-      </SafeAreaView>
+        <Text style={styles.loaderText}>Loading reels...</Text>
+      </View>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>Erreur: {error}</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchReels}>
-          <Text style={styles.retryButtonText}>Réessayer</Text>
+          <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  // No content state
   if (reels.length === 0) {
     return (
-      <SafeAreaView style={styles.noContentContainer}>
-        <Text style={styles.noContentText}>Aucun reel disponible</Text>
+      <View style={styles.noContentContainer}>
+        <Text style={styles.noContentText}>No reels available</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={fetchReels}>
-          <Text style={styles.refreshButtonText}>Rafraîchir</Text>
+          <Text style={styles.refreshButtonText}>Refresh</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  // Main render
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" />
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       
-      {/* FlatList verticale pour les reels */}
+      {/* Vertical FlatList for reels */}
       <FlatList
         ref={flatListRef}
         data={reels}
@@ -451,19 +507,17 @@ const ReelsScreen = () => {
         snapToAlignment="start"
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
-        maxToRenderPerBatch={3} // Limite le nombre d'éléments rendus par lot
-        windowSize={5} // Définit la taille de la fenêtre de rendu (éléments avant et après l'élément visible)
-        removeClippedSubviews={true} // Retire les vues qui ne sont pas visibles
-        initialNumToRender={1} // Commence avec un seul élément rendu
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={1}
+        contentContainerStyle={{ flexGrow: 1 }}
         onMomentumScrollEnd={(event) => {
           const index = Math.round(event.nativeEvent.contentOffset.y / height);
           setCurrentIndex(index);
         }}
       />
-      
-      {/* Espace réservé pour la barre de navigation */}
-      <View style={styles.navSpacerBottom} />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -471,28 +525,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+    margin: 0,
+    padding: 0,
+    paddingTop: 0,
   },
   reelContainer: {
-    width: width,
+    width: '100%',
     height: height,
     backgroundColor: '#000',
+    overflow: 'hidden',
   },
   videoBackground: {
     position: 'absolute',
-    width: width,
-    height: height,
+    width: '100%',
+    height: '100%',
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
   },
   overlay: {
     position: 'absolute',
-    width: width,
-    height: height,
+    width: '100%',
+    height: '100%',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  doubleTapArea: {
+    position: 'absolute',
+    width: '70%',
+    height: '70%',
+    top: '15%',
+    left: '15%',
+    zIndex: 4,
   },
   backButton: {
     position: 'absolute',
-    top: 50,
+    top: 60,
     left: 20,
     width: 40,
     height: 40,
@@ -501,6 +573,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  interactionButtons: {
+    position: 'absolute',
+    right: 20,
+    bottom: 180,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  likeButton: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  likeCount: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '600',
   },
   playPauseContainer: {
     position: 'absolute',
@@ -520,71 +609,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rightActions: {
+  unifiedCard: {
     position: 'absolute',
-    right: 20,
-    bottom: 250, // Déplacé plus haut sur l'écran
+    left: 20,
+    bottom: 100,
+    width: 300,
+    backgroundColor: 'rgba(12, 12, 12, 0.4)',
+    borderRadius: 15,
+    padding: 15,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  actionButton: {
-    alignItems: 'center',
-    marginBottom: 20,
-    minHeight: 50, // Pour éviter le saut lors du chargement
-    justifyContent: 'center',
-  },
-  actionText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 5,
-  },
-  profileAction: {
-    alignItems: 'center',
-  },
-  profilePic: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  creatorProfilePic: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 2,
     borderColor: 'white',
+    marginRight: 15,
   },
-  profileBadge: {
-    position: 'absolute',
-    bottom: 25,
-    right: -2,
-    backgroundColor: '#CCFF00',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileActionText: {
+  creatorName: {
     color: 'white',
-    fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 5,
+    fontSize: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
-  profileActionSubtext: {
-    color: 'white',
-    fontSize: 10,
-    opacity: 0.8,
-  },
-  bottomContent: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 70,
+  cardContent: {
+    
   },
   reelTitle: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 2,
   },
   reelDescription: {
     color: 'white',
-    fontSize: 14,
-    opacity: 0.9,
+    fontSize: 16,
+    opacity: 0.95,
+    lineHeight: 22,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 2,
   },
   loaderContainer: {
     flex: 1,
@@ -595,6 +677,7 @@ const styles = StyleSheet.create({
   loaderText: {
     color: 'white',
     marginTop: 10,
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -607,16 +690,18 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     marginBottom: 20,
+    fontSize: 18,
   },
   retryButton: {
     backgroundColor: '#CCFF00',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 25,
   },
   retryButtonText: {
     color: 'black',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   noContentContainer: {
     flex: 1,
@@ -627,23 +712,21 @@ const styles = StyleSheet.create({
   },
   noContentText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     marginBottom: 20,
     textAlign: 'center',
   },
   refreshButton: {
     backgroundColor: '#CCFF00',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 25,
   },
   refreshButtonText: {
     color: 'black',
     fontWeight: 'bold',
+    fontSize: 16,
   },
-  navSpacerBottom: {
-    height: 60, // Hauteur pour la barre de navigation
-  }
 });
 
 export default ReelsScreen;

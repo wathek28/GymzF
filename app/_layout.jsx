@@ -24,6 +24,8 @@ export default function RootLayout() {
       <Stack.Screen name="(Salle)" />
       {/* Désactivation de l'en-tête pour l'écran Reels */}
       <Stack.Screen name="(Reels)" />
+       {/* Désactivation de l'en-tête pour l'écran cour */}
+       <Stack.Screen name="(cour)" />
     </Stack>
   );
 }
