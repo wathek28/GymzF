@@ -19,25 +19,29 @@ const { width } = Dimensions.get('window');
 
 // Configuration API - pourrait être déplacée dans un fichier séparé pour être réutilisée
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.0.3:8082',
+  BASE_URL: 'http://192.168.1.194:8082',
   ENDPOINTS: {
     COURSE_DETAIL: '/api/courses',
-    COURSE_EXERCISES: '/api/courses'
+    COURSE_EXERCISES: '/api/courses',
+    COURSE_THUMBNAIL: '/api/courses',
+    EXERCISE_VIDEO: '/api/courses/exercises'
   },
   // Ajout de paramètres de timeout pour les requêtes
   TIMEOUT: 10000, // 10 secondes
 };
 
-// Formater la durée - fonction déplacée en dehors du composant
-const formatDuration = (exercise) => {
+// Formater l'information de l'exercice - modifié pour prioriser les répétitions
+const formatExerciseInfo = (exercise) => {
+  // Si l'exercice a des répétitions, on les affiche en priorité
+  if (exercise.repetitions) {
+    return `${exercise.repetitions} reps`;
+  } 
+  
+  // Sinon on affiche la durée en secondes si disponible
   if (exercise.durationSeconds) {
     const minutes = Math.floor(exercise.durationSeconds / 60);
     const seconds = exercise.durationSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  } 
-  
-  if (exercise.repetitions) {
-    return `${exercise.repetitions} × ${exercise.sets || 1}`;
   }
   
   return '';
@@ -45,6 +49,14 @@ const formatDuration = (exercise) => {
 
 // Composant d'exercice extrait pour éviter les re-rendus inutiles
 const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
+  // Créer une URL pour la miniature de la vidéo de l'exercice
+  const videoThumbnailUrl = exercise.videoId ? 
+    `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EXERCISE_VIDEO}/${exercise.id}/video-thumbnail` : 
+    null;
+
+  // Déterminer si nous affichons des répétitions ou une durée
+  const hasRepetitions = exercise.repetitions ? true : false;
+
   return (
     <TouchableOpacity 
       style={[
@@ -55,16 +67,20 @@ const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
     >
       <View style={styles.exerciseLeft}>
         <Image 
-          source={exercise.icon} 
+          source={videoThumbnailUrl ? { uri: videoThumbnailUrl } : require('../../assets/images/b.png')} 
           style={styles.exerciseIcon}
-          // Préchargement et mise en cache pour les images
           defaultSource={require('../../assets/images/b.png')}
         />
         <Text style={styles.exerciseName}>{exercise.name}</Text>
       </View>
       
       <View style={styles.exerciseRight}>
-        <Text style={styles.exerciseDuration}>{exercise.duration}</Text>
+        <Text style={[
+          styles.exerciseDuration,
+          hasRepetitions ? styles.exerciseRepetitions : null
+        ]}>
+          {exercise.duration}
+        </Text>
         <Ionicons name="chevron-forward" size={18} color="#888" />
       </View>
     </TouchableOpacity>
@@ -82,6 +98,12 @@ const ExerciseDetailScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = params.id;
+
+  // Construction de l'URL de la miniature du cours
+  const courseThumbnailUrl = useMemo(() => {
+    if (!id) return null;
+    return `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COURSE_THUMBNAIL}/${id}/thumbnail`;
+  }, [id]);
   
   // Fonction pour récupérer les données du cours avec controller pour annuler les requêtes en cas de démontage
   const fetchCourseData = useCallback(async () => {
@@ -146,10 +168,13 @@ const ExerciseDetailScreen = () => {
       // Transformer les données des exercices pour l'affichage
       const formattedExercises = exercisesData.map(ex => ({
         id: ex.id,
-        name: ex.title || ex.name,
-        duration: formatDuration(ex),
+        name: ex.name,
+        // Utiliser la nouvelle fonction de formatage
+        duration: formatExerciseInfo(ex),
         description: ex.description || '',
-        icon: ex.imageUrl ? { uri: ex.imageUrl } : require('../../assets/images/b.png')
+        videoId: ex.video ? ex.video.id : null,
+        // Stocker la valeur des répétitions pour y accéder facilement
+        repetitions: ex.repetitions
       }));
       
       setExercises(formattedExercises);
@@ -166,30 +191,6 @@ const ExerciseDetailScreen = () => {
     }
   }, [id]);
   
-  // Préchargement des images pour améliorer les performances visuelles
-  const precacheImages = useCallback(async () => {
-    if (!courseData) return;
-    
-    // Liste des images à précharger
-    const imagesToPreload = [];
-    
-    // Image du cours
-    if (courseData.thumbnail) {
-      imagesToPreload.push(`data:image/jpeg;base64,${courseData.thumbnail}`);
-    }
-    
-    // Images des exercices
-    exercises.forEach(exercise => {
-      if (exercise.icon && exercise.icon.uri) {
-        imagesToPreload.push(exercise.icon.uri);
-      }
-    });
-    
-    // Préchargement des images (vous pouvez utiliser Image.prefetch si disponible)
-    // Note: cette partie est conceptuelle et pourrait nécessiter une bibliothèque comme 'react-native-fast-image'
-    console.log('Préchargement de', imagesToPreload.length, 'images');
-  }, [courseData, exercises]);
-  
   // Charger les données au montage du composant avec annulation en cas de démontage
   useEffect(() => {
     fetchCourseData();
@@ -200,24 +201,26 @@ const ExerciseDetailScreen = () => {
       console.log('Nettoyage du composant');
     };
   }, [fetchCourseData]);
-  
-  // Précharger les images lorsque les données sont disponibles
-  useEffect(() => {
-    if (courseData && exercises.length > 0) {
-      precacheImages();
-    }
-  }, [courseData, exercises, precacheImages]);
 
   // Navigation retour - mémorisée pour éviter les re-créations
   const handleGoBack = useCallback(() => {
     router.back();
   }, [router]);
 
-  // Gestion du clic sur un exercice - mémorisée pour éviter les re-créations
+  // Afficher plus d'informations sur l'exercice en utilisant les répétitions si disponible
   const handleExercisePress = useCallback((exercise) => {
+    let detailMessage = exercise.description || "Aucune description disponible";
+    
+    // Ajouter les informations sur les répétitions ou la durée
+    if (exercise.repetitions) {
+      detailMessage += `\n\nNombre de répétitions : ${exercise.repetitions}`;
+    } else if (exercise.duration) {
+      detailMessage += `\n\nDurée : ${exercise.duration}`;
+    }
+    
     Alert.alert(
       exercise.name,
-      exercise.description || "Aucune description disponible"
+      detailMessage
     );
   }, []);
 
@@ -296,14 +299,13 @@ const ExerciseDetailScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header Image avec placeholder pour chargement rapide */}
+      {/* Header Image avec URL de miniature du cours */}
       <View style={styles.headerContainer}>
         <Image 
-          source={courseData.thumbnail 
-            ? { uri: `data:image/jpeg;base64,${courseData.thumbnail}` }
+          source={courseThumbnailUrl 
+            ? { uri: courseThumbnailUrl }
             : require('../../assets/images/b.png')} 
           style={styles.headerImage}
-          // Ajout du placeholder pour chargement plus rapide
           defaultSource={require('../../assets/images/b.png')}
         />
         
@@ -531,6 +533,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     marginRight: 15,
+    borderRadius: 5,
   },
   exerciseName: {
     fontSize: 15,
@@ -544,6 +547,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     marginRight: 8,
+  },
+  // Nouveau style pour mettre en évidence les répétitions
+  exerciseRepetitions: {
+    color: '#555',
+    fontWeight: '500',
   },
   startButton: {
     backgroundColor: '#CBFF06',

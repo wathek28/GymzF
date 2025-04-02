@@ -69,7 +69,7 @@ const CoachDetailsScreen = () => {
   const fetchCoaches = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.0.3:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -166,9 +166,9 @@ const CoachDetailsScreen = () => {
     </View>
   );
   
-  const handleProfilePress = () => {
+  const handleProfilePress  = () => {
     router.push({
-      pathname: '/Coachc',
+      pathname: '/coachc',
       params: {
         userId: userId,
         coachId: coach.id,  // Changed from idCoach to coachId for consistency
@@ -186,12 +186,13 @@ const CoachDetailsScreen = () => {
         niveauCours: coach.niveauCours,
         phoneNumber: coach.phoneNumber,
         photo: coach.photo,
-        poste: coach.poste,
+       
         prixSeance: coach.prixSeance,
         santeEtBienEtre: coach.santeEtBienEtre,
         tiktok: coach.tiktok,
         typeCoaching: coach.typeCoaching,
         bio: coach.bio,
+        poste: coach.poste,
       }
     });
   };
@@ -270,7 +271,7 @@ const CoachDetailsScreen = () => {
                   </TouchableOpacity>
                 </View>
                 
-                <Text style={styles.title}>Coach sportif de {coach.entrainementPhysique || 'N/A'}</Text>
+                <Text style={styles.title}> {coach.poste || 'N/A'}</Text>
 
                 {/* Badges Section */}
                 <View style={styles.badgesContainer}>

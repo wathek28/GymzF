@@ -73,7 +73,7 @@ const fetchGyms = async () => {
     // If gymId is available, we could fetch just that gym
     // But since your current logic relies on having all gyms for swipe navigation,
     // we'll keep fetching all gyms and then find the right index
-    const response = await fetch(`http://192.168.0.3:8082/api/auth/gyms`);
+    const response = await fetch(`http://192.168.1.194:8082/api/auth/gyms`);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

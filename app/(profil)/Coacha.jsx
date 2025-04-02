@@ -59,7 +59,7 @@ const CoachSearchScreen = () => {
   const fetchCoaches = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://192.168.0.3:8082/api/auth/coaches`);
+      const response = await fetch(`http://192.168.1.194:8082/api/auth/coaches`);
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des coachs');

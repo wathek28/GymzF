@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Scro
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-const API_BASE_URL = 'http://192.168.0.3:8082'; // Remplacez par votre adresse IP locale
+const API_BASE_URL = 'http://192.168.1.194:8082'; // Remplacez par votre adresse IP locale
 
 const SubscriptionCard = ({ titre, description, prix, ancienPrix, duree, uniteDuree }) => {
   // Fonction pour personnaliser la couleur de bordure en fonction de la durée

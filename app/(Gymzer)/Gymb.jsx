@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Service pour l'API de changement de numéro
 class PhoneService {
-  static BASE_URL = 'http://192.168.0.3:8082/api/auth/initiate-phone-change';
+  static BASE_URL = 'http://192.168.1.194:8082/api/auth/initiate-phone-change';
 
   // Méthode pour initier le changement de numéro
   static async initiatePhoneChange(currentPhoneNumber, newPhoneNumber) {

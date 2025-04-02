@@ -22,7 +22,7 @@ import { FlashList } from '@shopify/flash-list'; // Plus performant que FlatList
 
 // Configuration globale pour l'API
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.0.3:8082',
+  BASE_URL: 'http://192.168.1.194:8082',
   ENDPOINTS: {
     COACH_PROGRAMS: '/api/courses/coach',
     PROGRAM_DETAIL: '/api/courses',
@@ -153,12 +153,18 @@ const LevelBadge = React.memo(({ level }) => {
 // Composant pour une carte de programme avec gestion améliorée des images
 // Composant pour une carte de programme avec gestion améliorée des images
 // Composant pour une carte de programme avec gestion améliorée des images
+// Composant pour une carte de programme avec gestion améliorée des images
+// Composant pour une carte de programme avec gestion simple des images
 const ProgramCard = React.memo(({ program, onPress }) => {
-  // Formatter les données de l'image si c'est un BLOB
-  const getFormattedThumbnail = () => {
-    if (!program.thumbnail) return null;
-    return program.thumbnail;
-  };
+  // État local pour suivre le chargement de l'image
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  
+  // Construire l'URL complète de la miniature
+  const thumbnailUrl = useMemo(() => {
+    if (!program.id) return null;
+    return `${API_CONFIG.BASE_URL}/api/courses/${program.id}/thumbnail`;
+  }, [program.id]);
 
   // Fonction pour formater le prix
   const formatPrice = (price) => {
@@ -175,11 +181,35 @@ const ProgramCard = React.memo(({ program, onPress }) => {
       activeOpacity={0.8}
     >
       <View style={styles.programCard}>
-        <BlobImage 
-          source={getFormattedThumbnail()}
-          style={styles.programImage}
-          defaultImage={require('../../assets/images/b.png')}
+        {/* Image par défaut toujours affichée en arrière-plan */}
+        <Image 
+          source={require('../../assets/images/b.png')}
+          style={[styles.programImage, { position: 'absolute' }]}
         />
+        
+        {/* Indicateur de chargement */}
+        {imageLoading && (
+          <View style={styles.imageLoaderContainer}>
+            <ActivityIndicator size="small" color="#ADFF2F" />
+          </View>
+        )}
+        
+        {/* Image principale avec gestion du chargement */}
+        {thumbnailUrl && !imageError && (
+          <Image 
+            source={{ uri: thumbnailUrl }}
+            style={styles.programImage}
+            onLoadStart={() => setImageLoading(true)}
+            onLoad={() => setImageLoading(false)}
+            onLoadEnd={() => setImageLoading(false)}
+            onError={() => {
+              setImageLoading(false);
+              setImageError(true);
+            }}
+            // Optimisations supplémentaires
+            fadeDuration={300}
+          />
+        )}
         
         {/* Badge Prix (seulement si c'est payant) */}
         {!isFree && (
@@ -207,7 +237,6 @@ const ProgramCard = React.memo(({ program, onPress }) => {
     </TouchableOpacity>
   );
 });
-
 // Composant pour le carrousel horizontal de programmes
 const ProgramsCarousel = React.memo(({ programs, onProgramPress }) => {
   return (

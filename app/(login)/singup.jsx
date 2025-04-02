@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -14,11 +14,22 @@ const Singup = () => {
   const router = useRouter();
 
   const handleProfileSelect = (profileType) => {
-    console.log('Role avant envoi:', profileType);
-    router.replace({
-      pathname: '/inscription',
-      params: { role: profileType }
-    });
+    setSelectedProfile(profileType);
+    
+    if (profileType === 'GYMZER') {
+      console.log('Role avant envoi:', profileType);
+      router.replace({
+        pathname: '/inscription',
+        params: { role: profileType }
+      });
+    } else {
+      // Show an alert for non-GYMZER profiles
+      Alert.alert(
+        "Accès limité",
+        "Seul le profil GYMZER est disponible pour le moment.",
+        [{ text: "OK", onPress: () => console.log("Alert closed") }]
+      );
+    }
   };
 
   return (
@@ -47,6 +58,7 @@ const Singup = () => {
             style={[
               styles.profileButton,
               selectedProfile === profile.title && styles.selectedButton,
+              profile.title !== 'GYMZER' && styles.disabledButton,
             ]}
             onPress={() => handleProfileSelect(profile.title)}
           >
@@ -54,9 +66,11 @@ const Singup = () => {
               style={[
                 styles.buttonText,
                 selectedProfile === profile.title && styles.selectedText,
+                profile.title !== 'GYMZER' && styles.disabledText,
               ]}
             >
               {profile.title}
+              {profile.title !== 'GYMZER' && " (Bientôt disponible)"}
             </Text>
             <View
               style={[
@@ -132,6 +146,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#CCFF00',
   },
+  disabledButton: {
+    opacity: 0.7,
+    backgroundColor: '#333',
+  },
   buttonText: {
     color: '#CCFF00',
     fontSize: 18,
@@ -139,6 +157,10 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     color: '#CCFF00',
+  },
+  disabledText: {
+    color: '#999',
+    fontSize: 16,
   },
   iconContainer: {
     justifyContent: 'center',

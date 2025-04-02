@@ -40,7 +40,7 @@ const CoachProfile = () => {
     const fetchCoaches = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('http://192.168.0.3:8082/api/auth/coaches');
+        const response = await fetch('http://192.168.1.194:8082/api/auth/coaches');
         
         if (!response.ok) {
           throw new Error(`Erreur HTTP: ${response.status}`);

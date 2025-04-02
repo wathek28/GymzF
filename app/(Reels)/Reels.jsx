@@ -7,7 +7,6 @@ import {
   Dimensions,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   FlatList,
   ActivityIndicator,
   Animated
@@ -22,7 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const { width, height } = Dimensions.get('window');
 
 // API Configuration 
-const API_BASE_URL = 'http://192.168.0.3:8082';
+const API_BASE_URL = 'http://192.168.1.194:8082';
 
 const ReelsScreen = () => {
   // State management
@@ -35,7 +34,7 @@ const ReelsScreen = () => {
   const [likedReels, setLikedReels] = useState({});
   const [likeCounts, setLikeCounts] = useState({});
   
-  // Animation pour l'effet du like
+  // Animation for like effect
   const likeAnimation = useRef({});
   
   // Refs for video and flatlist management
@@ -48,7 +47,7 @@ const ReelsScreen = () => {
 
   // Save user data to local storage
   const saveUserDataToStorage = async () => {
-    if (userId && !await AsyncStorage.getItem('userId')) {
+    if (userId && !(await AsyncStorage.getItem('userId'))) {
       try {
         await AsyncStorage.setItem('userId', userId);
         if (firstName) await AsyncStorage.setItem('firstName', firstName);
@@ -82,23 +81,23 @@ const ReelsScreen = () => {
     }
   };
 
-  // Fonction pour gérer les likes (frontend uniquement)
+  // Function to handle likes (frontend only)
   const handleLike = async (reelId) => {
-    // Créer une nouvelle copie de l'état actuel des likes
+    // Create a new copy of the current likes state
     const newLikedReels = { ...likedReels };
     const isLiked = !newLikedReels[reelId];
     
-    // Mettre à jour l'état local
+    // Update local state
     newLikedReels[reelId] = isLiked;
     setLikedReels(newLikedReels);
     
-    // Mettre à jour le compteur de likes
+    // Update like counter
     setLikeCounts(prev => ({
       ...prev,
       [reelId]: isLiked ? (prev[reelId] || 0) + 1 : Math.max(0, (prev[reelId] || 0) - 1)
     }));
     
-    // Animer le cœur
+    // Animate heart
     if (isLiked && likeAnimation.current[reelId]) {
       Animated.sequence([
         Animated.timing(likeAnimation.current[reelId], {
@@ -114,13 +113,13 @@ const ReelsScreen = () => {
       ]).start();
     }
     
-    // Sauvegarder dans AsyncStorage pour persistance locale
+    // Save to AsyncStorage for local persistence
     saveLikedReels(newLikedReels);
     
     console.log(`Reel ${reelId} ${isLiked ? 'liked' : 'unliked'} locally`);
   };
 
-  // Double-tap pour like
+  // Double-tap for like
   const lastTap = useRef({});
   const handleDoubleTap = (reelId) => {
     const now = Date.now();
@@ -255,19 +254,13 @@ const ReelsScreen = () => {
           ? videoFilesMap[reel.id] 
           : `${API_BASE_URL}/api/reels/video/${reel.id}`;
         
-        // Thumbnail or default image
-        const thumbnailUri = reel.thumbnail
-          ? `data:image/jpeg;base64,${reel.thumbnail}`
-          : Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
-        
         return {
           id: reel.id,
           videoUri,
-          thumbnailUri,
           title: reel.title || 'Untitled',
           description: reel.description || '',
           likesCount: reel.likesCount || 0,
-          isLiked: reel.isLiked || false,
+          isLiked: likedReels[reel.id] || false, // Use local liked state
           user: {
             name: reel.author?.firstName || 'User',
             profilePic: reel.author?.photo 
@@ -310,6 +303,8 @@ const ReelsScreen = () => {
 
   // Manage video playback on index change
   useEffect(() => {
+    if (reels.length === 0) return;
+    
     const playCurrentVideo = async () => {
       // Pause all videos
       for (const [id, ref] of Object.entries(videoRefs.current)) {
@@ -347,7 +342,7 @@ const ReelsScreen = () => {
     
     // Reset pause state on index change
     setPausedVideos(prev => ({ ...prev, [currentIndex]: false }));
-  }, [currentIndex]);
+  }, [currentIndex, reels]);
 
   // Render individual reel
   const renderReel = ({ item, index }) => {
@@ -355,7 +350,7 @@ const ReelsScreen = () => {
     const isPaused = pausedVideos[index] || false;
     const isLiked = likedReels[item.id] || false;
     
-    // Animation scale pour le bouton like
+    // Animation scale for like button
     const likeScale = likeAnimation.current[item.id] || new Animated.Value(1);
     
     return (
@@ -364,9 +359,6 @@ const ReelsScreen = () => {
         <Video
           ref={ref => { videoRefs.current[index.toString()] = ref; }}
           source={{ uri: item.videoUri }}
-          posterSource={{ uri: item.thumbnailUri }}
-          usePoster={true}
-          posterStyle={{ resizeMode: 'cover' }}
           style={styles.videoBackground}
           resizeMode="contain"
           shouldPlay={index === currentIndex && !isPaused}
@@ -379,7 +371,7 @@ const ReelsScreen = () => {
           }}
           onPlaybackStatusUpdate={(status) => {
             if (status.isLoaded && index === currentIndex && !status.isPlaying && !isPaused) {
-              videoRefs.current[index.toString()].playAsync().catch(() => {});
+              videoRefs.current[index.toString()]?.playAsync().catch(() => {});
             }
           }}
         />
@@ -461,7 +453,7 @@ const ReelsScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#CCFF00" />
+        <ActivityIndicator size="large" color="#CBFF06" />
         <Text style={styles.loaderText}>Loading reels...</Text>
       </View>
     );
@@ -693,7 +685,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   retryButton: {
-    backgroundColor: '#CCFF00',
+    backgroundColor: '#CBFF06',
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 25,
@@ -717,7 +709,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   refreshButton: {
-    backgroundColor: '#CCFF00',
+    backgroundColor: '#CBFF06',
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 25,

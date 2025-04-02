@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#eee",
     position: "absolute",
-    bottom: 2, 
+    bottom: 20, 
     width: "100%",
     borderRadius: 25,
     elevation: 8,

@@ -57,7 +57,7 @@ const Code = () => {
     }
   
     try {
-      const response = await fetch('http://192.168.0.3:8082/api/auth/verify', {
+      const response = await fetch('http://192.168.1.194:8082/api/auth/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ const Code = () => {
 
   const handleResendCode = async () => {
     try {
-      const response = await fetch('http://192.168.0.3:8082/api/auth/register', {
+      const response = await fetch('http://192.168.1.194:8082/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

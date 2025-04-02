@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Modal, 
   Keyboard,
+  StatusBar
   
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -24,19 +25,21 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Dimensions } from 'react-native';
-
-// Pour l'instant, nous utilisons expo-av pour le composant Video
 import { Video } from 'expo-av';
+// Pour l'instant, nous utilisons expo-av pour le composant Video
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
-
+const { width, height } = Dimensions.get('window');
 //
 // Hook pour charger les images de la galerie
 //
+// Hook pour charger les images de la galerie
 const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.0.3:8082/api';
+  const API_BASE_URL = 'http://192.168.1.194:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
@@ -44,73 +47,6 @@ const useGalleryImages = (id, selectedTab) => {
       loadGalleryImages(id);
     }
   }, [selectedTab, id]);
-
-  const extractBase64Content = (text) => {
-    const images = new Map(); // Pour dédupliquer
-    let position = 0;
-
-    while (position < text.length) {
-      const contentKey = '"content"';
-      const startContent = text.indexOf(contentKey, position);
-      if (startContent === -1) break;
-
-      const startQuote = text.indexOf('"', startContent + contentKey.length);
-      if (startQuote === -1) break;
-
-      let endQuote = startQuote + 1;
-      let escape = false;
-
-      while (endQuote < text.length) {
-        const char = text[endQuote];
-        if (escape) {
-          escape = false;
-        } else if (char === '\\') {
-          escape = true;
-        } else if (char === '"' && !escape) {
-          break;
-        }
-        endQuote++;
-      }
-
-      if (endQuote < text.length) {
-        const base64Content = text.slice(startQuote + 1, endQuote);
-
-        // Recherche d'un ID associé
-        const idSearch = text.slice(Math.max(0, startContent - 200), startContent);
-        const idMatch = idSearch.match(/"id"\s*:\s*(\d+)/);
-        let imageId;
-
-        if (idMatch) {
-          imageId = parseInt(idMatch[1]);
-        } else {
-          imageId = `generated_${Date.now()}_${Math.random()}`;
-        }
-
-        if (/^[A-Za-z0-9+/=]+$/.test(base64Content) && !images.has(base64Content)) {
-          images.set(base64Content, {
-            id: imageId,
-            content: base64Content
-          });
-        }
-      }
-
-      position = endQuote + 1;
-    }
-
-    return Array.from(images.values());
-  };
-
-  const processImages = (photos) => {
-    const seen = new Set();
-    return photos.map(photo => {
-      const uri = photo.url || (photo.content ? `data:image/jpeg;base64,${photo.content}` : DEFAULT_IMAGE);
-      if (seen.has(uri)) {
-        photo.id = `${photo.id}_${Date.now()}_${Math.random()}`;
-      }
-      seen.add(uri);
-      return { id: photo.id, uri };
-    }).filter(img => img.uri !== DEFAULT_IMAGE);
-  };
 
   const loadGalleryImages = async (coachId) => {
     try {
@@ -129,17 +65,24 @@ const useGalleryImages = (id, selectedTab) => {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
 
-      const data = await response.json();
-      const foundImages = extractBase64Content(JSON.stringify(data));
-
-      if (foundImages.length === 0) {
+      const photos = await response.json();
+      
+      // Traitement des photos reçues
+      if (!Array.isArray(photos) || photos.length === 0) {
         throw new Error('Aucune image trouvée dans la réponse');
       }
 
-      const processedImages = processImages(foundImages);
-      setGalleryImages(processedImages);
+      // Création des URI pour chaque photo
+      const processedImages = photos.map(photo => ({
+        id: photo.id,
+        uri: `${API_BASE_URL}/photos/${photo.id}`, // Utilise l'endpoint qui renvoie l'image binaire
+        fileName: photo.fileName,
+        uploadDate: photo.uploadDate
+      }));
 
+      setGalleryImages(processedImages);
     } catch (err) {
+      console.error('Erreur lors du chargement des images:', err);
       setError(err.message || "Impossible de charger les images.");
     } finally {
       setIsLoading(false);
@@ -152,12 +95,6 @@ const useGalleryImages = (id, selectedTab) => {
 //
 // Modal pour publier un avis (ReviewModal)
 //
-//const handleDiscoverCourses = () => {
-  // Naviguer vers la page coura.jsx dans le dossier (cour)
-
-
-// Modal pour publier un avis (ReviewModal)
-//
 const ReviewModal = ({ 
   isVisible, 
   onClose, 
@@ -166,42 +103,52 @@ const ReviewModal = ({
   comment, 
   setComment, 
   firstName,
-  // Ces props doivent être passées lors de l'utilisation du composant
-  utilisateurId,  // ID de l'utilisateur qui poste le commentaire
-  recepteurId     // ID du coach qui reçoit le commentaire
+  recepteurId
 }) => {
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de votre serveur backend
+  
+  // Remove these lines that overwrite the recepteurId prop
+  // const route = useRoute();
+  // const params = route.params || {};
+  // const recepteurId = params.idCoach;
 
-  // Fonction pour sélectionner une image depuis la galerie
+  const API_BASE_URL = 'http://192.168.1.194:8082'; // URL de l'API
+
   const pickImage = async (setImage) => {
     try {
+      // Request permission to access the media library
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
       if (!permissionResult.granted) {
         Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
         return;
       }
       
-      // Utilisons la méthode qui fonctionne avec votre version
-      // Certaines versions utilisent encore MediaTypeOptions
+      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'Images', // Simplifié pour la compatibilité
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 1,
       });
       
-      // Vérifiez comment le résultat est structuré dans votre version
       if (!result.canceled) {
-        // Pour les versions récentes
-        if (result.assets && result.assets.length > 0) {
+        // Compress the image before setting it
+        try {
+          const compressedUri = await compressImage(result.assets[0].uri, {
+            maxWidth: 800,
+            maxHeight: 800,
+            quality: 0.6,
+          });
+          
+          // Set the compressed image
+          setImage(compressedUri);
+        } catch (compressionError) {
+          console.error('Erreur lors de la compression:', compressionError);
+          // If compression fails, use the original image
           setImage(result.assets[0].uri);
-        } 
-        // Pour les versions plus anciennes
-        else if (result.uri) {
-          setImage(result.uri);
         }
       }
     } catch (error) {
@@ -210,62 +157,170 @@ const ReviewModal = ({
     }
   };
 
-  // Fonction pour soumettre le commentaire à l'API
+  const getMimeType = (filename) => {
+    if (!filename) return 'image/jpeg'; // Default to jpeg
+    
+    const extension = filename.split('.').pop().toLowerCase();
+    
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      default:
+        return 'image/jpeg'; // Default
+    }
+  };
+
+  const compressImage = async (uri, options = {}) => {
+    try {
+      // Check if URI is valid
+      if (!uri || typeof uri !== 'string') {
+        throw new Error('Invalid image URI');
+      }
+      
+      // Get original file info
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists) {
+        throw new Error('Image file does not exist');
+      }
+      
+      console.log(`Original image size: ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB`);
+      
+      // Check if ImageManipulator is available
+      if (!ImageManipulator) {
+        console.warn('ImageManipulator not available, returning original image');
+        return uri;
+      }
+      
+      // Default options
+      const imageOptions = {
+        maxWidth: options.maxWidth || 1024,
+        maxHeight: options.maxHeight || 1024,
+        quality: options.quality || 0.7,
+        format: options.format || ImageManipulator.SaveFormat.JPEG
+      };
+      
+      // Perform the compression and resizing
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: imageOptions.maxWidth, height: imageOptions.maxHeight } }],
+        { compress: imageOptions.quality, format: imageOptions.format }
+      );
+      
+      // Log the results
+      const compressedInfo = await FileSystem.getInfoAsync(result.uri);
+      console.log(`Compressed image size: ${(compressedInfo.size / 1024 / 1024).toFixed(2)} MB`);
+      console.log(`Compression ratio: ${(compressedInfo.size / fileInfo.size * 100).toFixed(2)}%`);
+      
+      return result.uri;
+    } catch (error) {
+      console.error('Image compression error:', error);
+      // Return original URI if compression fails
+      return uri;
+    }
+  };
+
   const submitReview = async () => {
-    // Validation...
-    if (!rating || !comment.trim() || !utilisateurId || !recepteurId) {
-      Alert.alert("Erreur", "Veuillez remplir tous les champs obligatoires");
+    console.log("Starting review submission with recepteurId:", recepteurId);
+    
+    // Validation
+    if (!rating) {
+      Alert.alert("Erreur", "Veuillez donner une évaluation");
       return;
     }
-  
+    if (!comment.trim()) {
+      Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+      return;
+    }
+    
+    // Vérifier que l'ID du coach est disponible
+    if (!recepteurId) {
+      Alert.alert("Erreur", "Information du coach manquante");
+      console.error("ID du coach manquant");
+      return;
+    }
+
     setIsSubmitting(true);
-  
+
     try {
+      // Récupérer l'ID utilisateur depuis AsyncStorage
+      const storedUserId = await AsyncStorage.getItem('userId');
+      console.log("ID utilisateur récupéré depuis AsyncStorage:", storedUserId);
+      
+      // Utiliser l'ID stocké ou un ID par défaut si non disponible
+      const currentUserId = storedUserId ? storedUserId : 2;
+      console.log("ID utilisateur utilisé pour la requête:", currentUserId);
+      
       // Préparation du FormData
       const formData = new FormData();
       formData.append('evaluation', rating.toString());
       formData.append('commentaire', comment);
-  
-      // Traitement des images...
+
+      // Traitement de l'image "avant" si disponible
       if (beforeImage) {
-        const imageNameBefore = beforeImage.split('/').pop();
+        const processedBeforeImage = await compressImage(beforeImage, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.5,
+        });
+        
+        const imageNameBefore = processedBeforeImage.split('/').pop();
         const mimeTypeBefore = getMimeType(imageNameBefore);
         
         formData.append('imageAvant', {
-          uri: Platform.OS === 'android' ? beforeImage : beforeImage.replace('file://', ''),
+          uri: Platform.OS === 'android' ? processedBeforeImage : processedBeforeImage.replace('file://', ''),
           name: imageNameBefore,
           type: mimeTypeBefore
         });
       }
-  
+
+      // Traitement de l'image "après" si disponible
       if (afterImage) {
-        const imageNameAfter = afterImage.split('/').pop();
+        const processedAfterImage = await compressImage(afterImage, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.5,
+        });
+        
+        const imageNameAfter = processedAfterImage.split('/').pop();
         const mimeTypeAfter = getMimeType(imageNameAfter);
         
         formData.append('imageApres', {
-          uri: Platform.OS === 'android' ? afterImage : afterImage.replace('file://', ''),
+          uri: Platform.OS === 'android' ? processedAfterImage : processedAfterImage.replace('file://', ''),
           name: imageNameAfter,
           type: mimeTypeAfter
         });
       }
-  
-      console.log(`Envoi du commentaire à l'URL: ${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`);
-  
-      // Simplifier la gestion de la réponse
-      const response = await fetch(`${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`, {
+
+      // Log pour le debug
+      const apiUrl = `${API_BASE_URL}/api/commentaires/${currentUserId}/${recepteurId}`;
+      console.log(`Envoi du commentaire à l'URL: ${apiUrl}`);
+
+      // Appel API
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
+          // Ne pas définir Content-Type pour un FormData multipart
         },
         body: formData
       });
-  
-      // Vérifier uniquement le statut HTTP
+
+      // Vérifier le statut HTTP
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
-  
-      // Ne pas traiter la réponse JSON pour éviter le problème de parsing
+
       console.log("Commentaire publié avec succès");
       
       // Réinitialiser le formulaire
@@ -283,6 +338,11 @@ const ReviewModal = ({
         "Votre avis a été publié avec succès !",
         [{ text: "OK" }]
       );
+      
+      // Rafraîchir la liste des commentaires si disponible
+      if (typeof fetchComments === 'function') {
+        fetchComments(recepteurId);
+      }
     } catch (error) {
       console.error('Erreur lors de la publication de l\'avis:', error);
       Alert.alert(
@@ -292,22 +352,6 @@ const ReviewModal = ({
       );
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Fonction utilitaire pour déterminer le type MIME
-  const getMimeType = (filename) => {
-    const ext = filename.split('.').pop().toLowerCase();
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      default:
-        return 'image/jpeg'; // Par défaut
     }
   };
 
@@ -327,9 +371,8 @@ const ReviewModal = ({
             <View style={styles.modalContent}>
               <ScrollView>
                 <Text style={styles.modalTitle}>
-                  Vous avez récemment travaillé avec{'\n'}
-                  COACH {firstName?.toUpperCase()},{'\n'}
-                  Partagez votre expérience !
+                  Partagez votre expérience{'\n'}
+                  {firstName ? `chez ${firstName}` : 'au gym'}
                 </Text>
                 <Text style={styles.fieldLabel}>Évaluation *</Text>
                 <View style={styles.starsContainer}>
@@ -419,6 +462,13 @@ const ReviewModal = ({
     </Modal>
   );
 };
+//const handleDiscoverCourses = () => {
+  // Naviguer vers la page coura.jsx dans le dossier (cour)
+
+
+// Modal pour publier un avis (ReviewModal)
+//
+
 
 //
 // Composant principal CoachProfile
@@ -468,6 +518,7 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
     santeEtBienEtre = [],
     bio,
     typeCoaching,
+    poste,
     
   } = route.params || {};
 
@@ -480,6 +531,9 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
       }
     });
   };
+  ////////////
+  
+  ////////////////
 
   const handleDiscoverCourses = () => {
     // Naviguer vers la page coura.jsx dans le dossier (cour)
@@ -561,363 +615,298 @@ const [photoModalVisible, setPhotoModalVisible] = useState(false);
   };
 
   // Fonction pour récupérer et traiter les reels
-  const fetchReels = async (coachId) => {
-    if (!coachId) {
-      console.error('🚨 coachId is required');
+ // Improved function for fetching and processing reels
+// Updated fetchReels function focusing on direct video playback
+// Improved fetchReels function with better error handling and debugging
+// Improved fetchReels function that correctly uses the video streaming endpoint
+const fetchReels = async (coachId) => {
+  if (!coachId) {
+    console.error('🚨 coachId is required');
+    return [];
+  }
+
+  try {
+    console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
+    const response = await fetch(`http://192.168.1.194:8082/api/reels/user/${coachId}`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reels = await response.json();
+    console.log('Response data structure:', JSON.stringify(reels[0], null, 2));
+
+    if (!Array.isArray(reels)) {
+      console.error('⚠️ Invalid response format - expected array');
       return [];
     }
 
-    try {
-      console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-      const response = await fetch(`http://192.168.0.3:8082/api/reels/user/${coachId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
+    const processedReels = reels.map(reel => {
+      try {
+        // IMPORTANT CHANGE: Instead of using the videoPath directly,
+        // use the dedicated video streaming endpoint
+        const videoUri = `http://192.168.1.194:8082/api/reels/video/${reel.id}`;
+        console.log(`Video streaming URI: ${videoUri}`);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Process title, defaults to original filename if title is missing
+        const title = reel.title || (reel.originalFilename ? 
+                               reel.originalFilename.substring(0, 30) : 'Vidéo sans titre');
+        
+        // We'll use placeholder image for thumbnails
+        const defaultThumbnail = require('../../assets/images/b.png');
+
+        const processedReel = {
+          id: reel.id,
+          videoUri,
+          thumbnailUri: defaultThumbnail,
+          title,
+          description: reel.description || '',
+          createdAt: reel.createdAt
+        };
+
+        console.log(`Processed reel ${reel.id}:`, {
+          id: reel.id,
+          hasVideo: !!videoUri,
+          title: title.substring(0, 30) + (title.length > 30 ? '...' : '')
+        });
+
+        return processedReel;
+
+      } catch (error) {
+        console.error(`❌ Error processing reel ${reel.id}:`, error);
+        return {
+          id: reel.id || Math.random().toString(),
+          videoUri: null,
+          thumbnailUri: require('../../assets/images/b.png'),
+          title: reel.title || 'Vidéo sans titre',
+          description: reel.description || 'Erreur de chargement',
+          error: true
+        };
       }
+    });
 
-      const reels = await response.json();
-      console.log('Response data structure:', JSON.stringify(reels[0], null, 2));
+    console.log(`✅ Processed ${processedReels.length} reels successfully`);
+    return processedReels;
 
-      if (!Array.isArray(reels)) {
-        console.error('⚠️ Invalid response format - expected array');
-        return [];
-      }
-
-      const processedReels = reels.map(reel => {
-        try {
-          // Vérifier les différentes possibilités de stockage des données vidéo
-          const videoData = reel.videoData || reel.video_data || reel.video;
-          let videoUri = null;
-
-          if (videoData) {
-            // Si les données vidéo sont en base64
-            if (typeof videoData === 'string' && videoData.match(/^[A-Za-z0-9+/=]+$/)) {
-              videoUri = `data:video/mp4;base64,${videoData}`;
-            }
-            // Si les données vidéo sont un objet avec une propriété data
-            else if (videoData.data) {
-              if (Array.isArray(videoData.data)) {
-                // Convertir le tableau de bytes en base64
-                const bytes = new Uint8Array(videoData.data);
-                const binary = bytes.reduce((data, byte) => data + String.fromCharCode(byte), '');
-                const base64 = btoa(binary);
-                videoUri = `data:video/mp4;base64,${base64}`;
-              } else if (typeof videoData.data === 'string') {
-                videoUri = `data:video/mp4;base64,${videoData.data}`;
-              }
-            }
-          }
-
-          // Traitement de la miniature
-          let thumbnailUri;
-          try {
-            thumbnailUri = reel.thumbnail 
-              ? `data:image/jpeg;base64,${reel.thumbnail}`
-              : require('../../assets/images/b.png');
-          } catch (thumbnailError) {
-            console.warn(`Cannot load thumbnail for reel ${reel.id}:`, thumbnailError);
-            thumbnailUri = require('../../assets/images/b.png');
-          }
-
-          const processedReel = {
-            ...reel,
-            videoUri,
-            thumbnailUri,
-            title: reel.title || 'Vidéo sans titre',
-            duration: reel.duration || ''
-          };
-
-          console.log(`Processed reel ${reel.id}:`, {
-            hasVideo: !!videoUri,
-            hasThumb: !!thumbnailUri
-          });
-
-          return processedReel;
-
-        } catch (error) {
-          console.error(`❌ Error processing reel ${reel.id}:`, error);
-          return {
-            ...reel,
-            videoUri: null,
-            error: true,
-            errorMessage: error.message,
-            thumbnailUri: require('../../assets/images/b.png'),
-            title: reel.title || 'Vidéo sans titre',
-            duration: reel.duration || ''
-          };
-        }
-      });
-
-      console.log(`✅ Processed ${processedReels.length} reels successfully`);
-      return processedReels;
-
-    } catch (error) {
-      console.error('❌ Error fetching reels:', error);
-      throw error;
-    }
-  };
+  } catch (error) {
+    console.error('❌ Error fetching reels:', error);
+    throw error;
+  }
+};
 
   // Composant VideoModal mis à jour pour utiliser expo-av Video
  // Composant VideoModal mis à jour pour être scrollable
+// Improved VideoModal component for direct video playback
+
+// Version simplifiée du composant VideoModal
+// Improved VideoModal component for direct video playback
+// Enhanced VideoModal with better error handling and support for streaming endpoint
+// Modal Vidéo avec scroll vertical pour plusieurs vidéos
 const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [localVideoUris, setLocalVideoUris] = useState({});
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const videoRef = useRef(null);
   const scrollViewRef = useRef(null);
-  const videoRefs = useRef({});
-
-  // Détermine les vidéos à afficher
-  const videosToShow = allVideos.length > 0 && videoUri 
-    ? allVideos 
-    : videoUri ? [{ id: 'single', videoUri }] : [];
-
-  // Trouve l'index de la vidéo sélectionnée
-  const initialIndex = videoUri 
-    ? allVideos.findIndex(video => video.videoUri === videoUri) 
-    : 0;
-
-  // Prépare toutes les vidéos
-  const prepareVideos = useCallback(async () => {
-    if (videosToShow.length === 0) return;
-    
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Prépare seulement la vidéo actuelle et les adjacentes pour optimiser les performances
-      const videosToProcess = videosToShow.filter((_, index) => {
-        return Math.abs(index - initialIndex) <= 1;
-      });
-
-      const processedUris = {};
-      
-      for (const video of videosToProcess) {
-        const videoData = video.videoUri;
-        if (videoData) {
-          try {
-            const processedUri = await processVideoData(videoData);
-            if (processedUri) {
-              processedUris[video.id] = processedUri;
-            }
-          } catch (err) {
-            console.error(`Error processing video ${video.id}:`, err);
-          }
-        }
-      }
-      
-      setLocalVideoUris(processedUris);
-      
-    } catch (err) {
-      console.error('Error preparing videos:', err);
-      setError('Erreur lors de la préparation des vidéos');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [videosToShow, initialIndex]);
-
-  // Charge la vidéo à l'index spécifié lorsqu'elle devient visible
-  const loadVideoAtIndex = useCallback(async (index) => {
-    if (index < 0 || index >= videosToShow.length) return;
-    
-    const video = videosToShow[index];
-    
-    // Si la vidéo est déjà chargée, ne rien faire
-    if (localVideoUris[video.id]) return;
-    
-    try {
-      const processedUri = await processVideoData(video.videoUri);
-      if (processedUri) {
-        setLocalVideoUris(prev => ({
-          ...prev,
-          [video.id]: processedUri
-        }));
-      }
-    } catch (err) {
-      console.error(`Error loading video at index ${index}:`, err);
-    }
-  }, [videosToShow, localVideoUris]);
-
-  // Gère le changement de vidéo lors du défilement
-  const handleScroll = useCallback((event) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const width = Dimensions.get('window').width;
-    const newIndex = Math.round(offsetX / width);
-    
-    if (newIndex !== currentVideoIndex) {
-      // Pause toutes les vidéos
-      Object.keys(videoRefs.current).forEach(id => {
-        if (videoRefs.current[id]) {
-          videoRefs.current[id].pauseAsync().catch(console.error);
-        }
-      });
-      
-      setCurrentVideoIndex(newIndex);
-      
-      // Précharge les vidéos adjacentes
-      loadVideoAtIndex(newIndex - 1);
-      loadVideoAtIndex(newIndex + 1);
-      
-      // Lecture de la vidéo courante
-      const currentVideo = videosToShow[newIndex];
-      if (currentVideo && videoRefs.current[currentVideo.id]) {
-        videoRefs.current[currentVideo.id].playAsync().catch(console.error);
-      }
-    }
-  }, [currentVideoIndex, videosToShow, loadVideoAtIndex]);
-
-  // Initialisation au montage du composant
+  
+  // Trouver l'index de la vidéo sélectionnée
+  const selectedVideoIndex = allVideos.findIndex(video => video.videoUri === videoUri);
+  const videosToShow = allVideos.length > 0 ? allVideos : [{ id: 'single', videoUri }];
+  
   useEffect(() => {
+    // Reset state when modal opens
     if (visible) {
-      prepareVideos();
+      setIsLoading(true);
+      setError(null);
+      console.log("Opening video modal with streaming URI:", videoUri);
       
-      // Définir l'index initial
-      if (initialIndex >= 0) {
-        setCurrentVideoIndex(initialIndex);
-      }
-    }
-    
-    return () => {
-      // Nettoyage des fichiers temporaires
-      Object.values(localVideoUris).forEach(uri => {
-        if (uri && uri.startsWith(FileSystem.cacheDirectory)) {
-          FileSystem.deleteAsync(uri, { idempotent: true })
-            .catch(console.error);
+      // Scroll to the selected video position after a short timeout
+      setTimeout(() => {
+        if (scrollViewRef.current && selectedVideoIndex > -1) {
+          const yOffset = selectedVideoIndex * Dimensions.get('window').height;
+          scrollViewRef.current.scrollTo({ y: yOffset, animated: false });
         }
-      });
-    };
-  }, [visible, prepareVideos, initialIndex]);
-
-  // Effet pour lecture automatique de la vidéo courante
-  useEffect(() => {
-    if (visible && videosToShow.length > 0) {
-      const currentVideo = videosToShow[currentVideoIndex];
-      if (currentVideo && videoRefs.current[currentVideo.id]) {
-        // Pause toutes les autres vidéos d'abord
-        Object.keys(videoRefs.current).forEach(id => {
-          if (id !== currentVideo.id && videoRefs.current[id]) {
-            videoRefs.current[id].pauseAsync().catch(console.error);
-          }
-        });
-        
-        // Lecture de la vidéo courante
-        videoRefs.current[currentVideo.id].playAsync().catch(console.error);
+      }, 100);
+    } else {
+      // Pause all videos when modal closes
+      if (videoRef.current) {
+        videoRef.current.pauseAsync().catch(() => {});
       }
     }
-  }, [visible, currentVideoIndex, videosToShow, localVideoUris]);
-
+  }, [visible, videoUri, selectedVideoIndex]);
+  
   if (!visible) return null;
-
+  
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="fade"
       transparent={false}
+      onRequestClose={onClose}
     >
-      <View style={styles.videoModalContainer}>
-        <TouchableOpacity 
-          style={styles.videoModalCloseButton}
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <StatusBar hidden />
+        
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 40,
+            right: 20,
+            zIndex: 100, // Valeur plus élevée pour être au-dessus du ScrollView
+            padding: 10,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            borderRadius: 20
+          }}
           onPress={onClose}
         >
-          <Text style={styles.videoModalCloseText}>Fermer</Text>
+          <MaterialIcons name="close" size={24} color="#FFF" />
         </TouchableOpacity>
-
-        {videosToShow.length > 0 ? (
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleScroll}
-            contentContainerStyle={styles.videoScrollViewContent}
-            scrollEventThrottle={16}
-          >
-            {videosToShow.map((video, index) => (
-              <View key={video.id} style={styles.videoScrollItem}>
-                {localVideoUris[video.id] ? (
-                  <Video
-                    ref={ref => { videoRefs.current[video.id] = ref; }}
-                    style={styles.videoPlayer}
-                    source={{ uri: localVideoUris[video.id] }}
-                    resizeMode="contain"
-                    useNativeControls
-                    shouldPlay={index === currentVideoIndex}
-                    isLooping
-                    onLoadStart={() => {
-                      if (index === currentVideoIndex) setIsLoading(true);
-                    }}
-                    onLoad={() => {
-                      if (index === currentVideoIndex) setIsLoading(false);
-                    }}
-                    onError={(error) => {
-                      console.error(`Video playback error for ${video.id}:`, error);
-                      if (index === currentVideoIndex) {
-                        setError('Erreur de lecture de la vidéo');
-                        setIsLoading(false);
-                      }
-                    }}
-                  />
-                ) : (
-                  <View style={styles.videoLoadingContainer}>
-                    <ActivityIndicator size="large" color="#FFFFFF" />
-                    <Text style={styles.videoLoadingText}>
-                      Chargement de la vidéo...
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.videoErrorContainer}>
-            <Text style={styles.videoErrorText}>Aucune vidéo disponible</Text>
-          </View>
-        )}
-
-        {isLoading && currentVideoIndex >= 0 && (
-          <View style={styles.videoLoadingOverlay}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.videoLoadingText}>Chargement de la vidéo...</Text>
-          </View>
-        )}
-
-        {error && (
-          <View style={styles.videoErrorContainer}>
-            <Text style={styles.videoErrorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={prepareVideos}
+        
+        <ScrollView
+          ref={scrollViewRef}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+        >
+          {videosToShow.map((video, index) => (
+            <View 
+              key={video.id || `video-${index}`}
+              style={{ 
+                width: '100%',
+                height: Dimensions.get('window').height,
+                justifyContent: 'center'
+              }}
             >
-              <Text style={styles.retryButtonText}>Réessayer</Text>
+              <Video
+                ref={index === selectedVideoIndex ? videoRef : null}
+                source={{ 
+                  uri: video.videoUri,
+                  headers: {
+                    'Accept': 'video/mp4,video/*;q=0.9,*/*;q=0.8',
+                    'Range': 'bytes=0-'
+                  }
+                }}
+                style={{ width: '100%', height: '70%' }}
+                resizeMode="contain"
+                shouldPlay={index === selectedVideoIndex}
+                isLooping
+                useNativeControls
+                onPlaybackStatusUpdate={(status) => {
+                  if (status.isLoaded && !status.error && index === selectedVideoIndex) {
+                    setIsLoading(false);
+                  }
+                }}
+                onLoadStart={() => {
+                  if (index === selectedVideoIndex) {
+                    console.log("Video loading started");
+                    setIsLoading(true);
+                  }
+                }}
+                onLoad={() => {
+                  if (index === selectedVideoIndex) {
+                    console.log("Video loaded successfully");
+                    setIsLoading(false);
+                  }
+                }}
+                onError={(error) => {
+                  if (index === selectedVideoIndex) {
+                    console.error("Video playback error:", error);
+                    setError(`Error: ${error.error?.message || "Unable to play video"}`);
+                    setIsLoading(false);
+                  }
+                }}
+              />
+              
+              {/* Titre et infos en bas de la vidéo */}
+              {video.title && (
+                <View style={{
+                  padding: 15,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  borderRadius: 10,
+                  margin: 10
+                }}>
+                  <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginBottom: 5 }}>
+                    {video.title}
+                  </Text>
+                  {video.description && (
+                    <Text style={{ color: '#CCC', fontSize: 14 }}>
+                      {video.description}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+        
+        {isLoading && (
+          <View style={{
+            ...StyleSheet.absoluteFillObject,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            zIndex: 50
+          }}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={{ color: 'white', marginTop: 10 }}>Chargement...</Text>
+          </View>
+        )}
+        
+        {error && (
+          <View style={{
+            position: 'absolute',
+            top: '50%',
+            left: 20,
+            right: 20,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            padding: 20,
+            borderRadius: 10,
+            alignItems: 'center',
+            zIndex: 50
+          }}>
+            <Text style={{ color: 'white', marginBottom: 10 }}>{error}</Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#D4FF00',
+                padding: 10,
+                borderRadius: 20
+              }}
+              onPress={onClose}
+            >
+              <Text style={{ fontWeight: 'bold' }}>Fermer</Text>
             </TouchableOpacity>
           </View>
         )}
         
-        {/* Indicateur de position */}
-        {videosToShow.length > 1 && (
-          <View style={styles.videoPageIndicator}>
-            {videosToShow.map((_, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.indicatorDot,
-                  index === currentVideoIndex && styles.indicatorDotActive
-                ]} 
-              />
-            ))}
-          </View>
-        )}
+        {/* Indicateur de pagination */}
+        <View style={{
+          position: 'absolute',
+          right: 20,
+          top: '50%',
+          transform: [{ translateY: -50 }],
+          zIndex: 40
+        }}>
+          {videosToShow.length > 1 && videosToShow.map((_, index) => (
+            <View
+              key={`dot-${index}`}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: index === selectedVideoIndex ? '#FFF' : 'rgba(255,255,255,0.5)',
+                margin: 4
+              }}
+            />
+          ))}
+        </View>
       </View>
     </Modal>
   );
 };
-
   // useEffect pour charger les reels
   useEffect(() => {
     let isActive = true;
@@ -953,63 +942,73 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
 
   // Rendu du contenu vidéo
  
-  const renderVideoContent = () => {
-    if (reelsLoading) {
-      return (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#D4FF00" />
-          <Text style={styles.loaderText}>Chargement des vidéos...</Text>
-        </View>
-      );
-    }
-  
-    if (reelsError) {
-      return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{reelsError}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => {
-              setReelsLoading(true);
-              setReelsError(null);
-              fetchReels(route.params?.id);
-            }}
-          >
-            <Text style={styles.retryButtonText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-  
-    if (!reels || reels.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.noVideosText}>Aucune vidéo disponible</Text>
-        </View>
-      );
-    }
-  
+ // Improved rendering function for video content
+// Updated renderVideoContent function to display videos directly without thumbnails
+const renderVideoContent = () => {
+  if (reelsLoading) {
     return (
-      <View style={styles.videoGridContainer}>
-        {reels.map((reel) => (
-          <TouchableOpacity
-            key={reel.id}
-            style={styles.videoGridItem}
-            onPress={() => {
-              if (reel.videoUri) {
-                setSelectedVideoUri(reel.videoUri);
-                setVideoModalVisible(true);
-              }
-            }}
-          >
-            <Image 
-              source={{ uri: reel.thumbnailUri }} 
-              style={styles.videoGridThumbnail}
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#D4FF00" />
+        <Text style={styles.loaderText}>Chargement des vidéos...</Text>
+      </View>
+    );
+  }
+
+  if (reelsError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{reelsError}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            setReelsLoading(true);
+            setReelsError(null);
+            fetchReels(route.params?.id);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!reels || reels.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.noVideosText}>Aucune vidéo disponible</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.videoGridContainer}>
+      {reels.map((reel) => (
+        <TouchableOpacity
+          key={reel.id}
+          style={styles.videoGridItem}
+          onPress={() => {
+            if (reel.videoUri) {
+              console.log(`Opening video: ${reel.videoUri.substring(0, 50)}...`);
+              setSelectedVideoUri(reel.videoUri);
+              setVideoModalVisible(true);
+            } else {
+              console.log('No video URI available for this reel');
+              Alert.alert('Erreur', 'Cette vidéo n\'est pas disponible');
+            }
+          }}
+        >
+          {/* Direct Video Display instead of Image thumbnail */}
+          <View style={styles.videoWrapper}>
+            <Video 
+              source={{ uri: reel.videoUri }}
+              style={styles.directVideo}
               resizeMode="cover"
+              shouldPlay={false}  // Don't autoplay to save resources
+              isMuted={true}
+              isLooping={false}
+              useNativeControls={false}
             />
-            {/* Overlay sombre */}
             <View style={styles.videoOverlay} />
-            {/* Bouton play */}
             <View style={styles.playIconContainer}>
               <MaterialIcons 
                 name="play-circle-outline" 
@@ -1017,12 +1016,17 @@ const VideoModal = ({ visible, onClose, videoUri, allVideos = [] }) => {
                 color="#fff" 
               />
             </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
+            <View style={styles.videoTitleOverlay}>
+              <Text style={styles.videoTitleText} numberOfLines={1}>
+                {reel.title}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
   const renderStars = (selectedRating, interactive = false) => (
     <View style={styles.starsContainer}>
       {[1, 2, 3, 4, 5].map((star) => (
@@ -1154,7 +1158,7 @@ const fetchComments = useCallback(async (coachId) => {
   setCommentsError(null);
   
   try {
-    const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${coachId}`);
+    const response = await fetch(`http://192.168.1.194:8082/api/commentaires/recus/${coachId}`);
     
     if (!response.ok) {
       throw new Error(`Erreur HTTP: ${response.status}`);
@@ -1278,7 +1282,7 @@ const CommentImage = ({ imageUrl, label }) => {
   const [error, setError] = useState(false);
   
   // L'URL complète de l'image
-  const fullImageUrl = `http://192.168.0.3:8082${imageUrl}`;
+  const fullImageUrl = `http://192.168.1.194:8082${imageUrl}`;
   
   return (
     <View style={styles.imageContainer}>
@@ -1344,14 +1348,16 @@ const renderEmojiContent = () => (
         comments.map((comment) => (
           <View key={comment.id} style={styles.reviewCard}>
             <View style={styles.reviewHeader}>
-              <Text style={styles.reviewerName}>
-                {comment.utilisateur?.firstName || "Utilisateur"}
-              </Text>
+              <View style={styles.reviewerInfo}>
+                <Text style={styles.reviewerName}>
+                  {comment.utilisateur?.firstName || "Utilisateur"}
+                </Text>
+                <Text style={styles.reviewDate}>
+                  {new Date(comment.dateCommentaire).toLocaleDateString()}
+                </Text>
+              </View>
               {renderStars(comment.evaluation)}
             </View>
-            <Text style={styles.reviewDate}>
-              {new Date(comment.dateCommentaire).toLocaleDateString()}
-            </Text>
             <Text style={styles.reviewText}>
               {comment.commentaire}
             </Text>
@@ -1459,7 +1465,7 @@ const renderEmojiContent = () => (
             resizeMode="cover"
           />
           <Text style={styles.name}>{firstName}</Text>
-          <Text style={styles.title}>Coach sportif à {disciplines}</Text>
+          <Text style={styles.title}> {poste}</Text>
           <Text style={styles.price}>
     Séance de <Text style={styles.highlight}>{dureeSeance}</Text> min à partir de 
     <Text style={styles.highlight}> {prixSeance}</Text> DT
@@ -1579,13 +1585,17 @@ const renderEmojiContent = () => (
 const styles = StyleSheet.create({
   /////////////////
 
+
   // Styles pour les images et leur affichage
 imageContainer: {
-  width: '48%',
+  width: '50%', // Exactement 50% de la largeur
   height: 150,
   position: 'relative',
   borderRadius: 8,
   overflow: 'hidden',
+  margin: 0,
+  padding: 0
+
 },
 imageLoadingOverlay: {
   ...StyleSheet.absoluteFillObject,
@@ -1599,24 +1609,26 @@ beforeAfterImage: {
   borderRadius: 8,
 },
 imageLabel: {
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  color: '#FFF',
+  position: 'relative', // Au lieu de 'absolute'
+  width: '100%',
+  backgroundColor: 'transparent', // Fond transparent
+  color: '#666', // Couleur de texte plus foncée
   textAlign: 'center',
   padding: 4,
   fontSize: 12,
   fontWeight: 'bold',
+  marginTop: 15
+  
 },
 emptyImagePlaceholder: {
-  width: '48%',
+  width: '50%', // Exactement 50% de la largeur
   height: 150,
   borderRadius: 8,
   backgroundColor: '#f0f0f0',
   justifyContent: 'center',
   alignItems: 'center',
+  margin: 0,
+  padding: 0
 },
 emptyImageText: {
   color: '#777',
@@ -1627,11 +1639,7 @@ reviewsSectionTitle: {
   fontWeight: 'bold',
   marginBottom: 15,
 },
-reviewDate: {
-  color: '#777',
-  fontSize: 12,
-  marginBottom: 8,
-},
+
 noCommentsText: {
   textAlign: 'center',
   color: '#777',
@@ -1688,71 +1696,80 @@ noCommentsText: {
     borderRadius: 15,
   },
   /////////vedio 
-  videoScrollItem: {
-    width: Dimensions.get('window').width,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoScrollViewContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  videoModalContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-    
   },
-  videoPlayer: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.8,
+  scrollViewContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  videoModalCloseButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 25,
-    padding: 10,
-  },
-  videoModalCloseText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  videoLoadingContainer: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.8,
+  videoContainer: {
+    width: width,
+    height: height,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
   },
-  videoLoadingOverlay: {
+  videoTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  playButtonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     zIndex: 5,
   },
-  videoLoadingText: {
-    color: '#fff',
-    fontSize: 16,
+  loadingText: {
+    color: '#FFFFFF',
     marginTop: 10,
+    fontSize: 16,
   },
-  videoErrorContainer: {
+  errorOverlay: {
+    position: 'absolute',
     padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 10,
+    zIndex: 10,
   },
-  videoErrorText: {
-    color: '#fff',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    marginBottom: 10,
+    marginBottom: 15,
     textAlign: 'center',
   },
   retryButton: {
@@ -1760,28 +1777,28 @@ noCommentsText: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    marginTop: 10,
   },
   retryButtonText: {
-    color: '#000',
+    color: '#000000',
     fontWeight: 'bold',
+    fontSize: 14,
   },
-  videoPageIndicator: {
+  paginationContainer: {
     position: 'absolute',
     bottom: 30,
     flexDirection: 'row',
     justifyContent: 'center',
     width: '100%',
   },
-  indicatorDot: {
+  paginationDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     marginHorizontal: 4,
   },
-  indicatorDotActive: {
-    backgroundColor: '#fff',
+  paginationDotActive: {
+    backgroundColor: '#FFFFFF',
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -2213,7 +2230,65 @@ playIconContainer: {
       fontSize: 12,
       fontWeight: '500',
     },
-  
+    videoWrapper: {
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+      borderRadius: 8,
+      overflow: 'hidden',
+      backgroundColor: '#000',
+    },
+    directVideo: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 8,
+    },
+    videoGridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      padding: 1,
+      backgroundColor: 'transparent',
+      marginBottom: 80,
+    },
+    videoGridItem: {
+      width: '33%', // For a 3x3 grid
+      aspectRatio: 1, // For perfect squares
+      padding: 1,
+      position: 'relative',
+      marginBottom: 2,
+      backgroundColor: 'transparent'
+    },
+    videoOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)', // Darker overlay for better visibility
+      borderRadius: 8,
+    },
+    playIconContainer: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: [
+        { translateX: -20 },
+        { translateY: -20 }
+      ],
+      zIndex: 2,
+    },
+    videoTitleOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: 8,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      borderBottomLeftRadius: 8,
+      borderBottomRightRadius: 8,
+    },
+    videoTitleText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '500',
+    },
     // ==============================
     // Styles du modal vidéo
     // ==============================
@@ -2361,7 +2436,7 @@ playIconContainer: {
       flexDirection: 'row',
       justifyContent: 'center',
       marginBottom: 20,
-      gap: 8,
+    
     },
     commentInput: {
       borderWidth: 1,
@@ -2430,16 +2505,27 @@ playIconContainer: {
       borderRadius: 10,
       marginBottom: 15,
     },
+    reviewerInfo: {
+      flexDirection: 'column',    // Disposition verticale pour le nom et la date
+    alignItems: 'flex-start',
+      gap: 5, // Petit espace entre le nom et la date
+    },
+    reviewerName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    reviewDate: {
+      color: '#777',
+      fontSize: 12,
+    },
     reviewHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 10,
     },
-    reviewerName: {
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
+   
+    
     reviewText: {
       fontSize: 14,
       color: '#666',
@@ -2448,12 +2534,17 @@ playIconContainer: {
     },
     beforeAfterContainer: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      width: '100%',
+      padding: 0,
+      margin: 0,
+      gap: 0,
+      // Remplacer justifyContent: 'space-between' par:
+      justifyContent: 'center' 
     },
     beforeAfterImage: {
-      width: '48%',
-      height: 150,
-      borderRadius: 8,
+      width: '80%',
+      height: '80%',
+      borderRadius: 8
     },
   
     // ==============================
@@ -2491,4 +2582,4 @@ playIconContainer: {
   });
 
 
-export default CoachProfile1;
+export default CoachProfile1; 

@@ -34,7 +34,8 @@ import { Dimensions } from 'react-native';
 // Pour l'instant, nous utilisons expo-av pour le composant Video
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImageManipulator from 'expo-image-manipulator';
 const SAlle = () => {
   // Récupérer les paramètres passés à la route
   const route = useRoute(); // Utiliser useRoute au lieu de useLocalSearchParams
@@ -99,7 +100,7 @@ const navigateToSalled = useCallback(() => {
     const fetchCoaches = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://192.168.0.3:8082/api/auth/coaches');
+        const response = await fetch('http://192.168.1.194:8082/api/auth/coaches');
         
         if (!response.ok) {
           throw new Error(`Erreur HTTP: ${response.status}`);
@@ -259,90 +260,99 @@ const VideoErrorHandler = ({
 };
   // Fonction pour récupérer et traiter les reels du gym
  // Fonction améliorée de récupération des reels avec une meilleure gestion des erreurs
+
+// Improved fetchReels function
+// Improved fetchReels function
 const fetchReels = useCallback(async (gymId) => {
   if (!gymId) {
-    console.log('⚠️ Aucun ID de gym fourni');
+    console.log('⚠️ No gym ID provided');
     return [];
   }
 
   let retryCount = 0;
   const MAX_RETRIES = 2;
+  const BASE_URL = 'http://192.168.1.194:8082'; // Extract the base URL
 
-  // Fonction interne pour les tentatives
+  // Internal retry function
   const attemptFetch = async () => {
     try {
-      console.log(`🔄 Tentative ${retryCount + 1}/${MAX_RETRIES + 1} de récupération des reels pour le gym ID: ${gymId}`);
+      console.log(`🔄 Attempt ${retryCount + 1}/${MAX_RETRIES + 1} to fetch reels for gym ID: ${gymId}`);
       
       // Create a timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout dépassé')), 20000); // 8 secondes de timeout
+        setTimeout(() => reject(new Error('Timeout exceeded')), 20000);
       });
       
       // Create the fetch promise
-      const fetchPromise = fetch(`http://192.168.0.3:8082/api/reels/user/${gymId}`, {
+      const fetchPromise = fetch(`${BASE_URL}/api/reels/user/${gymId}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
-        },
-        // Pas besoin d'AbortController ici car nous utilisons Promise.race
+        }
       });
       
       // Race between fetch and timeout
       const response = await Promise.race([fetchPromise, timeoutPromise]);
       
       if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
+        throw new Error(`HTTP Error: ${response.status}`);
       }
       
-      // Utilisation d'un try/catch dédié pour le parsing JSON
+      // Parse the JSON response
       let reels;
       try {
-        const text = await response.text(); // Récupérer d'abord le texte brut
-        console.log('Réponse brute:', text.substring(0, 100) + "..."); // Log pour le débogage
+        const text = await response.text();
+        console.log('Raw response:', text.substring(0, 100) + "...");
         
-        // Vérifier si la réponse est vide
         if (!text || text.trim() === '') {
-          console.log('⚠️ Réponse vide de l\'API');
+          console.log('⚠️ Empty API response');
           return [];
         }
         
         reels = JSON.parse(text);
       } catch (parseError) {
-        console.error('❌ Erreur lors du parsing JSON:', parseError);
-        throw new Error('Format de réponse invalide');
+        console.error('❌ JSON parsing error:', parseError);
+        throw new Error('Invalid response format');
       }
       
-      console.log(`📊 ${reels.length} reels récupérés`);
+      console.log(`📊 ${reels.length} reels retrieved`);
       
       if (!Array.isArray(reels)) {
-        console.error('⚠️ Format de réponse invalide - tableau attendu');
+        console.error('⚠️ Invalid response format - array expected');
         return [];
       }
       
-      // Simplifier le traitement des reels pour réduire les risques d'erreur
+      // Process reels with the correct field mapping
       const processedReels = reels.map(reel => {
         try {
-          // Récupérer les données vidéo (peu importe leur format)
-          const videoData = reel.videoData || reel.video_data || reel.video;
+          // Log the entire reel object to inspect its structure
+          console.log(`Processing reel: ${reel.id}`, JSON.stringify(reel, null, 2));
           
-          // Construire l'objet reel de façon sécurisée avec des valeurs par défaut
+          // Important: Use the dedicated video endpoint instead of the direct file path
+          const videoUri = reel.id 
+            ? `${BASE_URL}/api/reels/video/${reel.id}` 
+            : null;
+          
+          console.log(`Constructed video URL: ${videoUri}`);
+          
+          // Create a thumbnail from the first frame of the video or use a default image
+          const thumbnailUri = require('../../assets/images/b.png');
+          
           return {
             id: reel.id || `reel_${Date.now()}_${Math.random()}`,
-            videoUri: videoData || null,
-            thumbnailUri: reel.thumbnail 
-              ? `data:image/jpeg;base64,${reel.thumbnail}`
-              : require('../../assets/images/b.png'),
-            title: reel.title || 'Vidéo sans titre',
-            duration: reel.duration || ''
+            videoUri: videoUri,
+            thumbnailUri: thumbnailUri,
+            title: reel.title || 'Untitled Video',
+            description: reel.description || '',
+            duration: ''
           };
         } catch (error) {
-          console.warn(`⚠️ Erreur lors du traitement du reel ${reel.id || 'inconnu'}:`, error);
-          // Retourner un reel avec des valeurs par défaut en cas d'erreur
+          console.warn(`⚠️ Error processing reel ${reel.id || 'unknown'}:`, error);
           return {
             id: `error_${Date.now()}_${Math.random()}`,
             videoUri: null,
             thumbnailUri: require('../../assets/images/b.png'),
-            title: 'Vidéo non disponible',
+            title: 'Video unavailable',
             duration: '',
             error: true
           };
@@ -352,35 +362,74 @@ const fetchReels = useCallback(async (gymId) => {
       return processedReels;
       
     } catch (error) {
-      // Si l'erreur est liée au réseau et qu'il reste des tentatives, réessayer
+      // Retry for network errors and timeouts
       if ((error.message.includes('Network') || error.message.includes('Timeout')) && 
           retryCount < MAX_RETRIES) {
         retryCount++;
-        console.log(`🔄 Nouvelle tentative ${retryCount}/${MAX_RETRIES}...`);
+        console.log(`🔄 Retry ${retryCount}/${MAX_RETRIES}...`);
         
-        // Attendre un court délai avant de réessayer (backoff exponentiel)
+        // Exponential backoff delay
         const delay = 1000 * Math.pow(2, retryCount);
         await new Promise(resolve => setTimeout(resolve, delay));
         
-        // Tentative récursive
+        // Recursive retry
         return attemptFetch();
       }
       
-      console.error('❌ Erreur finale lors de la récupération des reels:', error.message);
+      console.error('❌ Final error fetching reels:', error.message);
       throw error;
     }
   };
   
-  // Démarrer le processus de tentatives
+  // Start the retry process
   try {
     return await attemptFetch();
   } catch (finalError) {
-    console.error('❌ Toutes les tentatives ont échoué:', finalError.message);
-    // Retourner un tableau vide au lieu de propager l'erreur pour éviter les crashs
+    console.error('❌ All attempts failed:', finalError.message);
+    // Return empty array instead of propagating the error to prevent crashes
     return [];
   }
 }, []);
 
+
+////////////
+
+
+const validateVideoUrl = async (url) => {
+  if (!url) return false;
+  
+  console.log(`🔍 Validating video URL: ${url}`);
+  
+  try {
+    // Test if the URL is accessible
+    const response = await fetch(url, { 
+      method: 'HEAD',  // Use HEAD to just check headers without downloading content
+      timeout: 5000    // 5 second timeout
+    });
+    
+    // Check if request was successful
+    if (response.ok) {
+      console.log(`✅ URL is valid: ${url}`);
+      
+      // Check content type to ensure it's a video
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('video')) {
+        console.log(`✅ Content type is video: ${contentType}`);
+        return true;
+      } else {
+        console.log(`⚠️ Content type not recognized as video: ${contentType}`);
+        // Return true anyway since some servers may not set correct content type
+        return true;
+      }
+    } else {
+      console.log(`❌ URL request failed with status: ${response.status}`);
+      return false;
+    }
+  } catch (error) {
+    console.log(`❌ Error validating URL: ${error.message}`);
+    return false;
+  }
+};
 // Utilisation de la fonction dans un effet pour charger les reels
 useEffect(() => {
   let isMounted = true;
@@ -446,7 +495,7 @@ useEffect(() => {
    setCommentsError(null);
    
    try {
-     const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${gymId}`);
+     const response = await fetch(`http://192.168.1.194:8082/api/commentaires/recus/${gymId}`);
      
      if (!response.ok) {
        throw new Error(`Erreur HTTP: ${response.status}`);
@@ -532,7 +581,7 @@ useEffect(() => {
                    <Image 
                      source={
                        comment.hasImageAvant
-                         ? { uri: `http://192.168.0.3:8082${comment.imageAvantUrl}` }
+                         ? { uri: `http://192.168.1.194:8082${comment.imageAvantUrl}` }
                          : require('../../assets/images/b.png')
                      } 
                      style={styles.beforeAfterImage} 
@@ -544,7 +593,7 @@ useEffect(() => {
                    <Image 
                      source={
                        comment.hasImageApres
-                         ? { uri: `http://192.168.0.3:8082${comment.imageApresUrl}` }
+                         ? { uri: `http://192.168.1.194:8082${comment.imageApresUrl}` }
                          : require('../../assets/images/b.png')
                      } 
                      style={styles.beforeAfterImage} 
@@ -564,141 +613,220 @@ useEffect(() => {
 
 
   ////////////////////////////
+// Déplacez cette définition de composant AVANT le composant SAlle
+const PhotoViewerModal = ({ visible, onClose, imageUri, allImages = [] }) => {
+  // Log pour le débogage
+  console.log('Images reçues:', allImages);
+  console.log('Image sélectionnée:', imageUri);
 
-  // Fonction pour rendre le contenu vidéo
-  const renderVideoContent = () => {
-    if (reelsLoading) {
-      return (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#D4FF00" />
-          <Text style={styles.loaderText}>Chargement des vidéos...</Text>
-        </View>
-      );
-    }
-  
-    if (reelsError) {
-      return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{reelsError}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => {
-              setReelsLoading(true);
-              setReelsError(null);
-              fetchReels(idGym);
-            }}
+  // S'assurer que imageUri est un objet avec une propriété uri
+  const normalizedImageUri = typeof imageUri === 'string' 
+    ? { uri: imageUri } 
+    : imageUri;
+
+  // Préparer les images à afficher
+  const imagesToShow = allImages.length > 0 ? allImages : 
+      (imageUri ? [{ id: 'single', source: normalizedImageUri }] : []);
+
+  // Trouver l'index initial
+  const initialScrollIndex = allImages.findIndex(img => {
+    if (!img.source || !normalizedImageUri) return false;
+    
+    const imgUri = img.source.uri;
+    const selectedUri = normalizedImageUri.uri;
+    
+    return imgUri === selectedUri;
+  });
+
+  // Vérification des conditions d'affichage
+  if (!visible) return null;
+  if (imagesToShow.length === 0) {
+    console.warn('Aucune image à afficher');
+    return null;
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.photoModalContainer}>
+        <TouchableOpacity 
+          style={styles.closeButton} 
+          onPress={onClose}
+        >
+          <Ionicons name="close" size={30} color="white" />
+        </TouchableOpacity>
+
+        <View style={styles.photoModalContent}>
+          <ScrollView 
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={initialScrollIndex > -1 ? initialScrollIndex : 0}
+            contentContainerStyle={styles.scrollViewContent}
           >
-            <Text style={styles.retryButtonText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-  
-    if (!reels || reels.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.noVideosText}>Aucune vidéo disponible</Text>
-        </View>
-      );
-    }
-  
-    return (
-      <View style={styles.videoGridContainer}>
-        {reels.map((reel) => {
-          // Vérifier si l'URI vidéo est valide
-          const hasValidVideo = !!reel.videoUri;
-          
-          return (
-            <TouchableOpacity
-              key={reel.id}
-              style={styles.videoGridItem}
-              onPress={() => {
-                if (hasValidVideo) {
-                  setSelectedVideoUri(reel.videoUri);
-                  setVideoModalVisible(true);
-                } else {
-                  // Afficher une alerte si la vidéo n'est pas disponible
-                  Alert.alert(
-                    "Vidéo non disponible",
-                    "Cette vidéo ne peut pas être lue actuellement.",
-                    [{ text: "OK" }]
-                  );
-                }
-              }}
-            >
-              <Image 
-                source={
-                  typeof reel.thumbnailUri === 'string' 
-                    ? { uri: reel.thumbnailUri } 
-                    : reel.thumbnailUri
-                } 
-                style={styles.videoGridThumbnail}
-                resizeMode="cover"
-              />
-              {/* Overlay sombre */}
-              <View style={styles.videoOverlay} />
-              {/* Bouton play ou icône d'erreur si vidéo non disponible */}
-              <View style={styles.playIconContainer}>
-                <MaterialIcons 
-                  name={hasValidVideo ? "play-circle-outline" : "error-outline"} 
-                  size={40} 
-                  color="#fff" 
+            {imagesToShow.map((image, index) => (
+              <View 
+                key={image.id || `image-${index}`} 
+                style={styles.photoScrollItem}
+              >
+                <Image 
+                  source={image.source} 
+                  style={styles.photoModalImage}
+                  resizeMode="contain"
+                  onError={(e) => {
+                    console.error('Erreur de chargement de l\'image:', e.nativeEvent.error);
+                  }}
                 />
               </View>
-            </TouchableOpacity>
-          );
-        })}
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+  // Fonction pour rendre le contenu vidéo
+ // Function to render video content
+ const renderVideoContent = () => {
+  if (reelsLoading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#D4FF00" />
+        <Text style={styles.loaderText}>Loading videos...</Text>
       </View>
     );
-  };
+  }
+
+  if (reelsError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{reelsError}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            setReelsLoading(true);
+            setReelsError(null);
+            fetchReels(idGym);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!reels || reels.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <MaterialIcons name="videocam-off" size={50} color="#CCCCCC" />
+        <Text style={styles.noVideosText}>No videos available</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.videoGridContainer}>
+      {reels.map((reel) => {
+        // Check if the video URI is valid
+        const hasValidVideo = !!reel.videoUri;
+        
+        return (
+          <TouchableOpacity
+            key={reel.id}
+            style={[styles.videoGridItem, { padding: 2 }]} // Reduced padding
+            onPress={() => {
+              if (hasValidVideo) {
+                setSelectedVideoUri(reel.videoUri);
+                setVideoModalVisible(true);
+              } else {
+                // Show alert if video is not available
+                Alert.alert(
+                  "Video unavailable",
+                  "This video cannot be played at this time.",
+                  [{ text: "OK" }]
+                );
+              }
+            }}
+          >
+            <Video
+              source={{ uri: reel.videoUri }}
+              style={styles.videoGridThumbnail}
+              resizeMode="cover"
+              isMuted={true} // Mute by default
+              shouldPlay={false}
+              isLooping={false}
+            />
+            {/* Title overlaid on the video */}
+            <View style={styles.videoTitleContainer}>
+              <Text numberOfLines={1} style={styles.videoTitle}>
+                {reel.title || 'Untitled Video'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
   // Render the gallery grid manually instead of using FlatList
  // Then use the hook
-const useGymGalleryImages = (gymId) => {
+ const useGymGalleryImages = (gymId) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const API_BASE_URL = 'http://192.168.1.194:8082';
 
   useEffect(() => {
     const fetchGalleryImages = async () => {
       if (!gymId) {
-        // Early return if no gymId
+        // Retour anticipé si pas de gymId
         setGalleryImages([]);
         return;
       }
 
       setIsLoading(true);
       try {
-        const response = await fetch(`http://192.168.0.3:8082/api/photos/user/${gymId}`);
+        console.log(`Récupération des photos pour le gym ID: ${gymId}`);
+        const response = await fetch(`${API_BASE_URL}/api/photos/user/${gymId}`);
         
         if (!response.ok) {
-          // Instead of throwing an error, just log it and handle gracefully
-          console.warn(`HTTP error! status: ${response.status}`);
+          console.warn(`Erreur HTTP! statut: ${response.status}`);
+          setError(`Erreur HTTP: ${response.status}`);
           setGalleryImages([]);
           return;
         }
 
         const data = await response.json();
+        console.log("Photos reçues:", data);
         
-        // Check if data is valid and not empty
+        // Vérifier si les données sont valides et non vides
         if (!data || data.length === 0) {
-          console.log('No gallery images found');
+          console.log('Aucune photo trouvée');
           setGalleryImages([]);
           return;
         }
         
-        // Process images similar to coach profile
+        // Traiter les images en utilisant l'API endpoint pour servir les images
         const processedImages = data.map(photo => ({
-          id: photo.id || `img_${Math.random().toString(36).substr(2, 9)}`,
-          source: photo.content 
-            ? { uri: `data:image/jpeg;base64,${photo.content}` }
-            : require('../../assets/images/b.png')
+          id: photo.id,
+          source: { 
+            uri: `${API_BASE_URL}/api/photos/${photo.id}` // Utiliser l'ID pour accéder à l'image
+          },
+          fileName: photo.fileName,
+          uploadDate: photo.uploadDate
         }));
-
+        
+        console.log("Images traitées:", processedImages);
         setGalleryImages(processedImages);
+        setError(null);
       } catch (err) {
-        console.error('Error fetching gym gallery images:', err);
-        // Just set empty gallery instead of fallback images or error
+        console.error('Erreur lors de la récupération des images:', err);
+        setError(err.message || 'Erreur inconnue');
         setGalleryImages([]);
       } finally {
         setIsLoading(false);
@@ -706,16 +834,18 @@ const useGymGalleryImages = (gymId) => {
     };
 
     fetchGalleryImages();
-  }, [gymId]);
+  }, [gymId, API_BASE_URL]);
 
   return { galleryImages, isLoading, error };
 };
+
+
 
   // Then use the hook
   const { galleryImages, isLoading: galleryLoading, error: galleryError } = useGymGalleryImages(idGym);
 
   const renderGalleryGrid = () => {
-    // Check if gallery is empty
+    // Vérifier si la galerie est vide
     if (!galleryImages || galleryImages.length === 0) {
       return (
         <View style={styles.centerContainer}>
@@ -724,8 +854,8 @@ const useGymGalleryImages = (gymId) => {
         </View>
       );
     }
-  
-    // Otherwise render the gallery grid
+    
+    // Afficher la grille de galerie
     const rows = [];
     for (let i = 0; i < galleryImages.length; i += 3) {
       const rowImages = galleryImages.slice(i, i + 3);
@@ -735,13 +865,15 @@ const useGymGalleryImages = (gymId) => {
             <TouchableOpacity 
               key={item.id}
               onPress={() => {
+                console.log("Image sélectionnée:", item.source);
                 setSelectedImage(item.source);
                 setPhotoModalVisible(true);
               }}
             >
               <Image 
                 source={item.source} 
-                style={styles.galleryImage} 
+                style={styles.galleryImage}
+                defaultSource={require('../../assets/images/b.png')}
               />
             </TouchableOpacity>
           ))}
@@ -774,7 +906,7 @@ useEffect(() => {
       console.log(`Récupération des plannings pour le gym ID: ${idGym}`);
 
       // URL de l'API
-      const apiUrl = `http://192.168.0.3:8082/api/plannings/user/${idGym}`;
+      const apiUrl = `http://192.168.1.194:8082/api/plannings/user/${idGym}`;
       console.log('Appel API:', apiUrl);
 
       // Faire la requête GET
@@ -1358,143 +1490,264 @@ const ReviewModal = ({
   const params = route.params || {};
   const recepteurId = params.idGym; // ID du gym qui reçoit le commentaire
 
-  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de l'API
+  const API_BASE_URL = 'http://192.168.1.194:8082'; // URL de l'API
 
-  const pickImage = async (setImage) => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
-      if (!result.canceled) {
-        setImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la sélection de l\'image:', error);
-      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
-    }
-  };
+ 
 
   // Fonction pour soumettre le commentaire à l'API
-  const submitReview = async () => {
-    // Validation
-    if (!rating) {
-      Alert.alert("Erreur", "Veuillez donner une évaluation");
-      return;
-    }
-    if (!comment.trim()) {
-      Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+ // Enhanced Review Submission Function
+// Add this function to compress images before uploading
+
+
+// Compress and resize images before upload
+
+
+// Modified image picker function
+// Modified image picker function
+const pickImage = async (setImage) => {
+  try {
+    // Request permission to access the media library
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (!permissionResult.granted) {
+      Alert.alert("Permission refusée", "La permission d'accéder à la galerie est requise !");
       return;
     }
     
-    // Vérifier que les IDs requis sont disponibles
-    if (!utilisateurId || !recepteurId) {
-      Alert.alert("Erreur", "Information utilisateur manquante");
-      console.error("utilisateurId ou recepteurId manquant", { utilisateurId, recepteurId });
-      return;
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Use MediaTypeOptions instead of MediaType
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+    
+    if (!result.canceled) {
+      // Compress the image before setting it
+      try {
+        const compressedUri = await compressImage(result.assets[0].uri, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.6,
+        });
+        
+        // Set the compressed image
+        setImage(compressedUri);
+      } catch (compressionError) {
+        console.error('Erreur lors de la compression:', compressionError);
+        // If compression fails, use the original image
+        setImage(result.assets[0].uri);
+      }
     }
+  } catch (error) {
+    console.error('Erreur lors de la sélection de l\'image:', error);
+    Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+  }
+};
+// Function to determine the MIME type based on the file extension
+const getMimeType = (filename) => {
+  if (!filename) return 'image/jpeg'; // Default to jpeg
+  
+  const extension = filename.split('.').pop().toLowerCase();
+  
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    default:
+      return 'image/jpeg'; // Default
+  }
+};
+// Improved compress image function with better error handling
+const compressImage = async (uri, options = {}) => {
+  try {
+    // Default options
+    const imageOptions = {
+      maxWidth: options.maxWidth || 1024,
+      maxHeight: options.maxHeight || 1024,
+      quality: options.quality || 0.7,
+      format: options.format || ImageManipulator.SaveFormat.JPEG
+    };
 
-    setIsSubmitting(true);
+    console.log(`Compressing image: ${uri}`);
+    
+    // Check if URI is valid
+    if (!uri || typeof uri !== 'string') {
+      throw new Error('Invalid image URI');
+    }
+    
+    // Get original file info
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      throw new Error('Image file does not exist');
+    }
+    
+    console.log(`Original image size: ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB`);
+    
+    // Perform the compression and resizing
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: imageOptions.maxWidth, height: imageOptions.maxHeight } }],
+      { compress: imageOptions.quality, format: imageOptions.format }
+    );
+    
+    // Log the results
+    const compressedInfo = await FileSystem.getInfoAsync(result.uri);
+    console.log(`Compressed image size: ${(compressedInfo.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`Compression ratio: ${(compressedInfo.size / fileInfo.size * 100).toFixed(2)}%`);
+    
+    return result.uri;
+  } catch (error) {
+    console.error('Image compression error:', error);
+    // Return original URI if compression fails
+    return uri;
+  }
+};
+// Updated submitReview function with image compression
+// Importez AsyncStorage
 
-    try {
-      // Préparation du FormData
-      const formData = new FormData();
-      formData.append('evaluation', rating.toString());
-      formData.append('commentaire', comment);
 
-      // Traitement de l'image "avant" si disponible
-      if (beforeImage) {
-        const imageNameBefore = beforeImage.split('/').pop();
-        const mimeTypeBefore = getMimeType(imageNameBefore);
-        
-        formData.append('imageAvant', {
-          uri: Platform.OS === 'android' ? beforeImage : beforeImage.replace('file://', ''),
-          name: imageNameBefore,
-          type: mimeTypeBefore
-        });
-      }
+// Modifiez la fonction submitReview comme suit dans votre composant ReviewModal
+// Updated submitReview function with better error handling and debugging
+// Importez AsyncStorage
 
-      // Traitement de l'image "après" si disponible
-      if (afterImage) {
-        const imageNameAfter = afterImage.split('/').pop();
-        const mimeTypeAfter = getMimeType(imageNameAfter);
-        
-        formData.append('imageApres', {
-          uri: Platform.OS === 'android' ? afterImage : afterImage.replace('file://', ''),
-          name: imageNameAfter,
-          type: mimeTypeAfter
-        });
-      }
 
-      // Log pour le debug
-      console.log(`Envoi du commentaire à l'URL: ${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`);
+// Modifiez la fonction submitReview comme suit dans votre composant ReviewModal
+const submitReview = async () => {
+  // Validation
+  if (!rating) {
+    Alert.alert("Erreur", "Veuillez donner une évaluation");
+    return;
+  }
+  if (!comment.trim()) {
+    Alert.alert("Erreur", "Veuillez ajouter un commentaire");
+    return;
+  }
+  
+  // Obtenir l'ID du récepteur (gym) depuis les paramètres
+  if (!recepteurId) {
+    Alert.alert("Erreur", "Information du récepteur manquante");
+    console.error("ID du gym manquant");
+    return;
+  }
 
-      // Appel API
-      const response = await fetch(`${API_BASE_URL}/api/commentaires/${utilisateurId}/${recepteurId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          // Ne pas définir Content-Type pour un FormData multipart
-        },
-        body: formData
+  setIsSubmitting(true);
+
+  try {
+    // Récupérer l'ID utilisateur depuis AsyncStorage
+    const storedUserId = await AsyncStorage.getItem('userId');
+    console.log("ID utilisateur récupéré depuis AsyncStorage:", storedUserId);
+    
+    // Utiliser l'ID stocké ou un ID par défaut si non disponible
+    const currentUserId = storedUserId ? storedUserId : 2;
+    console.log("ID utilisateur utilisé pour la requête:", currentUserId);
+    
+    // Préparation du FormData
+    const formData = new FormData();
+    formData.append('evaluation', rating.toString());
+    formData.append('commentaire', comment);
+
+    // Traitement de l'image "avant" si disponible
+    if (beforeImage) {
+      const processedBeforeImage = await compressImage(beforeImage, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.5,
       });
-
-      // Vérifier uniquement le statut HTTP
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-
-      console.log("Commentaire publié avec succès");
       
-      // Réinitialiser le formulaire
-      setRating(0);
-      setComment('');
-      setBeforeImage(null);
-      setAfterImage(null);
+      const imageNameBefore = processedBeforeImage.split('/').pop();
+      const mimeTypeBefore = getMimeType(imageNameBefore);
       
-      // Fermer le modal
-      onClose();
-      
-      // Message de succès
-      Alert.alert(
-        "Succès",
-        "Votre avis a été publié avec succès !",
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      console.error('Erreur lors de la publication de l\'avis:', error);
-      Alert.alert(
-        "Erreur",
-        `Impossible de publier votre avis. ${error.message}`,
-        [{ text: "OK" }]
-      );
-    } finally {
-      setIsSubmitting(false);
+      formData.append('imageAvant', {
+        uri: Platform.OS === 'android' ? processedBeforeImage : processedBeforeImage.replace('file://', ''),
+        name: imageNameBefore,
+        type: mimeTypeBefore
+      });
     }
-  };
+
+    // Traitement de l'image "après" si disponible
+    if (afterImage) {
+      const processedAfterImage = await compressImage(afterImage, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.5,
+      });
+      
+      const imageNameAfter = processedAfterImage.split('/').pop();
+      const mimeTypeAfter = getMimeType(imageNameAfter);
+      
+      formData.append('imageApres', {
+        uri: Platform.OS === 'android' ? processedAfterImage : processedAfterImage.replace('file://', ''),
+        name: imageNameAfter,
+        type: mimeTypeAfter
+      });
+    }
+
+    // Log pour le debug
+    const apiUrl = `${API_BASE_URL}/api/commentaires/${currentUserId}/${recepteurId}`;
+    console.log(`Envoi du commentaire à l'URL: ${apiUrl}`);
+
+    // Appel API
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        // Ne pas définir Content-Type pour un FormData multipart
+      },
+      body: formData
+    });
+
+    // Vérifier le statut HTTP
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Response error:', errorText);
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+
+    console.log("Commentaire publié avec succès");
+    
+    // Réinitialiser le formulaire
+    setRating(0);
+    setComment('');
+    setBeforeImage(null);
+    setAfterImage(null);
+    
+    // Fermer le modal
+    onClose();
+    
+    // Message de succès
+    Alert.alert(
+      "Succès",
+      "Votre avis a été publié avec succès !",
+      [{ text: "OK" }]
+    );
+    
+    // Rafraîchir la liste des commentaires si disponible
+    if (typeof fetchComments === 'function') {
+      fetchComments(recepteurId);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la publication de l\'avis:', error);
+    Alert.alert(
+      "Erreur",
+      `Impossible de publier votre avis. ${error.message}`,
+      [{ text: "OK" }]
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Fonction utilitaire pour déterminer le type MIME
-  const getMimeType = (filename) => {
-    const ext = filename.split('.').pop().toLowerCase();
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      default:
-        return 'image/jpeg'; // Par défaut
-    }
-  };
+ 
 
   return (
     <Modal
@@ -1609,7 +1862,6 @@ const ReviewModal = ({
 
 //////////////////////
 
-
 const VideoModal = ({ 
   visible, 
   onClose, 
@@ -1618,130 +1870,143 @@ const VideoModal = ({
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [localVideoUris, setLocalVideoUris] = useState({});
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [urlsTested, setUrlsTested] = useState({}); // Utiliser un objet pour suivre les URLs testées
   const scrollViewRef = useRef(null);
   const videoRefs = useRef({});
   const mountedRef = useRef(true);
 
-  // Fonction stable de traitement des URI
-  const processVideoUri = (videoData) => {
-    if (!videoData) return null;
-
-    try {
-      // Vérification des différents types d'URI
-      if (typeof videoData !== 'string') {
-        console.error('❌ Type de données non valide');
-        return null;
-      }
-
-      // Cas 1: URI déjà valide
-      const validPrefixes = [
-        'http://', 
-        'https://', 
-        'file://', 
-        'content://'
-      ];
-
-      const isValidUri = validPrefixes.some(prefix => 
-        videoData.startsWith(prefix)
-      ) || videoData.endsWith('.mp4');
-
-      if (isValidUri) {
-        console.log('✅ URI valide détectée');
-        return videoData;
-      }
-
-      // Fallback
-      console.warn('⚠️ Aucun format d\'URI reconnu');
-      return 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4';
-
-    } catch (error) {
-      console.error('🚨 Erreur de traitement vidéo:', error);
-      return null;
-    }
-  };
-
-  // Préparer les vidéos - version simplifiée
-  const prepareVideos = useCallback(async () => {
-    if (!visible) return;
+  // Function to determine if a video URI is valid
+  const isValidVideoUri = useCallback((uri) => {
+    if (!uri) return false;
     
-    try {
-      setIsLoading(true);
-      setError(null);
+    // Check if it's a valid URL format
+    return (
+      typeof uri === 'string' && 
+      (uri.startsWith('http://') || 
+       uri.startsWith('https://') || 
+       uri.startsWith('file://'))
+    );
+  }, []);
 
-      // Sélectionner les vidéos à traiter
-      const videosToProcess = allVideos.length > 0 
-        ? allVideos.slice(0, 5)  // Limiter à 5 vidéos max
-        : (videoUri ? [{ id: 'single', videoUri }] : []);
-
-      const processedUris = {};
-      
-      for (const video of videosToProcess) {
-        if (!mountedRef.current) break;
-        
-        const videoData = video.videoUri;
-        if (videoData) {
-          const processedUri = processVideoUri(videoData);
-          if (processedUri) {
-            processedUris[video.id] = processedUri;
-          }
-        }
-      }
-      
-      if (mountedRef.current) {
-        setLocalVideoUris(processedUris);
-      }
-      
-    } catch (err) {
-      if (mountedRef.current) {
-        console.error('Erreur de préparation:', err);
-        setError('Impossible de préparer les vidéos');
-      }
-    } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [visible, allVideos, videoUri]);
-
-  // Effet pour préparer les vidéos
-  useEffect(() => {
-    mountedRef.current = true;
-    
-    if (visible) {
-      prepareVideos();
-    }
-
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [visible, prepareVideos]);
-
-  // Gestion du scroll
+  // Handle scroll between videos
   const handleScroll = useCallback((event) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const width = Dimensions.get('window').width;
     const newIndex = Math.round(offsetX / width);
     
     if (newIndex !== currentVideoIndex) {
-      // Pause toutes les vidéos
+      // Pause all videos
       Object.values(videoRefs.current).forEach(ref => {
         if (ref) {
-          ref.pauseAsync().catch(console.error);
+          ref.pauseAsync().catch(err => console.log('Error pausing video:', err));
         }
       });
       
       setCurrentVideoIndex(newIndex);
+      setIsLoading(true); // Show loading for the new video
+      setError(null);
     }
   }, [currentVideoIndex]);
 
-  // Ne rien afficher si le modal n'est pas visible
+  // Helper to test a URL's validity before attempting to load it
+  const testVideoUrl = useCallback(async (url) => {
+    if (!url) return false;
+    
+    // Vérifier si cette URL a déjà été testée
+    if (urlsTested[url]) {
+      console.log(`URL déjà testée: ${url}`);
+      return urlsTested[url]; // Retourner le résultat précédent
+    }
+    
+    try {
+      console.log(`🔍 Testing video URL: ${url}`);
+      
+      // Try to fetch just the headers to see if the URL is accessible
+      const response = await fetch(url, { 
+        method: 'HEAD',
+        timeout: 5000
+      });
+      
+      if (!response.ok) {
+        console.log(`❌ URL test failed: ${response.status}`);
+        setError(`The video cannot be played (Status: ${response.status})`);
+        setIsLoading(false);
+        
+        // Mémoriser le résultat
+        setUrlsTested(prev => ({...prev, [url]: false}));
+        return false;
+      }
+      
+      console.log(`✅ URL test passed`);
+      
+      // Mémoriser le résultat
+      setUrlsTested(prev => ({...prev, [url]: true}));
+      return true;
+    } catch (error) {
+      console.log(`❌ URL test error: ${error.message}`);
+      
+      // More specific error message based on the error
+      let errorMessage = "The video cannot be played";
+      
+      if (error.message.includes('Network request failed')) {
+        errorMessage += " (Network error)";
+      } else if (error.message.includes('timeout')) {
+        errorMessage += " (Request timed out)";
+      } else {
+        errorMessage += ` (${error.message})`;
+      }
+      
+      setError(errorMessage);
+      setIsLoading(false);
+      
+      // Mémoriser le résultat
+      setUrlsTested(prev => ({...prev, [url]: false}));
+      return false;
+    }
+  }, [urlsTested]); // Dépendance à urlsTested
+
+  // Effect to set up videos when the modal becomes visible
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    // Reset states when modal opens
+    if (visible) {
+      setIsLoading(true);
+      setError(null);
+      
+      // Test the current video URL when the modal becomes visible
+      const videosToShow = allVideos.length > 0 
+        ? allVideos.filter(video => !!video.videoUri)
+        : (videoUri ? [{ id: 'single', videoUri }] : []);
+      
+      if (videosToShow.length > 0 && videosToShow[currentVideoIndex]) {
+        const currentVideo = videosToShow[currentVideoIndex];
+        
+        // Seulement tester si ce n'est pas déjà testé
+        if (!urlsTested[currentVideo.videoUri]) {
+          testVideoUrl(currentVideo.videoUri);
+        } else {
+          // Si déjà testé, mettre à jour l'état de chargement
+          setIsLoading(false);
+          if (!urlsTested[currentVideo.videoUri]) {
+            setError("The video cannot be played");
+          }
+        }
+      }
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [visible, videoUri, allVideos, currentVideoIndex, testVideoUrl, urlsTested]);
+
+  // Don't render anything if modal is not visible
   if (!visible) return null;
 
-  // Déterminer les vidéos à afficher
+  // Determine videos to display
   const videosToShow = allVideos.length > 0 
-    ? allVideos.slice(0, 5)  // Limiter à 5 vidéos max
+    ? allVideos.filter(video => !!video.videoUri) // Only include videos with URI
     : (videoUri ? [{ id: 'single', videoUri }] : []);
 
   return (
@@ -1752,15 +2017,15 @@ const VideoModal = ({
       transparent={false}
     >
       <View style={styles.videoModalContainer}>
-        {/* Bouton de fermeture */}
+        {/* Close button */}
         <TouchableOpacity 
           style={styles.videoModalCloseButton}
           onPress={onClose}
         >
-          <Text style={styles.videoModalCloseText}>Fermer</Text>
+          <Text style={styles.videoModalCloseText}>Close</Text>
         </TouchableOpacity>
 
-        {/* Contenu des vidéos */}
+        {/* Video content */}
         {videosToShow.length > 0 ? (
           <ScrollView
             ref={scrollViewRef}
@@ -1773,37 +2038,77 @@ const VideoModal = ({
           >
             {videosToShow.map((video, index) => (
               <View key={video.id || index} style={styles.videoScrollItem}>
-                {localVideoUris[video.id] ? (
+                {isValidVideoUri(video.videoUri) && (!error || index !== currentVideoIndex) ? (
                   <Video
                     ref={ref => { 
-                      if (ref) videoRefs.current[video.id] = ref; 
+                      if (ref) videoRefs.current[video.id || index] = ref; 
                     }}
                     style={styles.videoPlayer}
-                    source={{ uri: localVideoUris[video.id] }}
+                    source={{ uri: video.videoUri }}
                     resizeMode="contain"
                     useNativeControls
-                    shouldPlay={false}
+                    shouldPlay={index === currentVideoIndex && !error && !isLoading}
                     isLooping={false}
                     onLoadStart={() => {
-                      if (index === currentVideoIndex) setIsLoading(true);
+                      if (index === currentVideoIndex) {
+                        console.log(`▶️ Starting to load video: ${video.videoUri}`);
+                        setIsLoading(true);
+                      }
                     }}
                     onLoad={() => {
-                      if (index === currentVideoIndex) setIsLoading(false);
+                      if (index === currentVideoIndex) {
+                        console.log(`✅ Video loaded successfully: ${video.videoUri}`);
+                        setIsLoading(false);
+                        setError(null);
+                      }
                     }}
                     onError={(error) => {
-                      console.error(`Erreur de lecture vidéo:`, error);
+                      console.error(`❌ Video playback error:`, error);
                       if (index === currentVideoIndex) {
-                        setError(`Erreur de lecture`);
+                        // Provide more specific error messages
+                        const errorCode = error?.error?.errorCode;
+                        let errorMessage = "Error playing video";
+                        
+                        if (errorCode === -1100) {
+                          errorMessage = "Video URL not found or inaccessible";
+                        } else if (errorCode) {
+                          errorMessage += ` (Error code: ${errorCode})`;
+                        }
+                        
+                        setError(errorMessage);
                         setIsLoading(false);
                       }
                     }}
                   />
                 ) : (
-                  <View style={styles.videoLoadingContainer}>
-                    <ActivityIndicator size="large" color="#FFFFFF" />
-                    <Text style={styles.videoLoadingText}>
-                      Chargement de la vidéo...  
-                    </Text>
+                  <View style={styles.videoErrorContainer}>
+                    {error && index === currentVideoIndex ? (
+                      <>
+                        <MaterialIcons name="error-outline" size={60} color="#fff" />
+                        <Text style={styles.videoErrorText}>{error}</Text>
+                        <TouchableOpacity 
+                          style={styles.retryButton}
+                          onPress={() => {
+                            setError(null);
+                            setIsLoading(true);
+                            // Supprimer cet URL du cache pour forcer un nouveau test
+                            setUrlsTested(prev => {
+                              const newState = {...prev};
+                              if (video.videoUri) delete newState[video.videoUri];
+                              return newState;
+                            });
+                            testVideoUrl(video.videoUri);
+                          }}
+                        >
+                          <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <>
+                        <MaterialIcons name="videocam-off" size={60} color="#fff" />
+                        <Text style={styles.videoErrorText}>Video format not supported</Text>
+                      </>
+                    )}
                   </View>
                 )}
               </View>
@@ -1812,32 +2117,19 @@ const VideoModal = ({
         ) : (
           <View style={styles.videoErrorContainer}>
             <MaterialIcons name="videocam-off" size={60} color="#555" />
-            <Text style={styles.videoErrorText}>Aucune vidéo disponible</Text>
+            <Text style={styles.videoErrorText}>No videos available</Text>
           </View>
         )}
 
-        {/* Indicateur de chargement */}
-        {isLoading && currentVideoIndex >= 0 && (
+        {/* Loading indicator */}
+        {isLoading && !error && currentVideoIndex >= 0 && (
           <View style={styles.videoLoadingOverlay}>
             <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.videoLoadingText}>Chargement de la vidéo...</Text>
-          </View>
-        )}
-
-        {/* Gestion des erreurs */}
-        {error && (
-          <View style={styles.videoErrorContainer}>
-            <Text style={styles.videoErrorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={prepareVideos}
-            >
-              <Text style={styles.retryButtonText}>Réessayer</Text>
-            </TouchableOpacity>
+            <Text style={styles.videoLoadingText}>Loading video...</Text>
           </View>
         )}
         
-        {/* Indicateur de position pour plusieurs vidéos */}
+        {/* Position indicator dots for multiple videos */}
         {videosToShow.length > 1 && (
           <View style={styles.videoPageIndicator}>
             {videosToShow.map((_, index) => (
@@ -1861,74 +2153,46 @@ const VideoModal = ({
 
 // Ajoutez ce composant après le composant VideoModal dans votre code
 
-const PhotoViewerModal = ({ visible, onClose, imageUri, allImages = [] }) => {
-  // Log pour le débogage
-  console.log('Images reçues:', allImages);
-  console.log('Image sélectionnée:', imageUri);
-
-  // Préparer les images à afficher
-  const imagesToShow = allImages.length > 0 ? allImages : 
-      (imageUri ? [{ id: 'single', source: imageUri }] : []);
-
-  // Trouver l'index initial
-  const initialScrollIndex = allImages.findIndex(img => 
-      img.source === imageUri || 
-      (imageUri && img.source.uri === imageUri.uri)
-  );
-
-  // Vérification des conditions d'affichage
-  if (!visible) return null;
-  if (imagesToShow.length === 0) {
-      console.warn('Aucune image à afficher');
-      return null;
+const renderGalleryGrid = () => {
+  // Vérification si la galerie est vide
+  if (!galleryImages || galleryImages.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <MaterialIcons name="photo-library" size={50} color="#CCCCCC" />
+        <Text style={styles.noImagesText}>Aucune photo disponible</Text>
+      </View>
+    );
   }
-
-  return (
-      <Modal
-          visible={visible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={onClose}
-      >
-          <View style={styles.photoModalContainer}>
-              <TouchableOpacity 
-                  style={styles.closeButton} 
-                  onPress={onClose}
-              >
-                  <Ionicons name="close" size={30} color="white" />
-              </TouchableOpacity>
-
-              <View style={styles.photoModalContent}>
-                  <ScrollView 
-                      horizontal
-                      pagingEnabled
-                      showsHorizontalScrollIndicator={false}
-                      initialScrollIndex={initialScrollIndex > -1 ? initialScrollIndex : 0}
-                      contentContainerStyle={styles.scrollViewContent}
-                  >
-                      {imagesToShow.map((image, index) => (
-                          <View 
-                              key={image.id || `image-${index}`} 
-                              style={styles.photoScrollItem}
-                          >
-                              <Image 
-                                  source={image.source} 
-                                  style={styles.photoModalImage}
-                                  resizeMode="contain"
-                                  onError={(e) => {
-                                      console.error(
-                                          'Erreur de chargement de l\'image:', 
-                                          e.nativeEvent.error
-                                      );
-                                  }}
-                              />
-                          </View>
-                      ))}
-                  </ScrollView>
-              </View>
-          </View>
-      </Modal>
-  );
+  
+  // Afficher la grille de galerie
+  const rows = [];
+  for (let i = 0; i < galleryImages.length; i += 3) {
+    const rowImages = galleryImages.slice(i, i + 3);
+    const row = (
+      <View key={`row-${i}`} style={styles.galleryRow}>
+        {rowImages.map(item => (
+          <TouchableOpacity 
+            key={item.id}
+            onPress={() => {
+              // Log pour debug
+              console.log("Image sélectionnée:", item.source);
+              setSelectedImage(item.source);
+              setPhotoModalVisible(true);
+            }}
+          >
+            <Image 
+              source={item.source} 
+              style={styles.galleryImage}
+              // Ajouter un indicateur de chargement si nécessaire
+              loadingIndicatorSource={require('../../assets/images/b.png')}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+    rows.push(row);
+  }
+  return rows;
 };
 ////////
 // Enhanced video data processing with more detailed logging
@@ -1995,6 +2259,105 @@ const processVideoData = async (videoData) => {
 
 
 const styles = StyleSheet.create({
+
+
+  //////////////vedio
+
+videoGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 2,
+    backgroundColor: 'transparent',
+    marginBottom: 80,
+  },
+  videoGridItem: {
+    width: '33%', // For a 3x3 grid
+    aspectRatio: 1, // For perfect squares
+    marginBottom: 2,
+    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  videoGridThumbnail: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black', // Ensure visibility of video
+  },
+  videoTitleContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 5,
+  },
+  videoTitle: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  videoTitleContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 5,
+  },
+  videoTitle: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  
+  // Video modal styles
+  videoScrollItem: {
+    width: Dimensions.get('window').width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  videoLoadingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  videoErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  videoErrorText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  noVideosText: {
+    marginTop: 10,
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+
+
+
+
+
+
+
+
+
+  //////////////////
   noScheduleContainer: {
     padding: 20,
     alignItems: 'center',
