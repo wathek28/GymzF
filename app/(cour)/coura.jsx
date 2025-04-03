@@ -22,7 +22,7 @@ import { FlashList } from '@shopify/flash-list'; // Plus performant que FlatList
 
 // Configuration globale pour l'API
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.194:8082',
+  BASE_URL: 'http://192.168.0.3:8082',
   ENDPOINTS: {
     COACH_PROGRAMS: '/api/courses/coach',
     PROGRAM_DETAIL: '/api/courses',

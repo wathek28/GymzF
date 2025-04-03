@@ -271,7 +271,7 @@ const ProfileScreen = () => {
       }
       
       console.log('Envoi de la requête à l\'API...');
-      const apiUrl = 'http://192.168.1.194:8082/api/auth/update-photo';
+      const apiUrl = 'http://192.168.0.3:8082/api/auth/update-photo';
       console.log('URL de l\'API:', apiUrl);
       
       console.log('Début de la requête fetch');

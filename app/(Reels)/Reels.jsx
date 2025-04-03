@@ -21,7 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const { width, height } = Dimensions.get('window');
 
 // API Configuration 
-const API_BASE_URL = 'http://192.168.1.194:8082';
+const API_BASE_URL = 'http://192.168.0.3:8082';
 
 const ReelsScreen = () => {
   // State management

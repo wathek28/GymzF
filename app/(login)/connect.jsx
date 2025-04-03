@@ -29,7 +29,7 @@ const Connect = () => {
       console.log('Numéro avec code pays:', phoneWithCountryCode); // Log pour vérifier le numéro
 
       // Envoi du code de connexion à l'API
-      const response = await fetch('http://192.168.1.194:8082/api/auth/login', {
+      const response = await fetch('http://192.168.0.3:8082/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

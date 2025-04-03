@@ -39,7 +39,7 @@ const useGalleryImages = (id, selectedTab) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.1.194:8082/api';
+  const API_BASE_URL = 'http://192.168.0.3:8082/api';
   const DEFAULT_IMAGE = Image.resolveAssetSource(require('../../assets/images/b.png')).uri;
 
   useEffect(() => {
@@ -114,7 +114,7 @@ const ReviewModal = ({
   // const params = route.params || {};
   // const recepteurId = params.idCoach;
 
-  const API_BASE_URL = 'http://192.168.1.194:8082'; // URL de l'API
+  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de l'API
 
   const pickImage = async (setImage) => {
     try {
@@ -627,7 +627,7 @@ const fetchReels = async (coachId) => {
 
   try {
     console.log(`🔄 Fetching reels for coach ID: ${coachId}`);
-    const response = await fetch(`http://192.168.1.194:8082/api/reels/user/${coachId}`, {
+    const response = await fetch(`http://192.168.0.3:8082/api/reels/user/${coachId}`, {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
@@ -650,7 +650,7 @@ const fetchReels = async (coachId) => {
       try {
         // IMPORTANT CHANGE: Instead of using the videoPath directly,
         // use the dedicated video streaming endpoint
-        const videoUri = `http://192.168.1.194:8082/api/reels/video/${reel.id}`;
+        const videoUri = `http://192.168.0.3:8082/api/reels/video/${reel.id}`;
         console.log(`Video streaming URI: ${videoUri}`);
 
         // Process title, defaults to original filename if title is missing
@@ -1158,7 +1158,7 @@ const fetchComments = useCallback(async (coachId) => {
   setCommentsError(null);
   
   try {
-    const response = await fetch(`http://192.168.1.194:8082/api/commentaires/recus/${coachId}`);
+    const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${coachId}`);
     
     if (!response.ok) {
       throw new Error(`Erreur HTTP: ${response.status}`);
@@ -1282,7 +1282,7 @@ const CommentImage = ({ imageUrl, label }) => {
   const [error, setError] = useState(false);
   
   // L'URL complète de l'image
-  const fullImageUrl = `http://192.168.1.194:8082${imageUrl}`;
+  const fullImageUrl = `http://192.168.0.3:8082${imageUrl}`;
   
   return (
     <View style={styles.imageContainer}>

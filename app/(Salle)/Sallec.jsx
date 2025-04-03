@@ -100,7 +100,7 @@ const navigateToSalled = useCallback(() => {
     const fetchCoaches = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://192.168.1.194:8082/api/auth/coaches');
+        const response = await fetch('http://192.168.0.3:8082/api/auth/coaches');
         
         if (!response.ok) {
           throw new Error(`Erreur HTTP: ${response.status}`);
@@ -271,7 +271,7 @@ const fetchReels = useCallback(async (gymId) => {
 
   let retryCount = 0;
   const MAX_RETRIES = 2;
-  const BASE_URL = 'http://192.168.1.194:8082'; // Extract the base URL
+  const BASE_URL = 'http://192.168.0.3:8082'; // Extract the base URL
 
   // Internal retry function
   const attemptFetch = async () => {
@@ -495,7 +495,7 @@ useEffect(() => {
    setCommentsError(null);
    
    try {
-     const response = await fetch(`http://192.168.1.194:8082/api/commentaires/recus/${gymId}`);
+     const response = await fetch(`http://192.168.0.3:8082/api/commentaires/recus/${gymId}`);
      
      if (!response.ok) {
        throw new Error(`Erreur HTTP: ${response.status}`);
@@ -581,7 +581,7 @@ useEffect(() => {
                    <Image 
                      source={
                        comment.hasImageAvant
-                         ? { uri: `http://192.168.1.194:8082${comment.imageAvantUrl}` }
+                         ? { uri: `http://192.168.0.3:8082${comment.imageAvantUrl}` }
                          : require('../../assets/images/b.png')
                      } 
                      style={styles.beforeAfterImage} 
@@ -593,7 +593,7 @@ useEffect(() => {
                    <Image 
                      source={
                        comment.hasImageApres
-                         ? { uri: `http://192.168.1.194:8082${comment.imageApresUrl}` }
+                         ? { uri: `http://192.168.0.3:8082${comment.imageApresUrl}` }
                          : require('../../assets/images/b.png')
                      } 
                      style={styles.beforeAfterImage} 
@@ -779,7 +779,7 @@ const PhotoViewerModal = ({ visible, onClose, imageUri, allImages = [] }) => {
   const [galleryImages, setGalleryImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const API_BASE_URL = 'http://192.168.1.194:8082';
+  const API_BASE_URL = 'http://192.168.0.3:8082';
 
   useEffect(() => {
     const fetchGalleryImages = async () => {
@@ -906,7 +906,7 @@ useEffect(() => {
       console.log(`Récupération des plannings pour le gym ID: ${idGym}`);
 
       // URL de l'API
-      const apiUrl = `http://192.168.1.194:8082/api/plannings/user/${idGym}`;
+      const apiUrl = `http://192.168.0.3:8082/api/plannings/user/${idGym}`;
       console.log('Appel API:', apiUrl);
 
       // Faire la requête GET
@@ -1490,7 +1490,7 @@ const ReviewModal = ({
   const params = route.params || {};
   const recepteurId = params.idGym; // ID du gym qui reçoit le commentaire
 
-  const API_BASE_URL = 'http://192.168.1.194:8082'; // URL de l'API
+  const API_BASE_URL = 'http://192.168.0.3:8082'; // URL de l'API
 
  
 

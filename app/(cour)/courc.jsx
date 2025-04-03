@@ -19,7 +19,7 @@ import * as FileSystem from 'expo-file-system';
 
 // Configuration de l'API
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.194:8082',
+  BASE_URL: 'http://192.168.0.3:8082',
   ENDPOINTS: {
     EXERCISE_DETAIL: '/api/courses/exercises',
     EXERCISE_VIDEO: '/api/courses/exercises'

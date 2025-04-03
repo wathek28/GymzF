@@ -92,6 +92,44 @@ const validateEmail = (email) => {
     return emailRegex.test(email);
   };
 
+  // Fonction pour extraire userId du token JWT
+  const extractUserIdFromToken = (token) => {
+    try {
+      // Extraire la partie payload du token (la deuxième partie séparée par des points)
+      const base64Payload = token.split('.')[1];
+      // Décoder la charge utile Base64 avec atob (disponible nativement)
+      const decodedPayload = atob(base64Payload);
+      const payload = JSON.parse(decodedPayload);
+      console.log('Payload du token:', payload);
+      // Renvoyer l'ID utilisateur si disponible dans le payload
+      return payload.userId || payload.user_id || payload.id || null;
+    } catch (e) {
+      console.error('Erreur d\'extraction de l\'ID utilisateur du token:', e);
+      return null;
+    }
+  };
+
+  // Fonction pour obtenir l'ID utilisateur de l'API ou générer un ID temporaire si nécessaire
+  const getUserId = async (phoneNumber, token) => {
+    try {
+      // Vérifier d'abord le token
+      const tokenUserId = extractUserIdFromToken(token);
+      if (tokenUserId) {
+        console.log('ID utilisateur extrait du token:', tokenUserId);
+        return tokenUserId;
+      }
+      
+      // Si aucun ID n'a pu être extrait, générer un ID temporaire
+      const tempId = 'temp_' + Date.now();
+      console.log('Génération d\'un ID temporaire:', tempId);
+      return tempId;
+    } catch (e) {
+      console.error('Erreur lors de la récupération de l\'ID utilisateur:', e);
+      // Générer un ID temporaire si tout échoue
+      return 'temp_' + Date.now();
+    }
+  };
+
   const handleSubmit = async () => {
     if (!name || !email) {
       Alert.alert('Error', 'All fields are required');
@@ -113,7 +151,7 @@ const validateEmail = (email) => {
         return;
       }
 
-      const [firstName] = name.split(' ');
+      const firstName = name.split(' ')[0];
       const formData = new FormData();
       formData.append('phoneNumber', fullPhoneNumber);
       formData.append('firstName', firstName);
@@ -128,7 +166,7 @@ const validateEmail = (email) => {
         });
       }
 
-      const response = await fetch('http://192.168.1.194:8082/api/auth/update-profile', {
+      const response = await fetch('http://192.168.0.3:8082/api/auth/update-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -142,16 +180,83 @@ const validateEmail = (email) => {
       if (!response.ok) {
         Alert.alert('Error', data.message || 'Profile update failed');
       } else {
+        // Si un nouveau token est fourni, le sauvegarder
         if (data.token) {
           await AsyncStorage.setItem('authToken', data.token);
         }
-        router.push('/home');
+        
+        // Obtenir l'ID utilisateur, soit de la réponse, soit par d'autres moyens
+        let userId = data.id || data.userId;
+        
+        // Si aucun ID n'est disponible dans la réponse, essayer de l'extraire du token
+        if (!userId) {
+          console.log('ID utilisateur non trouvé dans la réponse, tentative d\'extraction du token');
+          userId = await getUserId(fullPhoneNumber, token);
+        }
+        
+        console.log('ID utilisateur obtenu:', userId);
+        
+        // Sauvegarde des données utilisateur dans AsyncStorage
+        await saveUserDataToAsyncStorage(firstName, email, fullPhoneNumber, photo, role, userId);
+        
+        // Navigation vers la page home avec les paramètres 
+        // Utiliser les mêmes noms de paramètres que dans _layout
+        router.push({
+          pathname: '/home',
+          params: {
+            userId: userId,
+            firstName: firstName,
+            phoneNumber: fullPhoneNumber,
+            photo: photo,
+            email: email
+          }
+        });
       }
     } catch (e) {
       console.error('Connection error:', e);
       Alert.alert('Error', 'Connection error. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Fonction pour sauvegarder les données utilisateur dans AsyncStorage
+  const saveUserDataToAsyncStorage = async (firstName, email, phoneNumber, photo, role, userId) => {
+    try {
+      // Stocker les éléments avec les mêmes noms de clés que dans _layout
+      await AsyncStorage.setItem('firstName', firstName);
+      await AsyncStorage.setItem('userEmail', email);
+      await AsyncStorage.setItem('phoneNumber', phoneNumber);
+      
+      if (photo) {
+        await AsyncStorage.setItem('userPhoto', photo);
+      }
+      
+      await AsyncStorage.setItem('userRole', role);
+      
+      if (userId) {
+        await AsyncStorage.setItem('userId', userId.toString());
+      }
+      
+      // Également stocker avec les anciens noms de clés pour compatibilité avec le reste de l'app
+      await AsyncStorage.setItem('userFirstName', firstName);
+      await AsyncStorage.setItem('userPhoneNumber', phoneNumber);
+      
+      // Stocker également un objet complet pour faciliter la récupération
+      const userProfile = {
+        firstName,
+        email,
+        phoneNumber,
+        photo,
+        role,
+        id: userId
+      };
+      
+      await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
+      
+      console.log('Données utilisateur sauvegardées dans AsyncStorage:', userProfile);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des données utilisateur:', error);
     }
   };
 

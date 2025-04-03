@@ -19,7 +19,7 @@ const { width } = Dimensions.get('window');
 
 // Configuration API - pourrait être déplacée dans un fichier séparé pour être réutilisée
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.194:8082',
+  BASE_URL: 'http://192.168.0.3:8082',
   ENDPOINTS: {
     COURSE_DETAIL: '/api/courses',
     COURSE_EXERCISES: '/api/courses',
