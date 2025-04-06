@@ -25,7 +25,7 @@ const CoachProfile = () => {
     id: initialParams.id,
     name: initialParams.firstName || 'Ahmed Mohamed',
     verified: true,
-    specialties: initialParams.typeCoaching || 'Fitness Et Yoga',
+    specialties: initialParams.typeCoaching ,
     description: initialParams.bio || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi vestibulum eros at dolor mollis aliquam at erat mattis. Donec dignissim ultricies mauris, ac tristique.',
     avatar: initialParams.photo 
       ? { uri: `data:image/jpeg;base64,${initialParams.photo}` }
@@ -83,7 +83,7 @@ const CoachProfile = () => {
       id: coach.id,
       name: coach.firstName,
       verified: true,
-      specialties: 'Fitness Et Yoga', // Default or use a property from coach if available
+      specialties: '', // Default or use a property from coach if available
       description: coach.bio || "Aucune biographie disponible pour ce coach.",
       avatar: coach.photo 
         ? { uri: `data:image/jpeg;base64,${coach.photo}` }

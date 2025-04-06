@@ -508,12 +508,25 @@ const Fit = () => {
 
   // Navigation vers les détails du programme
   const navigateToProgramDetail = useCallback((programId) => {
-    // Navigation vers l'écran "courb" avec l'ID du cours en paramètre
-    navigation.navigate('courb', { 
-      id: programId,  // Paramètre principal 'id' pour identifier le cours
-      // Vous pouvez ajouter d'autres paramètres si nécessaire
-    });
-  }, [navigation]);
+    // Trouver le programme correspondant pour accéder à son prix
+    const selectedProgram = programs.find(program => program.id === programId);
+    
+    // S'assurer que le programme a été trouvé
+    if (selectedProgram) {
+      // Navigation vers l'écran "courb" avec l'ID du cours et le prix en paramètres
+      navigation.navigate('courb', { 
+        id: programId,  // Paramètre principal 'id' pour identifier le cours
+        price: selectedProgram.price, // Ajouter le prix comme paramètre
+        isFree: (!selectedProgram.price || parseFloat(selectedProgram.price) === 0 || selectedProgram.price === '0.00')
+      });
+    } else {
+      // Fallback si le programme n'est pas trouvé (improbable mais par sécurité)
+      navigation.navigate('courb', { 
+        id: programId
+      });
+      console.warn(`Programme avec l'ID ${programId} non trouvé dans la liste.`);
+    }
+  }, [navigation, programs]);
 
   // Fonction pour afficher le message de bienvenue avec le nom du coach coloré
   const renderWelcomeMessage = useCallback(() => (

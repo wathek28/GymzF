@@ -55,7 +55,8 @@ const SAlle = () => {
     poste,
     typeCoaching,
     bio,
-    idGym  
+    idGym  ,
+    address
   } = params;
   console.log("ID du gym:", idGym);
   
@@ -1264,7 +1265,7 @@ const renderMainContent = () => {
                 
                 <View style={styles.gymHours}>
                   <Ionicons name="location-outline" size={20} color="#777" />
-                  <Text style={styles.aboutText}>{typeCoaching}</Text>
+                  <Text style={styles.aboutText}>{address}</Text>
                 </View>
                 <View style={styles.gymHours}>
                   <Ionicons name="time-outline" size={16} color="#777" />

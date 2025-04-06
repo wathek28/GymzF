@@ -221,6 +221,7 @@ const fetchGyms = async () => {
         tiktok: currentGym.tiktok,
         typeCoaching: currentGym.typeCoaching,
         bio: currentGym.bio,
+        address:currentGym.address
       }
     });
   };
@@ -298,8 +299,7 @@ const fetchGyms = async () => {
                     <Text style={styles.profileButtonText}>Voir le profil</Text>
                   </TouchableOpacity>
                 </View>
-                
-                <Text style={styles.title}>7H - 21H</Text>
+                <Text style={styles.title}>{gym.address || 'Adresse non disponible'}</Text>
                 {renderLocationInfo()}
 
                 {/* Badges Section */}

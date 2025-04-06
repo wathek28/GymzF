@@ -1,4 +1,8 @@
 import { Stack } from 'expo-router';
+import { LogBox } from 'react-native';
+
+// Ignorer spécifiquement l'erreur de text strings
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 export default function RootLayout() {
   return (
@@ -8,24 +12,24 @@ export default function RootLayout() {
         animation: 'slide_from_right',
       }}
     >
-      {/* Désactivation de l'en-tête pour l'écran login */}
-      <Stack.Screen name="(login)" />
-      {/* Désactivation de l'en-tête pour l'écran home */}
+      {/* Screens groupés par catégorie avec des options spécifiques si nécessaire */}
+      <Stack.Screen 
+        name="(login)" 
+        options={{
+          animation: 'slide_from_bottom',
+        }} 
+      />
       <Stack.Screen name="home" />
-      {/* Désactivation de l'en-tête pour l'écran profil */}
       <Stack.Screen name="(profil)" />
-      {/* Désactivation de l'en-tête pour l'écran coach */}
       <Stack.Screen name="(coach)" />
-      {/* Désactivation de l'en-tête pour l'écran event */}
       <Stack.Screen name="(event)" />
-      {/* Désactivation de l'en-tête pour l'écran Gymzer */}
       <Stack.Screen name="(Gymzer)" />
-      {/* Désactivation de l'en-tête pour l'écran Salle */}
       <Stack.Screen name="(Salle)" />
-      {/* Désactivation de l'en-tête pour l'écran Reels */}
       <Stack.Screen name="(Reels)" />
-       {/* Désactivation de l'en-tête pour l'écran cour */}
-       <Stack.Screen name="(cour)" />
+      <Stack.Screen name="(cour)" />
+      
+      {/* Screen d'index qui redirige vers login */}
+      <Stack.Screen name="index" options={{ headerShown: false }} />
     </Stack>
   );
 }

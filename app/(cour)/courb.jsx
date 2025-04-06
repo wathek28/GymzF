@@ -47,6 +47,14 @@ const formatExerciseInfo = (exercise) => {
   return '';
 };
 
+// Fonction pour formater le prix
+const formatPrice = (price) => {
+  if (!price || parseFloat(price) === 0 || price === '0.00') {
+    return 'GRATUIT';
+  }
+  return `${parseFloat(price).toFixed(0)} DT`;
+};
+
 // Composant d'exercice extrait pour éviter les re-rendus inutiles
 const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
   // Créer une URL pour la miniature de la vidéo de l'exercice
@@ -98,6 +106,15 @@ const ExerciseDetailScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = params.id;
+  
+  // Récupérer le prix et le statut gratuit/payant depuis les paramètres
+  const price = params.price;
+  const isFree = params.isFree === 'true'; // Convertir la string en boolean
+  
+  // Formater le prix pour l'affichage
+  const formattedPrice = useMemo(() => {
+    return formatPrice(price);
+  }, [price]);
 
   // Construction de l'URL de la miniature du cours
   const courseThumbnailUrl = useMemo(() => {
@@ -224,8 +241,52 @@ const ExerciseDetailScreen = () => {
     );
   }, []);
 
+  // État pour afficher/masquer la popup de paiement
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  
+  // Gestion du clic sur le bouton de déblocage
+  const handleUnlockPress = useCallback(() => {
+    setShowPaymentModal(true);
+  }, []);
+  
+  // Gestion de la fermeture de la popup de paiement
+  const handleClosePaymentModal = useCallback(() => {
+    setShowPaymentModal(false);
+  }, []);
+  
+  // Gestion du paiement
+ // Modification de la fonction handlePayment dans ExerciseDetailScreen.js
+ const handlePayment = useCallback(() => {
+  // Fermer la modal de paiement
+  setShowPaymentModal(false);
+  
+  // Extraire tous les IDs des exercices
+  const exerciseIds = exercises.map(exercise => exercise.id).join(',');
+  
+  // Naviguer vers le formulaire de paiement avec les paramètres nécessaires
+  router.push({
+    pathname: '/(cour)/PaymentForm',
+    params: { 
+      courseId: id,
+      price: price,
+      courseTitle: courseData.title,
+      exerciseIds: exerciseIds // Ajout des ids des exercices comme paramètre
+    }
+  });
+}, [id, price, courseData, exercises, router]);
+  
+  // Gestion du clic sur le support
+  const handleSupportPress = useCallback(() => {
+    // Ouvrir un lien vers le support ou afficher des coordonnées
+    Alert.alert(
+      "Support Client",
+      "Pour toute question ou assistance, notre équipe de support est disponible par email à support@exemple.com ou par téléphone au +1234567890."
+    );
+  }, []);
+  
   // Gestion du clic sur le bouton de démarrage - mémorisée pour éviter les re-créations
   const handleStartPress = useCallback(() => {
+    // Si le cours est gratuit ou déjà débloqué
     if (exercises.length > 0) {
       // Extraire tous les IDs des exercices
       const exerciseIds = exercises.map(exercise => exercise.id);
@@ -323,6 +384,19 @@ const ExerciseDetailScreen = () => {
         <View style={styles.idBadge}>
           <Text style={styles.idText}>Cours #{id}</Text>
         </View>
+        
+        {/* Price Badge */}
+        <View style={[
+          styles.priceBadge,
+          isFree ? styles.freePriceBadge : styles.proPriceBadge
+        ]}>
+          <Text style={[
+            styles.priceText,
+            isFree ? styles.freeText : styles.proText
+          ]}>
+            {formattedPrice}
+          </Text>
+        </View>
       </View>
       
       {/* Content - optimisé pour ne pas recréer les fonctions de rendu */}
@@ -371,13 +445,76 @@ const ExerciseDetailScreen = () => {
           </>
         )}
         
-        {/* Start Button */}
-        <TouchableOpacity 
-          style={styles.startButton} 
-          onPress={handleStartPress}
-        >
-          <Text style={styles.startButtonText}>Commencer</Text>
-        </TouchableOpacity>
+        {/* Conditional Button: "Commencer" for free courses, "Débloquer" for paid courses */}
+        {isFree ? (
+          <TouchableOpacity 
+            style={styles.startButton} 
+            onPress={handleStartPress}
+          >
+            <Text style={styles.startButtonText}>Commencer</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={styles.unlockButton} 
+            onPress={handleUnlockPress}
+          >
+            <Text style={styles.unlockButtonText}>Débloquer</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Modal de paiement */}
+        {showPaymentModal && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.paymentModal}>
+              <View style={styles.paymentModalHeader}>
+                <View style={styles.playIconContainer}>
+                  <Ionicons name="play" size={24} color="#CBFF06" />
+                </View>
+                <Text style={styles.paymentModalTitle}>
+                  Débloquez immédiatement ce cours pour {formattedPrice}
+                </Text>
+              </View>
+              
+              <View style={styles.paymentBenefits}>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
+                  <Text style={styles.benefitText}>Accès immédiat et illimité au contenu</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
+                  <Text style={styles.benefitText}>Exercices détaillés et vidéos incluses</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
+                  <Text style={styles.benefitText}>Aucun abonnement, un seul paiement</Text>
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.paymentButton}
+                onPress={handlePayment}
+              >
+                <Text style={styles.paymentButtonText}>Passer à la caisse</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.supportContainer}>
+                <Text style={styles.supportText}>Besoin d'aide ? Contactez </Text>
+                <TouchableOpacity onPress={handleSupportPress}>
+                  <Text style={styles.supportLink}>notre support</Text>
+                </TouchableOpacity>
+                <Text style={styles.supportText}>.</Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={handleClosePaymentModal}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         
         {/* Bottom space */}
         <View style={styles.bottomSpace} />
@@ -451,6 +588,30 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  priceBadge: {
+    position: 'absolute',
+    top: 55,
+    right: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  freePriceBadge: {
+    backgroundColor: '#32CD32',
+  },
+  proPriceBadge: {
+    backgroundColor: '#FF9900',
+  },
+  priceText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  freeText: {
+    color: 'white',
+  },
+  proText: {
+    color: 'white',
   },
   content: {
     flex: 1,
@@ -565,6 +726,104 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  unlockButton: {
+    backgroundColor: '#CBFF06',
+    borderRadius: 30,
+    paddingVertical: 15,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  unlockButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
+  // Styles pour la modal de paiement
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  paymentModal: {
+    width: '90%',
+    backgroundColor: '#222',
+    borderRadius: 15,
+    padding: 20,
+    position: 'relative',
+  },
+  paymentModalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  playIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(203, 255, 6, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  paymentModalTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    paddingHorizontal: 10,
+  },
+  paymentBenefits: {
+    marginBottom: 25,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  benefitText: {
+    color: 'white',
+    marginLeft: 10,
+    fontSize: 14,
+  },
+  paymentButton: {
+    backgroundColor: '#CBFF06',
+    borderRadius: 30,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  paymentButtonText: {
+    color: '#222',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  supportContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  supportText: {
+    color: '#999',
+    fontSize: 12,
+  },
+  supportLink: {
+    color: '#CBFF06',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'transparent',
   },
   bottomSpace: {
     height: 20,
