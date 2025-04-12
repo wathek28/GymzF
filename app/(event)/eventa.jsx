@@ -160,9 +160,7 @@ const EventsScreen = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.title}>Événements</Text>
-        {userId && (
-          <Text style={styles.userIdText}>User ID: {userId}</Text>
-        )}
+        
       </View>
 
       <View style={styles.searchContainer}>

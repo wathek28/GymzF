@@ -531,7 +531,7 @@ const Fit = () => {
   // Fonction pour afficher le message de bienvenue avec le nom du coach coloré
   const renderWelcomeMessage = useCallback(() => (
     <Text style={styles.welcomeText}>
-      Coach <Text style={styles.coachNameHighlight}>{coachName}</Text> a conçu des séances efficaces pour{'\n'}des resultats au top.
+      Coach <Text style={styles.coachNameHighlight}>{coachName}</Text> a conçu des séances efficaces pour des resultats au top.
     </Text>
   ), [coachName]);
 

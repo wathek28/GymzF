@@ -10,9 +10,11 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Linking,
+  Image,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -29,19 +31,9 @@ const ContactForm = () => {
     userId, 
     firstName, 
     email, 
-    phoneNumber 
+    phoneNumber,
+    photo
   } = route.params || {};
-
-  // Log the parameters as soon as the component mounts
-  useEffect(() => {
-    console.log("Route params received:", {
-      idCoach,
-      userId,
-      firstName,
-      email,
-      phoneNumber
-    });
-  }, [idCoach, userId, firstName, email, phoneNumber]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -49,25 +41,39 @@ const ContactForm = () => {
     whatsapp: '',
     reason: '',
     message: '',
-    idCoach: idCoach, // Include idCoach in the form data
-    userId: userId,   // Include userId in the form data
+    idCoach: idCoach,
+    userId: userId,
   });
 
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  // Effect to pre-populate form fields with user data
+  // Reasons list
+  const reasons = [
+    'Réservation d\'une séance individuelle',
+    'Organisation d\'une session en groupe',
+    'Coaching personnalisé',
+    'Programme d\'entraînement sur mesure',
+    'Perte de poids (objectif fitness)',
+    'Gain de poids ou prise de masse musculaire',
+    'Demande d\'informations sur les cours',
+    'Questions sur les tarifs et abonnements',
+    'Planification alimentaire et nutrition',
+    'Autre (à préciser dans le message)',
+  ];
+
+  // Load user data on component mount
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // First priority: Use data from route params
+        // First, try to use data from route params
         let userData = {
           name: firstName || '',
           email: email || '',
           whatsapp: phoneNumber || ''
         };
         
-        // Second priority: Try to get data from AsyncStorage if not present in params
+        // If not found in params, try AsyncStorage
         if (!userData.name) {
           const storedName = await AsyncStorage.getItem('firstName');
           if (storedName) userData.name = storedName;
@@ -83,10 +89,7 @@ const ContactForm = () => {
           if (storedPhone) userData.whatsapp = storedPhone;
         }
         
-        // Log what we found
-        console.log("User data for form:", userData);
-        
-        // Update form data with user information
+        // Update form data
         setFormData(prevData => ({
           ...prevData,
           name: userData.name,
@@ -101,36 +104,93 @@ const ContactForm = () => {
     loadUserData();
   }, [firstName, email, phoneNumber]);
 
-  const reasons = [
-    'Réservation d\'une séance individuelle',
-    'Organisation d\'une session en groupe',
-    'Coaching personnalisé',
-    'Programme d\'entraînement sur mesure',
-    'Perte de poids (objectif fitness)',
-    'Gain de poids ou prise de masse musculaire',
-    'Demande d\'informations sur les cours',
-    'Questions sur les tarifs et abonnements',
-    'Planification alimentaire et nutrition',
-    'Autre (à préciser dans le message)',
-  ];
+  // Open WhatsApp function
+  // Open WhatsApp function
+  // Open WhatsApp function
+  // Open WhatsApp function
+  const openWhatsApp = async () => {
+    // Utilisez le numéro de téléphone fourni si aucun n'est passé dans les paramètres
+    const contactNumber = phoneNumber || '+21690306551';
 
-  // Fonction de validation d'email simple
+    if (!contactNumber) {
+      Alert.alert('Information manquante', 'Les coordonnées du coach ne sont pas disponibles.');
+      return;
+    }
+
+    // Liste des raisons prédéfinies
+    const reasons = [
+      'Réservation d\'une séance individuelle',
+      'Organisation d\'une session en groupe',
+      'Coaching personnalisé',
+      'Programme d\'entraînement sur mesure',
+      'Perte de poids (objectif fitness)',
+      'Gain de poids ou prise de masse musculaire',
+      'Demande d\'informations sur les cours',
+      'Questions sur les tarifs et abonnements',
+      'Planification alimentaire et nutrition',
+      'Autre (à préciser dans le message)',
+    ];
+
+    // Préparer le message par défaut avec la raison si sélectionnée
+    const defaultMessage = formData.reason 
+      ? `Bonjour ${firstName || 'Coach'}, je souhaite vous contacter concernant ${formData.reason}.`
+      : `Bonjour ${firstName || 'Coach'}, je souhaite vous contacter concernant un coaching.`;
+
+    // Normalize phone number (remove spaces and +)
+    const cleanPhoneNumber = contactNumber.replace(/\s+/g, '').replace(/^\+/, '');
+
+    // Construct WhatsApp URLs for different methods
+    const whatsappUrls = [
+      `whatsapp://send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(defaultMessage)}`, // Default WhatsApp
+      `https://wa.me/${cleanPhoneNumber}?text=${encodeURIComponent(defaultMessage)}`, // Web WhatsApp
+    ];
+
+    // Try multiple URL methods
+    for (const url of whatsappUrls) {
+      try {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+          return; // Exit if successful
+        }
+      } catch (error) {
+        console.error('Error opening WhatsApp:', error);
+      }
+    }
+
+    // If all methods fail
+    Alert.alert(
+      'WhatsApp non disponible',
+      'Impossible d\'ouvrir WhatsApp. Veuillez vérifier son installation.',
+      [
+        { 
+          text: 'Copier le numéro', 
+          onPress: () => {
+            Clipboard.setString(contactNumber);
+            Alert.alert('Numéro copié', `Le numéro ${contactNumber} a été copié dans le presse-papiers.`);
+          }
+        },
+        { text: 'Annuler', style: 'cancel' }
+      ]
+    );
+  };
+
+  // Email validation
   const validateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(String(email).toLowerCase());
   };
 
-  // MODIFIÉ: Ne ferme plus automatiquement le picker après sélection
+  // Handle reason change
   const handleReasonChange = (value) => {
     if (value !== '') {
       setFormData({ ...formData, reason: value });
     }
-    // Ne plus fermer automatiquement
-    // setShowPicker(false); <- Cette ligne a été retirée
   };
 
+  // Submit form
   const handleSubmit = async () => {
-    // Form validation
+    // Validation checks
     if (!formData.name.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer votre nom');
       return;
@@ -160,10 +220,10 @@ const ContactForm = () => {
       return;
     }
 
-    // Construction de l'URL avec les IDs du coach et du gymzer
+    // API URL
     const apiUrl = `${API_BASE_URL}/api/contact/coach/${formData.idCoach}/gymzer/${formData.userId}`;
     
-    // Formatez les données exactement comme dans votre test Postman réussi
+    // Prepare API data
     const apiData = {
       raisonContact: formData.reason,
       message: formData.message,
@@ -172,9 +232,6 @@ const ContactForm = () => {
       telephone: formData.whatsapp
     };
 
-    console.log('Sending data to API:', apiData);
-    console.log('Request URL:', apiUrl);
-    
     try {
       setLoading(true);
       
@@ -187,16 +244,12 @@ const ContactForm = () => {
         body: JSON.stringify(apiData),
       });
 
-      console.log('Response status:', response.status);
       const responseText = await response.text();
-      console.log('Response text:', responseText);
-      
       let responseData;
+      
       try {
         responseData = JSON.parse(responseText);
-        console.log('Response data:', responseData);
       } catch (e) {
-        console.log('Response is not JSON:', e);
         responseData = { message: responseText };
       }
       
@@ -207,6 +260,7 @@ const ContactForm = () => {
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
         
+        // Reset form
         setFormData({
           name: '',
           email: '',
@@ -217,11 +271,10 @@ const ContactForm = () => {
           userId: formData.userId,
         });
       } else {
-        if (responseData && responseData.error) {
-          Alert.alert('Erreur', `${responseData.error || 'Une erreur s\'est produite'}`);
-        } else {
-          Alert.alert('Erreur', 'Une erreur s\'est produite lors de l\'envoi du message.');
-        }
+        Alert.alert(
+          'Erreur',
+          responseData.error || 'Une erreur s\'est produite lors de l\'envoi du message.'
+        );
       }
     } catch (error) {
       console.error('Error details:', error);
@@ -244,146 +297,165 @@ const ContactForm = () => {
           >
             <Ionicons name="chevron-back" size={24} color="#000" />
           </TouchableOpacity>
-          <Text style={styles.header}>Contactez-moi</Text>
+          <Text style={styles.header}>Contactez {firstName}</Text>
         </View>
 
-        {/* ID information - Debug only */}
-       
-
-        {/* Nom et prénom */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nom et Prénom<Text style={styles.required}>*</Text></Text>
-          <TextInput
-            style={styles.input}
-            value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
-            placeholder="Ahmed Mahmoud"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        {/* Email */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Adresse email<Text style={styles.required}>*</Text></Text>
-          <TextInput
-            style={styles.input}
-            value={formData.email}
-            onChangeText={(text) => setFormData({ ...formData, email: text })}
-            placeholder="ahmed@gmail.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        {/* Numéro WhatsApp */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Numéro WhatsApp<Text style={styles.required}>*</Text></Text>
-          <TextInput
-            style={styles.input}
-            value={formData.whatsapp}
-            onChangeText={(text) => setFormData({ ...formData, whatsapp: text })}
-            placeholder="90306551"
-            keyboardType="phone-pad"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        {/* Raison de contact */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Raison de contact<Text style={styles.required}>*</Text></Text>
-          {Platform.OS === 'ios' ? (
-            <>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowPicker(true)}
-              >
-                <Text style={styles.pickerButtonText}>
-                  {formData.reason || 'Sélectionner une raison'}
-                </Text>
-              </TouchableOpacity>
-              <Modal visible={showPicker} transparent animationType="slide">
-                <View style={styles.modalContainer}>
-                  <View style={styles.pickerWrapper}>
-                    <Picker
-                      selectedValue={formData.reason}
-                      onValueChange={handleReasonChange}
-                      itemStyle={{ fontSize: 14 }}
-                    >
-                      <Picker.Item label="Sélectionner une raison" value="" color="#999" />
-                      {reasons.map((reason, index) => (
-                        <Picker.Item key={index} label={reason} value={reason} />
-                      ))}
-                    </Picker>
-                    <TouchableOpacity style={styles.modalButton} onPress={() => setShowPicker(false)}>
-                      <Text style={styles.modalButtonText}>Fermer</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Modal>
-            </>
-          ) : (
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.reason}
-                onValueChange={handleReasonChange}
-                style={styles.picker}
-                itemStyle={{ fontSize: 14 }}
-              >
-                <Picker.Item label="Sélectionner une raison" value="" color="#999" />
-                {reasons.map((reason, index) => (
-                  <Picker.Item key={index} label={reason} value={reason} />
-                ))}
-              </Picker>
+        {/* WhatsApp Direct Contact Section */}
+        <View style={styles.whatsappSectionContainer}>
+          <View style={styles.whatsappSection}>
+            <View style={styles.whatsappTextContainer}>
+              <Text style={styles.whatsappTitle}>Contactez rapidement {firstName}</Text>
+              <Text style={styles.whatsappSubtitle}>Disponible sur WhatsApp</Text>
             </View>
-          )}
+            <TouchableOpacity 
+              style={styles.whatsappButton} 
+              onPress={openWhatsApp}
+            >
+              <FontAwesome5 name="whatsapp" size={24} color="black" />
+              <Text style={styles.whatsappButtonText}>Chatter</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Message */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Message<Text style={styles.required}>*</Text></Text>
-          <TextInput
-            style={[styles.input, styles.messageInput]}
-            value={formData.message}
-            onChangeText={(text) => setFormData({ ...formData, message: text })}
-            multiline
-            numberOfLines={4}
-            placeholder="Votre message..."
-            placeholderTextColor="#999"
-            textAlignVertical="top"
-          />
-        </View>
+        {/* Form Fields */}
+        <View style={styles.formFieldsContainer}>
+          {/* Name */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nom et Prénom<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={formData.name}
+              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              placeholder="Ahmed Mahmoud"
+              placeholderTextColor="#999"
+            />
+          </View>
 
-        {/* Boutons */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => {
-              // Reset the form but keep personal information and IDs
-              setFormData(prev => ({
-                ...prev,
-                reason: '',
-                message: ''
-              }));
-            }}
-            disabled={loading}
-          >
-            <Text style={styles.cancelButtonText}>Annuler</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.disabledButton]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#fff" />
-                <Text style={styles.submitButtonText}>Envoi en cours...</Text>
-              </View>
+          {/* Email */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Adresse email<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={formData.email}
+              onChangeText={(text) => setFormData({ ...formData, email: text })}
+              placeholder="ahmed@gmail.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {/* WhatsApp Number */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Numéro WhatsApp<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={formData.whatsapp}
+              onChangeText={(text) => setFormData({ ...formData, whatsapp: text })}
+              placeholder="90306551"
+              keyboardType="phone-pad"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {/* Reason Picker */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Raison de contact<Text style={styles.required}>*</Text></Text>
+            {Platform.OS === 'ios' ? (
+              <>
+                <TouchableOpacity
+                  style={styles.pickerButton}
+                  onPress={() => setShowPicker(true)}
+                >
+                  <Text style={styles.pickerButtonText}>
+                    {formData.reason || 'Sélectionner une raison'}
+                  </Text>
+                </TouchableOpacity>
+                <Modal visible={showPicker} transparent animationType="slide">
+                  <View style={styles.modalContainer}>
+                    <View style={styles.pickerWrapper}>
+                      <Picker
+                        selectedValue={formData.reason}
+                        onValueChange={handleReasonChange}
+                        itemStyle={{ fontSize: 14 }}
+                      >
+                        <Picker.Item label="Sélectionner une raison" value="" color="#999" />
+                        {reasons.map((reason, index) => (
+                          <Picker.Item key={index} label={reason} value={reason} />
+                        ))}
+                      </Picker>
+                      <TouchableOpacity 
+                        style={styles.modalButton} 
+                        onPress={() => setShowPicker(false)}
+                      >
+                        <Text style={styles.modalButtonText}>Fermer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Modal>
+              </>
             ) : (
-              <Text style={styles.submitButtonText}>Envoyer</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={formData.reason}
+                  onValueChange={handleReasonChange}
+                  style={styles.picker}
+                  itemStyle={{ fontSize: 14 }}
+                >
+                  <Picker.Item label="Sélectionner une raison" value="" color="#999" />
+                  {reasons.map((reason, index) => (
+                    <Picker.Item key={index} label={reason} value={reason} />
+                  ))}
+                </Picker>
+              </View>
             )}
-          </TouchableOpacity>
+          </View>
+
+          {/* Message */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Message<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, styles.messageInput]}
+              value={formData.message}
+              onChangeText={(text) => setFormData({ ...formData, message: text })}
+              multiline
+              numberOfLines={4}
+              placeholder="Votre message..."
+              placeholderTextColor="#999"
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  reason: '',
+                  message: ''
+                }));
+              }}
+              disabled={loading}
+            >
+              <Text style={styles.cancelButtonText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.disabledButton]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.submitButtonText}>Envoi en cours...</Text>
+                </View>
+              ) : (
+                <Text style={styles.submitButtonText}>Envoyer</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -531,6 +603,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 10,
+  },
+  whatsappSectionContainer: {
+    marginBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  whatsappSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  whatsappTextContainer: {
+    flex: 1,
+    marginRight: 15,
+  },
+  whatsappTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  whatsappSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  whatsappButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#CBFF06', // WhatsApp green
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    gap: 10,
+  },
+  whatsappButtonText: {
+    color: 'black',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  formFieldsContainer: {
+    marginTop: 20,
   },
 });
 

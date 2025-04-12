@@ -13,16 +13,21 @@ import {
   TextInput,
   Image,
   Animated,
-  Dimensions
+  Dimensions,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Nous n'utilisons plus ces imports car nous faisons directement l'appel fetch
-// import { confirmPayment, createPaymentIntent } from '../(cour)/PaymentForm';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.85;
+
+// Définir les cartes autorisées
+const VALID_CARD_NUMBERS = [
+  '1234 5678 9012 3456',
+  '5678 1234 9012 3456'
+];
 
 // Fonction pour formater le prix
 const formatPrice = (price) => {
@@ -115,6 +120,10 @@ const PaymentFormScreen = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStep, setPaymentStep] = useState(1); // 1: informations carte, 2: confirmation
   const [userId, setUserId] = useState(null);
+  
+  // États pour le modal de succès ou déjà acheté
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [alreadyPurchased, setAlreadyPurchased] = useState(false);
   
   // Animation pour la transition entre les étapes - simplifiée
   const fadeAnim = useState(new Animated.Value(1))[0];
@@ -219,8 +228,9 @@ const PaymentFormScreen = () => {
       return;
     }
     
-    if (cardNumber.replace(/\s/g, '').length !== 16) {
-      Alert.alert('Erreur', 'Numéro de carte invalide');
+    // Vérifier si la carte fait partie des cartes autorisées
+    if (!VALID_CARD_NUMBERS.includes(cardNumber)) {
+      Alert.alert('Erreur', 'Numéro de carte non valide. Veuillez utiliser une carte autorisée pour ce test.');
       return;
     }
     
@@ -239,6 +249,36 @@ const PaymentFormScreen = () => {
       setPaymentStep(2);
     }, 100);
   }, [cardName, cardNumber, expiryDate, cvv]);
+  
+  // Fermer le modal et naviguer vers la page de cours
+  const handleStartCourse = useCallback(() => {
+    setShowSuccessModal(false);
+    
+    // Vérifier qu'il y a au moins un exercice disponible
+    if (exerciseIds && exerciseIds.length > 0) {
+      // Rediriger vers la page du cours avec l'exercice débloqué
+      router.push({
+        pathname: '/courc',
+        params: { 
+          courseId: courseId,
+          exerciseId: exerciseIds[0],            // ID du premier exercice
+          allExerciseIds: exerciseIds.join(',')  // Tous les IDs pour navigation
+        }
+      });
+    } else {
+      // Cas où aucun exercice n'est disponible
+      Alert.alert(
+        'Information',
+        'Aucun exercice n\'est disponible pour ce cours.',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => router.back()
+          }
+        ]
+      );
+    }
+  }, [exerciseIds, courseId, router]);
   
   // Fonction pour soumettre le paiement
   const handleSubmitPayment = useCallback(async () => {
@@ -266,6 +306,13 @@ const PaymentFormScreen = () => {
         body: `courseId=${courseId}&userId=${userId}`,
       });
       
+      // Si l'utilisateur a déjà acheté le cours (code 400)
+      if (response.status === 400) {
+        setAlreadyPurchased(true);
+        setShowSuccessModal(true);
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
@@ -280,42 +327,9 @@ const PaymentFormScreen = () => {
       // Simuler un délai de traitement
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Si tout se passe bien, afficher un message de succès
-      Alert.alert(
-        'Paiement réussi',
-        'Votre cours a été débloqué avec succès!',
-        [
-          { 
-            text: 'Commencer le cours', 
-            onPress: () => {
-              // Vérifier qu'il y a au moins un exercice disponible
-              if (exerciseIds && exerciseIds.length > 0) {
-                // Rediriger vers la page du cours avec l'exercice débloqué
-                router.push({
-                  pathname: '/courc',
-                  params: { 
-                    courseId: courseId,
-                    exerciseId: exerciseIds[0],            // ID du premier exercice
-                    allExerciseIds: exerciseIds.join(',')  // Tous les IDs pour navigation
-                  }
-                });
-              } else {
-                // Cas où aucun exercice n'est disponible
-                Alert.alert(
-                  'Information',
-                  'Aucun exercice n\'est disponible pour ce cours.',
-                  [
-                    { 
-                      text: 'OK', 
-                      onPress: () => router.back()
-                    }
-                  ]
-                );
-              }
-            }
-          }
-        ]
-      );
+      // Afficher le modal de succès
+      setAlreadyPurchased(false);
+      setShowSuccessModal(true);
       
     } catch (error) {
       console.error('Erreur de paiement:', error);
@@ -433,7 +447,15 @@ const PaymentFormScreen = () => {
               </View>
             </View>
             
-            {/* Bouton de continuation - MODIFIÉ: position ajustée */}
+            {/* Information sur les cartes de test */}
+            <View style={styles.testCardsInfo}>
+              <Text style={styles.testCardsTitle}>Cartes de test acceptées:</Text>
+              {VALID_CARD_NUMBERS.map((card, index) => (
+                <Text key={index} style={styles.testCardNumber}>{card}</Text>
+              ))}
+            </View>
+            
+            {/* Bouton de continuation */}
             <TouchableOpacity
               style={styles.continueButton}
               onPress={handleContinue}
@@ -449,7 +471,7 @@ const PaymentFormScreen = () => {
             <View style={styles.confirmationContainer}>
               {/* Icône de succès */}
               <View style={styles.confirmationIconContainer}>
-                <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+                <Ionicons name="checkmark-circle" size={60} color="black" />
               </View>
               
               <Text style={styles.confirmationTitle}>Confirmer votre achat</Text>
@@ -472,7 +494,7 @@ const PaymentFormScreen = () => {
                 <View style={styles.confirmationItem}>
                   <Text style={styles.confirmationLabel}>Méthode de paiement</Text>
                   <View style={styles.confirmationCardInfo}>
-                    <Ionicons name="card" size={18} color="#4CAF50" />
+                    <Ionicons name="card" size={18} color="black" />
                     <Text style={styles.confirmationValue}>
                       •••• •••• •••• {cardNumber.slice(-4)}
                     </Text>
@@ -501,7 +523,7 @@ const PaymentFormScreen = () => {
                 ) : (
                   <>
                     <Text style={styles.payButtonText}>Payer {formattedPrice}</Text>
-                    <Ionicons name="lock-closed" size={18} color="#fff" />
+                    <Ionicons name="lock-closed" size={18} color="black" />
                   </>
                 )}
               </TouchableOpacity>
@@ -509,6 +531,66 @@ const PaymentFormScreen = () => {
           </>
         )}
       </Animated.ScrollView>
+      
+      {/* Modal de succès ou déjà acheté */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.successModalHeader}>
+              <View style={styles.successIconContainer}>
+                {alreadyPurchased ? (
+                  <Ionicons name="information-circle" size={60} color="#CBFF06" />
+                ) : (
+                  <Ionicons name="checkmark-circle" size={60} color="#CBFF06" />
+                )}
+              </View>
+              
+              <Text style={styles.successModalTitle}>
+                {alreadyPurchased 
+                  ? "Vous avez déjà acheté ce cours"
+                  : "Félicitations!"
+                }
+              </Text>
+              
+              <Text style={styles.successModalSubtitle}>
+                {alreadyPurchased
+                  ? "Ce cours est déjà disponible dans votre compte"
+                  : "Votre paiement a été traité avec succès"
+                }
+              </Text>
+            </View>
+            
+            <View style={styles.successModalContent}>
+              <View style={styles.courseBadge}>
+                <Ionicons name="fitness" size={24} color="#fff" />
+                <Text style={styles.courseBadgeText}>{courseTitle}</Text>
+              </View>
+              
+              <Text style={styles.successDescription}>
+                {alreadyPurchased
+                  ? "Vous pouvez accéder immédiatement à ce cours et à tout son contenu. Aucun paiement supplémentaire n'est nécessaire."
+                  : "Votre cours a été débloqué avec succès. Vous pouvez maintenant accéder à tout le contenu du cours."
+                }
+              </Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.startCourseButton}
+              onPress={handleStartCourse}
+            >
+              <Text style={styles.startCourseButtonText}>
+                Commencer le cours
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="black" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -560,7 +642,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   stepActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'black',
   },
   content: {
     flex: 1,
@@ -598,7 +680,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   courseSummaryPrice: {
-    color: '#4CAF50',
+    color: 'black',
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -674,7 +756,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   formContainer: {
-    marginBottom: 10, // Réduit la marge inférieure du formulaire
+    marginBottom: 10,
   },
   formGroup: {
     marginBottom: 15,
@@ -703,11 +785,32 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   inputFocused: {
-    borderColor: '#4CAF50',
+    borderColor: 'black',
     backgroundColor: '#fff',
   },
   inputDisabled: {
     opacity: 0.6,
+  },
+  testCardsInfo: {
+    marginTop: 10,
+    padding: 15,
+    backgroundColor: '#f0f7ff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#c5dbff',
+    marginBottom: 20,
+  },
+  testCardsTitle: {
+    color: '#0056b3',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  testCardNumber: {
+    color: '#0056b3',
+    fontSize: 13,
+    marginBottom: 4,
+    fontFamily: 'monospace',
   },
   continueButton: {
     backgroundColor: '#CBFF06',
@@ -716,8 +819,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 0, // Réduit la marge supérieure pour placer le bouton plus haut
-    marginBottom: 30, // Ajoute une marge inférieure
+    marginTop: 0,
+    marginBottom: 30,
   },
   continueButtonText: {
     color: 'black',
@@ -761,7 +864,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   confirmationValueHighlight: {
-    color: '#4CAF50',
+    color: 'black',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -780,11 +883,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   termsLink: {
-    color: '#4CAF50',
+    color: 'black',
     textDecorationLine: 'underline',
   },
   payButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#CBFF06',
     borderRadius: 30,
     paddingVertical: 16,
     paddingHorizontal: 30,
@@ -794,11 +897,96 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   payButtonText: {
-    color: '#fff',
+    color: 'black',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  
+  // Styles pour le modal de succès
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  successModal: {
+    width: '90%',
+    backgroundColor: '#222',
+    borderRadius: 15,
+    padding: 20,
+    position: 'relative',
+  },
+  successModalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  successIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(203, 255, 6, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  successModalTitle: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  successModalSubtitle: {
+    color: '#CBFF06',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  successModalContent: {
+    marginBottom: 25,
+  },
+  courseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  courseBadgeText: {
+    color: 'white',
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  successDescription: {
+    color: '#ccc',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 10,
+  },
+  startCourseButton: {
+    backgroundColor: '#CBFF06',
+    borderRadius: 30,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startCourseButtonText: {
+    color: 'black',
     fontSize: 16,
     fontWeight: 'bold',
     marginRight: 8,
   },
 });
 
-export default PaymentFormScreen;
+  export default PaymentFormScreen;

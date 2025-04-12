@@ -58,6 +58,135 @@ const FitnessApp = () => {
   const [userPhoto, setUserPhoto] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
+
+  ////////////notif 
+  // Ajouter ces états au début de votre composant FitnessApp
+const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+const [notifications, setNotifications] = useState([]);
+const [notificationsLoading, setNotificationsLoading] = useState(false);
+const [unreadCount, setUnreadCount] = useState(0);
+
+
+// Ajouter cette fonction dans votre composant FitnessApp
+// Fonction modifiée pour récupérer les notifications sans erreur
+
+const markNotificationAsRead = async (notificationId) => {
+  try {
+    const response = await fetch(
+      `http://192.168.0.3:8082/api/notifications/${notificationId}/lue?userId=${userId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    // Mise à jour directe de l'état local sans tenter de lire la réponse
+    setNotifications(notifications.map(notif => 
+      notif.id === notificationId ? {...notif, lue: true} : notif
+    ));
+    
+    // Mettre à jour le compteur de notifications non lues
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  } catch (error) {
+    console.error('Erreur lors du marquage de la notification:', error);
+    Alert.alert('Erreur', 'Impossible de marquer la notification comme lue');
+  }
+};
+
+// Cette fonction crée un objet notification simplifié sans référence circulaire
+const parseNotificationsSafely = (responseText) => {
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    console.error('Erreur de parsing JSON:', e);
+    return [];
+  }
+};
+
+// Modifiez la fonction fetchNotifications pour gérer le cas où l'utilisateur n'existe pas
+const fetchNotifications = async () => {
+  if (!userId) {
+    console.warn('ID utilisateur manquant pour récupérer les notifications');
+    return;
+  }
+  
+  setNotificationsLoading(true);
+  try {
+    console.log('Récupération des notifications pour userId:', userId);
+    
+    // Tenter de récupérer les notifications
+    let response;
+    try {
+      response = await fetch(`http://192.168.0.3:8082/api/notifications?userId=${userId}`);
+    } catch (fetchError) {
+      console.error('Erreur de réseau:', fetchError);
+      throw new Error('Problème de connexion au serveur');
+    }
+    
+    // Si le serveur répond avec 404 (utilisateur non trouvé), on considère simplement qu'il n'y a pas de notifications
+    if (response.status === 404) {
+      console.log('Aucune notification trouvée pour cet utilisateur');
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Réponse erreur HTTP:', errorText);
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    // Récupérer la réponse en texte
+    const responseText = await response.text();
+    
+    // Analyser la réponse et définir les notifications
+    const parsedNotifications = parseNotificationsSafely(responseText);
+    console.log('Notifications extraites:', parsedNotifications.length);
+    
+    setNotifications(parsedNotifications);
+    setUnreadCount(parsedNotifications.filter(n => !n.lue).length);
+    
+  } catch (error) {
+    // Au lieu d'afficher l'erreur, on considère simplement qu'il n'y a pas de notifications
+    console.log('Aucune notification disponible ou erreur:', error.message);
+    setNotifications([]);
+    setUnreadCount(0);
+  } finally {
+    setNotificationsLoading(false);
+  }
+};
+const markAllNotificationsAsRead = async () => {
+  try {
+    const response = await fetch(
+      `http://192.168.0.3:8082/api/notifications/lire-toutes?userId=${userId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    // Mettre à jour l'état local en marquant toutes les notifications comme lues
+    setNotifications(notifications.map(notif => ({...notif, lue: true})));
+    setUnreadCount(0);
+  } catch (error) {
+    console.error('Erreur lors du marquage des notifications:', error);
+    Alert.alert('Erreur', 'Impossible de marquer toutes les notifications comme lues');
+  }
+};
+
   // Fonction pour récupérer les événements
   const fetchEvents = async () => {
     try {
@@ -419,9 +548,26 @@ try {
                 <Text style={styles.subHeaderText}>Que cherchez-vous?</Text>
               </View>
             </View>
-            <TouchableOpacity>
-              <Ionicons name="notifications-outline" size={24} color="white" />
-            </TouchableOpacity>
+            <TouchableOpacity 
+  style={styles.notificationButton}
+  onPress={() => {
+    if (!notificationsModalVisible) {
+      fetchNotifications();
+    }
+    setNotificationsModalVisible(!notificationsModalVisible);
+  }}
+>
+  <View style={styles.notificationIconContainer}>
+    <Ionicons name="notifications-outline" size={24} color="white" />
+    {unreadCount > 0 && (
+      <View style={styles.notificationBadge}>
+        <Text style={styles.notificationBadgeText}>
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </Text>
+      </View>
+    )}
+  </View>
+</TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
@@ -809,6 +955,98 @@ try {
       </ScrollView>
 
       {/* Navigation */}
+      {/* Modal des notifications */}
+{/* Modal des notifications style Facebook */}
+      {/* Modal de notifications à côté de l'icône */}
+{/* Overlay pour fermer le popup en cliquant n'importe où */}
+{notificationsModalVisible && (
+  <TouchableOpacity 
+    style={styles.popupOverlay}
+    activeOpacity={1}
+    onPress={() => setNotificationsModalVisible(false)}
+  >
+    <View 
+      style={styles.popupNotificationContainer}
+      onStartShouldSetResponder={() => true}
+      onTouchEnd={(e) => e.stopPropagation()}
+    >
+      <View style={styles.notificationArrow} />
+      <View style={styles.notificationPopupHeader}>
+        <Text style={styles.notificationPopupTitle}>Notifications</Text>
+        <View style={styles.headerActions}>
+          {notifications.some(notif => !notif.lue) && (
+            <TouchableOpacity 
+              style={styles.markAllReadButton}
+              onPress={markAllNotificationsAsRead}
+            >
+              <Text style={styles.markAllReadText}>Tout marquer comme lu</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            onPress={() => setNotificationsModalVisible(false)}
+            style={styles.closeButton}
+          >
+            <Ionicons name="close" size={18} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      {notificationsLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#CCFF00" style={{margin: 10}} />
+        </View>
+      ) : notifications.length > 0 ? (
+        <ScrollView style={styles.notificationsList}>
+          {notifications.map((notification) => (
+            <TouchableOpacity
+              key={notification.id}
+              style={[
+                styles.notificationItem,
+                !notification.lue && styles.unreadItem
+              ]}
+              onPress={() => markNotificationAsRead(notification.id)}
+            >
+              <View style={styles.notificationIcon}>
+                {notification.type === 'NOUVELLE_OFFRE' ? (
+                  <Ionicons name="pricetag" size={22} color="#CCFF00" />
+                ) : notification.type === 'NOUVEL_EVENEMENT' ? (
+                  <Ionicons name="calendar" size={22} color="#CCFF00" />
+                ) : (
+                  <Ionicons name="notifications" size={22} color="#CCFF00" />
+                )}
+                {!notification.lue && (
+                  <View style={styles.unreadDot} />
+                )}
+              </View>
+              
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationTitle} numberOfLines={1}>
+                  {notification.titre}
+                </Text>
+                <Text style={styles.notificationMessage} numberOfLines={3}>
+                  {notification.message}
+                </Text>
+                <Text style={styles.notificationTime}>
+                  {new Date(notification.dateCreation).toLocaleString('fr-FR', {
+                    day: '2-digit', 
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="notifications-off-outline" size={40} color="#ddd" />
+          <Text style={styles.emptyText}>Aucune notification</Text>
+        </View>
+      )}
+    </View>
+  </TouchableOpacity>
+)}
       
     </SafeAreaView>
   );
@@ -1255,7 +1493,151 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
     textAlign: 'center',
-  }
+  }, //////// notif 
+  // Styles pour les notifications
+// Styles pour notifications style Facebook
+// Styles pour le popup de notifications
+// Styles pour le modal de notifications moderne
+popupOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'flex-start',
+  alignItems: 'center',
+  zIndex: 100,
+},
+popupNotificationContainer: {
+  position: 'absolute',
+  right: 10,
+  top: 65,
+  width: '90%', // Augmenter la largeur à 90% de l'écran
+  maxHeight: 550, // Augmenter la hauteur maximale
+  backgroundColor: 'white',
+  borderRadius: 12,
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 4,
+  },
+  shadowOpacity: 0.25,
+  shadowRadius: 8,
+  elevation: 10,
+  overflow: 'hidden',
+},
+notificationArrow: {
+  position: 'absolute',
+  right: 15,
+  top: -8,
+  width: 0,
+  height: 0,
+  backgroundColor: 'transparent',
+  borderStyle: 'solid',
+  borderLeftWidth: 8,
+  borderRightWidth: 8,
+  borderBottomWidth: 8,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderBottomColor: 'white',
+},
+notificationPopupHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: 15,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+notificationPopupTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#333',
+},
+headerActions: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+markAllReadButton: {
+  marginRight: 15,
+  paddingVertical: 5,
+},
+markAllReadText: {
+  color: '#CCFF00',
+  fontWeight: '600',
+  fontSize: 13,
+},
+closeButton: {
+  padding: 5,
+},
+loadingContainer: {
+  paddingVertical: 20,
+  alignItems: 'center',
+},
+notificationsList: {
+  maxHeight: 450, // Augmenter la hauteur maximale de la liste
+},
+notificationItem: {
+  flexDirection: 'row',
+  padding: 18, // Augmenter le padding
+  borderBottomWidth: 1,
+  borderBottomColor: '#f5f5f5',
+  backgroundColor: 'white',
+},
+unreadItem: {
+  backgroundColor: 'rgba(204, 255, 0, 0.08)',
+},
+notificationIcon: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: '#f9f9f9',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 12,
+  position: 'relative',
+},
+unreadDot: {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: '#CCFF00',
+  borderWidth: 1,
+  borderColor: 'white',
+},
+notificationContent: {
+  flex: 1,
+},
+notificationTitle: {
+  fontSize: 15,
+  fontWeight: 'bold',
+  color: '#333',
+  marginBottom: 4,
+},
+notificationMessage: {
+  fontSize: 14,
+  color: '#666',
+  lineHeight: 18,
+  marginBottom: 4,
+},
+notificationTime: {
+  fontSize: 12,
+  color: '#999',
+},
+emptyContainer: {
+  padding: 30,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+emptyText: {
+  marginTop: 10,
+  color: '#999',
+  fontSize: 15,
+},
 
 
 });

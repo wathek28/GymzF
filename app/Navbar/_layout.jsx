@@ -8,7 +8,7 @@ import {
   Dimensions
 } from "react-native";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get('window');
@@ -23,11 +23,29 @@ export default function _layout() {
     userEmail: ''
   });
   
-  // Suivre l'onglet actif
-  const [activeTab, setActiveTab] = useState('home');
+  // Récupérer le chemin actuel pour définir l'onglet actif
+  const currentPath = usePathname();
+  
+  // Mettre à jour l'onglet actif en fonction du chemin de navigation
+  const getActiveTabFromPath = (path) => {
+    if (path.includes('/home')) return 'home';
+    if (path.includes('/activitea')) return 'heart';
+    if (path.includes('/Reels')) return 'reels';
+    if (path.includes('/Gym')) return 'user';
+    return 'home'; // Par défaut
+  };
+  
+  // État pour l'onglet actif
+  const [activeTab, setActiveTab] = useState(() => getActiveTabFromPath(currentPath));
   
   // Animation pour l'indicateur coulissant
   const slideAnimation = useRef(new Animated.Value(0)).current;
+
+  // Mettre à jour l'onglet actif lorsque le chemin change
+  useEffect(() => {
+    const newActiveTab = getActiveTabFromPath(currentPath);
+    setActiveTab(newActiveTab);
+  }, [currentPath]);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -56,13 +74,15 @@ export default function _layout() {
   // Effet pour animer le changement d'onglet
   useEffect(() => {
     const indexMap = { home: 0, heart: 1, reels: 2, user: 3 };
-    const tabIndex = indexMap[activeTab];
+    const tabIndex = indexMap[activeTab] || 0;
     
     Animated.timing(slideAnimation, {
       toValue: tabIndex * TAB_WIDTH,
       duration: 300,
       useNativeDriver: true
     }).start();
+    
+    console.log('Animation mise à jour pour l\'onglet:', activeTab, 'à l\'index:', tabIndex);
   }, [activeTab]);
 
   // Éléments de la barre de navigation
@@ -72,24 +92,28 @@ export default function _layout() {
       icon: "home",
       name: "Accueil",
       Component: MaterialCommunityIcons,
+      route: "/home"
     },
     {
       id: "heart",
       icon: "heart",
-      name: "Mes envies",
+      name: "Mes Activités",
       Component: Feather,
+      route: "/(envie)/activitea"
     },
     {
       id: "reels",
       icon: "play-circle",
       name: "Reels",
       Component: Feather,
+      route: "/(Reels)/Reels"
     },
     {
       id: "user",
       icon: "user",
       name: "Profil",
       Component: Feather,
+      route: "/(Gymzer)/Gym"
     },
   ];
 
@@ -127,30 +151,14 @@ export default function _layout() {
           ]}
         />
         
-        {navItems.map((item, index) => {
+        {navItems.map((item) => {
           const isActive = activeTab === item.id;
           
           return (
             <TouchableOpacity
-              key={`nav-${item.id}-${index}`}
+              key={`nav-${item.id}`}
               style={styles.navItem}
-              onPress={() => {
-                switch (item.id) {
-                  case 'home':
-                    navigateWithUserData("/home", 'home');
-                    break;
-                  case 'user':
-                    navigateWithUserData("/(Gymzer)/Gym", 'user');
-                    break;
-                  case 'heart':
-                    navigateWithUserData("favorites", 'heart');
-                    break;
-                  case 'reels':
-                    console.log("Navigation vers Reels");
-                    navigateWithUserData("/(Reels)/Reels", 'reels'); 
-                    break;
-                }
-              }}
+              onPress={() => navigateWithUserData(item.route, item.id)}
             >
               <item.Component 
                 name={item.icon} 

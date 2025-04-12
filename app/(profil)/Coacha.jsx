@@ -354,7 +354,7 @@ const CoachSearchScreen = () => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          Coachs {userId ? `(ID: ${userId})` : ''}
+          Coachs 
         </Text>
       </View>
 

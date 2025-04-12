@@ -131,7 +131,7 @@ export default function ReelsLayout() {
                       navigateWithUserData("/(Gymzer)/Gym", 'user');
                       break;
                     case 'heart':
-                      navigateWithUserData("favorites", 'heart');
+                      navigateWithUserData("(envie)/activitea", 'heart');
                       break;
                     case 'reels':
                       navigateWithUserData("/(Reels)/Reels", 'reels'); 

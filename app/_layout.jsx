@@ -27,6 +27,8 @@ export default function RootLayout() {
       <Stack.Screen name="(Salle)" />
       <Stack.Screen name="(Reels)" />
       <Stack.Screen name="(cour)" />
+      <Stack.Screen name="(envie)"/>
+      
       
       {/* Screen d'index qui redirige vers login */}
       <Stack.Screen name="index" options={{ headerShown: false }} />

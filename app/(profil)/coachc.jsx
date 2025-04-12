@@ -61,6 +61,13 @@ const useGalleryImages = (id, selectedTab) => {
         },
       });
 
+      // Traiter spécifiquement les erreurs 404 sans lever d'exception
+      if (response.status === 404) {
+        console.log(`Aucune image trouvée pour le coach ${coachId}`);
+        setGalleryImages([]);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
@@ -69,7 +76,9 @@ const useGalleryImages = (id, selectedTab) => {
       
       // Traitement des photos reçues
       if (!Array.isArray(photos) || photos.length === 0) {
-        throw new Error('Aucune image trouvée dans la réponse');
+        // Ne pas lever d'erreur, juste définir un tableau vide
+        setGalleryImages([]);
+        return;
       }
 
       // Création des URI pour chaque photo
@@ -82,14 +91,15 @@ const useGalleryImages = (id, selectedTab) => {
 
       setGalleryImages(processedImages);
     } catch (err) {
-      console.error('Erreur lors du chargement des images:', err);
-      setError(err.message || "Impossible de charger les images.");
+      console.log(`Erreur lors du chargement des images pour le coach ${coachId}:`, err);
+      // Ne pas définir d'erreur, juste laisser un tableau vide
+      setGalleryImages([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  return { galleryImages, isLoading, error };
+  return { galleryImages, isLoading, error: null }; // Toujours renvoyer null pour error
 };
 
 //
@@ -1103,15 +1113,7 @@ const renderGalleryContent = () => {
     );
   }
   
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.noImagesText}>Aucune photo disponible</Text>
-      </View>
-    );
-  }
-  
-  if (!galleryImages || galleryImages.length === 0) {
+  if (error || !galleryImages || galleryImages.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <MaterialIcons name="photo-library" size={50} color="#CCCCCC" />
@@ -1137,6 +1139,10 @@ const renderGalleryContent = () => {
             source={{ uri: image.uri }} 
             style={styles.galleryImage1}
             resizeMode="cover"
+            onError={(e) => {
+              console.log(`Error loading image: ${image.uri}`, e.nativeEvent.error);
+              // Silently fails and uses default error handling in gallery
+            }}
           />
         </TouchableOpacity>
       ))}

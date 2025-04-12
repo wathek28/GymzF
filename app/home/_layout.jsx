@@ -76,7 +76,7 @@ export default function RootLayout() {
     {
       id: "heart",
       icon: "heart",
-      name: "Mes envies",
+      name: "Mes Activités",
       Component: Feather,
     },
     {
@@ -147,7 +147,7 @@ export default function RootLayout() {
                     navigateWithUserData("/(Gymzer)/Gym", 'user');
                     break;
                   case 'heart':
-                    navigateWithUserData("favorites", 'heart');
+                    navigateWithUserData("/(envie)/activitea", 'heart');
                     break;
                   case 'reels':
                     navigateWithUserData("/(Reels)/Reels", 'reels'); 

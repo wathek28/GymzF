@@ -47,16 +47,8 @@ const formatExerciseInfo = (exercise) => {
   return '';
 };
 
-// Fonction pour formater le prix
-const formatPrice = (price) => {
-  if (!price || parseFloat(price) === 0 || price === '0.00') {
-    return 'GRATUIT';
-  }
-  return `${parseFloat(price).toFixed(0)} DT`;
-};
-
-// Composant d'exercice extrait pour éviter les re-rendus inutiles
-// Composant d'exercice mis à jour avec l'image a.png
+// Composant d'exercice avec layout horizontal: image → position → répétitions
+// Composant d'exercice avec layout horizontal: image → nom → répétitions
 const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
   // Déterminer si nous affichons des répétitions ou une durée
   const hasRepetitions = exercise.repetitions ? true : false;
@@ -69,23 +61,26 @@ const ExerciseItem = React.memo(({ exercise, isLast, onPress }) => {
       ]}
       onPress={() => onPress(exercise)}
     >
-      <View style={styles.exerciseLeft}>
-        {/* Image a.png avec bordure */}
+      <View style={styles.exerciseRowContainer}>
+        {/* Image a.png au début */}
         <Image 
           source={require('../../assets/images/q.jpg')} 
           style={styles.positionIcon}
         />
+        
+        {/* Nom de l'exercice au milieu */}
         <Text style={styles.exerciseName}>{exercise.name}</Text>
-      </View>
-      
-      <View style={styles.exerciseRight}>
+        
+        {/* Répétitions ou durée à droite */}
         <Text style={[
           styles.exerciseDuration,
           hasRepetitions ? styles.exerciseRepetitions : null
         ]}>
           {exercise.duration}
         </Text>
-        <Ionicons name="chevron-forward" size={18} color="#888" />
+        
+        {/* Icône chevron tout à droite */}
+        <Ionicons name="chevron-forward" size={18} color="#888" style={styles.chevronIcon} />
       </View>
     </TouchableOpacity>
   );
@@ -103,15 +98,6 @@ const ExerciseDetailScreen = () => {
   const params = useLocalSearchParams();
   const id = params.id;
   
-  // Récupérer le prix et le statut gratuit/payant depuis les paramètres
-  const price = params.price;
-  const isFree = params.isFree === 'true'; // Convertir la string en boolean
-  
-  // Formater le prix pour l'affichage
-  const formattedPrice = useMemo(() => {
-    return formatPrice(price);
-  }, [price]);
-
   // Construction de l'URL de la miniature du cours
   const courseThumbnailUrl = useMemo(() => {
     if (!id) return null;
@@ -236,66 +222,24 @@ const ExerciseDetailScreen = () => {
       detailMessage
     );
   }, []);
-
-  // État pour afficher/masquer la popup de paiement
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   
-  // Gestion du clic sur le bouton de déblocage
-  const handleUnlockPress = useCallback(() => {
-    setShowPaymentModal(true);
-  }, []);
-  
-  // Gestion de la fermeture de la popup de paiement
-  const handleClosePaymentModal = useCallback(() => {
-    setShowPaymentModal(false);
-  }, []);
-  
-  // Gestion du paiement
- // Modification de la fonction handlePayment dans ExerciseDetailScreen.js
- const handlePayment = useCallback(() => {
-  // Fermer la modal de paiement
-  setShowPaymentModal(false);
-  
-  // Extraire tous les IDs des exercices
-  const exerciseIds = exercises.map(exercise => exercise.id).join(',');
-  
-  // Naviguer vers le formulaire de paiement avec les paramètres nécessaires
-  router.push({
-    pathname: '/(cour)/PaymentForm',
-    params: { 
-      courseId: id,
-      price: price,
-      courseTitle: courseData.title,
-      exerciseIds: exerciseIds // Ajout des ids des exercices comme paramètre
-    }
-  });
-}, [id, price, courseData, exercises, router]);
-  
-  // Gestion du clic sur le support
-  const handleSupportPress = useCallback(() => {
-    // Ouvrir un lien vers le support ou afficher des coordonnées
-    Alert.alert(
-      "Support Client",
-      "Pour toute question ou assistance, notre équipe de support est disponible par email à support@exemple.com ou par téléphone au +1234567890."
-    );
-  }, []);
-  
-  // Gestion du clic sur le bouton de démarrage - mémorisée pour éviter les re-créations
+  // Gestion du clic sur le bouton de démarrage
   const handleStartPress = useCallback(() => {
-    // Si le cours est gratuit ou déjà débloqué
+    // Si le cours a des exercices
     if (exercises.length > 0) {
       // Extraire tous les IDs des exercices
       const exerciseIds = exercises.map(exercise => exercise.id);
       
-      // Pour optimiser, préchargez les données du premier exercice avant la navigation
-      // Cette partie est conceptuelle et dépend de votre architecture d'application
+      console.log(`Navigation vers activitec avec l'exercice ${exerciseIds[0]} et tous les exercices: ${exerciseIds.join(',')}`);
       
-      // Passer les IDs des exercices en paramètre à la page courc
+      // Passer les IDs des exercices en paramètre à la page activitec
       router.push({
-        pathname: '/courc',
+        pathname: '/activited',
         params: { 
           exerciseId: exerciseIds[0],            // ID du premier exercice
-          allExerciseIds: exerciseIds.join(',')  // Tous les IDs pour navigation
+          allExerciseIds: exerciseIds.join(','),  // Tous les IDs pour navigation
+          courseId: id,                          // ID du cours pour référence
+          courseTitle: courseData.title || "Cours",  // Titre du cours pour l'affichage
         }
       });
     } else {
@@ -304,7 +248,7 @@ const ExerciseDetailScreen = () => {
         "Ce cours ne contient pas d'exercices disponibles."
       );
     }
-  }, [exercises, router]);
+  }, [exercises, router, id, courseData]);
 
   // Calcul du niveau mémorisé pour éviter les calculs répétés
   const levelText = useMemo(() => {
@@ -380,25 +324,11 @@ const ExerciseDetailScreen = () => {
         <View style={styles.idBadge}>
           <Text style={styles.idText}>Cours #{id}</Text>
         </View>
-        
-        {/* Price Badge */}
-        <View style={[
-          styles.priceBadge,
-          isFree ? styles.freePriceBadge : styles.proPriceBadge
-        ]}>
-          <Text style={[
-            styles.priceText,
-            isFree ? styles.freeText : styles.proText
-          ]}>
-            {formattedPrice}
-          </Text>
-        </View>
       </View>
       
       {/* Content - optimisé pour ne pas recréer les fonctions de rendu */}
       <ScrollView 
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
         removeClippedSubviews={true} // Optimisation pour grandes listes
         initialNumToRender={5} // Réduire le nombre initial d'éléments rendus
       >
@@ -428,7 +358,7 @@ const ExerciseDetailScreen = () => {
               <Text style={styles.sectionSubtitle}>Suivez l'ordre recommandé pour de meilleurs résultats</Text>
             </View>
             
-            {/* Exercises List - utilisation du composant mémorisé */}
+            {/* Exercises List - utilisation du composant modifié avec l'image */}
             <View style={styles.exercisesList}>
               {exercises.map((exercise, index) => (
                 <ExerciseItem
@@ -442,76 +372,13 @@ const ExerciseDetailScreen = () => {
           </>
         )}
         
-        {/* Conditional Button: "Commencer" for free courses, "Débloquer" for paid courses */}
-        {isFree ? (
-          <TouchableOpacity 
-            style={styles.startButton} 
-            onPress={handleStartPress}
-          >
-            <Text style={styles.startButtonText}>Commencer</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={styles.unlockButton} 
-            onPress={handleUnlockPress}
-          >
-            <Text style={styles.unlockButtonText}>Débloquer</Text>
-          </TouchableOpacity>
-        )}
-        
-        {/* Modal de paiement */}
-        {showPaymentModal && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.paymentModal}>
-              <View style={styles.paymentModalHeader}>
-                <View style={styles.playIconContainer}>
-                  <Ionicons name="play" size={24} color="#CBFF06" />
-                </View>
-                <Text style={styles.paymentModalTitle}>
-                  Débloquez immédiatement ce cours pour {formattedPrice}
-                </Text>
-              </View>
-              
-              <View style={styles.paymentBenefits}>
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
-                  <Text style={styles.benefitText}>Accès immédiat et illimité au contenu</Text>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
-                  <Text style={styles.benefitText}>Exercices détaillés et vidéos incluses</Text>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={18} color="#CBFF06" />
-                  <Text style={styles.benefitText}>Aucun abonnement, un seul paiement</Text>
-                </View>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.paymentButton}
-                onPress={handlePayment}
-              >
-                <Text style={styles.paymentButtonText}>Passer à la caisse</Text>
-              </TouchableOpacity>
-              
-              <View style={styles.supportContainer}>
-                <Text style={styles.supportText}>Besoin d'aide ? Contactez </Text>
-                <TouchableOpacity onPress={handleSupportPress}>
-                  <Text style={styles.supportLink}>notre support</Text>
-                </TouchableOpacity>
-                <Text style={styles.supportText}>.</Text>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={handleClosePaymentModal}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Bouton "Commencer" pour tous les cours */}
+        <TouchableOpacity 
+          style={styles.startButton} 
+          onPress={handleStartPress}
+        >
+          <Text style={styles.startButtonText}>Commencer</Text>
+        </TouchableOpacity>
         
         {/* Bottom space */}
         <View style={styles.bottomSpace} />
@@ -586,30 +453,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 12,
   },
-  priceBadge: {
-    position: 'absolute',
-    top: 55,
-    right: 15,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  freePriceBadge: {
-    backgroundColor: '#32CD32',
-  },
-  proPriceBadge: {
-    backgroundColor: '#FF9900',
-  },
-  priceText: {
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  freeText: {
-    color: 'white',
-  },
-  proText: {
-    color: 'white',
-  },
   content: {
     flex: 1,
     backgroundColor: '#fff',
@@ -675,42 +518,73 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     marginBottom: 20,
   },
+ 
+  // Nouveau conteneur pour la rangée horizontale
+ 
+  // Style pour l'icône de position
   exerciseItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  exerciseLeft: {
+  
+  // Conteneur pour la rangée horizontale
+  exerciseRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  exerciseIcon: {
-    width: 40,
-    height: 40,
-    marginRight: 15,
-    borderRadius: 5,
+  
+  // Style pour l'icône de position
+  positionIcon: {
+    width: 60,
+    height: 60,
+    marginRight: 10,
+    resizeMode: 'contain',
+    borderRadius: 8, // En React Native, on utilise un nombre et non une chaîne avec 'px'
+     // Ajoute la bordure (épaisseur 1)
+    
   },
+  
+  // Style pour le nom de l'exercice (maintenant au milieu)
   exerciseName: {
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
+    flex: 1, // Prend l'espace disponible
   },
-  exerciseRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  
+  // Style pour la durée/répétitions
   exerciseDuration: {
     fontSize: 14,
     color: '#888',
     marginRight: 8,
+    marginLeft: 8,
   },
-  // Nouveau style pour mettre en évidence les répétitions
+  
+  // Style spécifique pour les répétitions
   exerciseRepetitions: {
     color: '#555',
     fontWeight: '500',
   },
+  
+  // Style pour l'icône chevron
+  chevronIcon: {
+    marginLeft: 2,
+  },
+  // Style pour le texte de position
+  exercisePosition: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 'auto', // Pousse les éléments suivants vers la droite
+  },
+  // Style pour le nom de l'exercice (maintenant en dessous)
+
+  // Style pour la durée/répétitions
+ 
+  // Style spécifique pour les répétitions
+ 
+  // Style pour l'icône chevron
+ 
   startButton: {
     backgroundColor: '#CBFF06',
     borderRadius: 30,
@@ -718,124 +592,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     alignItems: 'center',
     marginBottom: 20,
-    
   },
   startButtonText: {
     color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  unlockButton: {
-    backgroundColor: '#CBFF06',
-    borderRadius: 30,
-    paddingVertical: 15,
-    marginHorizontal: 20,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  unlockButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  
-  // Styles pour la modal de paiement
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  paymentModal: {
-    width: '90%',
-    backgroundColor: '#222',
-    borderRadius: 15,
-    padding: 20,
-    position: 'relative',
-  },
-  paymentModalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  playIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(203, 255, 6, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  paymentModalTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
-  paymentBenefits: {
-    marginBottom: 25,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  benefitText: {
-    color: 'white',
-    marginLeft: 10,
-    fontSize: 14,
-  },
-  paymentButton: {
-    backgroundColor: '#CBFF06',
-    borderRadius: 30,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  paymentButtonText: {
-    color: '#222',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  supportContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  supportText: {
-    color: '#999',
-    fontSize: 12,
-  },
-  supportLink: {
-    color: '#CBFF06',
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'transparent',
-  },
   bottomSpace: {
     height: 20,
-  },
-  positionIcon: {
-    width: 60,
-    height: 60,
-    marginRight: 15,
-    resizeMode: 'contain',
-    borderRadius: 8,  // Coins arrondis
-   // Couleur de la bordure
-  },
-  contentContainer: {
-    paddingBottom: 80, // Ajustez cette valeur selon la hauteur de votre barre de navigation
   },
 });
 

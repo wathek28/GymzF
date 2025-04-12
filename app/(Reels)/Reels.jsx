@@ -9,10 +9,11 @@ import {
   StatusBar,
   FlatList,
   ActivityIndicator,
-  Animated
+  Animated,
+  AppState
 } from 'react-native';
 import { MaterialIcons, Ionicons, AntDesign } from '@expo/vector-icons';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useNavigation } from 'expo-router';
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -33,6 +34,7 @@ const ReelsScreen = () => {
   const [pausedVideos, setPausedVideos] = useState({});
   const [likedReels, setLikedReels] = useState({});
   const [likeCounts, setLikeCounts] = useState({});
+  const [appInBackground, setAppInBackground] = useState(false);
   
   // Animation for like effect
   const likeAnimation = useRef({});
@@ -40,10 +42,48 @@ const ReelsScreen = () => {
   // Refs for video and flatlist management
   const videoRefs = useRef({});
   const flatListRef = useRef(null);
+  const isScreenMounted = useRef(true);
   
-  // Navigation parameters
+  // Navigation parameters and hooks
   const params = useLocalSearchParams();
+  const navigation = useNavigation();
   const { userId, firstName, phoneNumber, photo } = params;
+
+  // Fonction pour arrêter toutes les vidéos
+  const stopAllVideos = async () => {
+    if (!isScreenMounted.current) return;
+    
+    console.log('Stopping all videos');
+    
+    // Pause et décharge toutes les vidéos
+    const videoPromises = Object.entries(videoRefs.current).map(async ([id, ref]) => {
+      if (ref) {
+        try {
+          // Vérifier si la vidéo est chargée avant d'essayer de la mettre en pause
+          const status = await ref.getStatusAsync().catch(() => null);
+          if (status && status.isLoaded) {
+            await ref.pauseAsync().catch(() => {});
+            // Décharger la vidéo pour libérer les ressources
+            await ref.unloadAsync().catch(() => {});
+          }
+        } catch (e) {
+          console.log(`Error stopping video ${id}:`, e);
+        }
+      }
+    });
+    
+    // Attendre que toutes les vidéos soient arrêtées
+    await Promise.all(videoPromises).catch(() => {});
+    
+    // Marquer toutes les vidéos comme en pause
+    if (isScreenMounted.current) {
+      const allPaused = {};
+      reels.forEach((_, index) => {
+        allPaused[index] = true;
+      });
+      setPausedVideos(allPaused);
+    }
+  };
 
   // Save user data to local storage
   const saveUserDataToStorage = async () => {
@@ -67,37 +107,35 @@ const ReelsScreen = () => {
       if (savedLikedReels) {
         setLikedReels(JSON.parse(savedLikedReels));
       }
+      
+      // Charger les statistiques de likes pour débug
+      const detailedLikesStr = await AsyncStorage.getItem('detailedLikes');
+      if (detailedLikesStr) {
+        const detailedLikes = JSON.parse(detailedLikesStr);
+        console.log(`Loaded ${Object.keys(detailedLikes).length} detailed likes`);
+      }
     } catch (error) {
       console.error('Error loading liked reels:', error);
     }
   };
 
-  // Save liked reels to AsyncStorage
-  const saveLikedReels = async (newLikedReels) => {
-    try {
-      await AsyncStorage.setItem('likedReels', JSON.stringify(newLikedReels));
-    } catch (error) {
-      console.error('Error saving liked reels:', error);
-    }
-  };
-
-  // Function to handle likes (frontend only)
+  // Function to handle likes
   const handleLike = async (reelId) => {
-    // Create a new copy of the current likes state
+    // Créer une copie de l'état actuel des likes
     const newLikedReels = { ...likedReels };
     const isLiked = !newLikedReels[reelId];
     
-    // Update local state
+    // Mettre à jour l'état local
     newLikedReels[reelId] = isLiked;
     setLikedReels(newLikedReels);
     
-    // Update like counter
+    // Mettre à jour le compteur de likes
     setLikeCounts(prev => ({
       ...prev,
       [reelId]: isLiked ? (prev[reelId] || 0) + 1 : Math.max(0, (prev[reelId] || 0) - 1)
     }));
     
-    // Animate heart
+    // Animer le cœur
     if (isLiked && likeAnimation.current[reelId]) {
       Animated.sequence([
         Animated.timing(likeAnimation.current[reelId], {
@@ -113,10 +151,48 @@ const ReelsScreen = () => {
       ]).start();
     }
     
-    // Save to AsyncStorage for local persistence
-    saveLikedReels(newLikedReels);
+    // Structure de données améliorée pour les likes
+    const timestamp = new Date().toISOString();
     
-    console.log(`Reel ${reelId} ${isLiked ? 'liked' : 'unliked'} locally`);
+    try {
+      // Récupérer la liste détaillée des likes
+      const detailedLikesStr = await AsyncStorage.getItem('detailedLikes');
+      let detailedLikes = detailedLikesStr ? JSON.parse(detailedLikesStr) : {};
+      
+      // Mettre à jour avec plus d'informations
+      detailedLikes[reelId] = {
+        status: isLiked,
+        timestamp,
+        reelId
+      };
+      
+      // Enregistrer les deux formats (simple et détaillé)
+      await AsyncStorage.setItem('likedReels', JSON.stringify(newLikedReels));
+      await AsyncStorage.setItem('detailedLikes', JSON.stringify(detailedLikes));
+      
+      // Enregistrer l'historique des actions de like/unlike
+      const likeHistoryStr = await AsyncStorage.getItem('likeHistory');
+      const likeHistory = likeHistoryStr ? JSON.parse(likeHistoryStr) : [];
+      
+      // Ajouter à l'historique (limité à 100 entrées pour éviter de surcharger le stockage)
+      likeHistory.unshift({
+        reelId,
+        action: isLiked ? 'like' : 'unlike',
+        timestamp
+      });
+      
+      // Limiter la taille de l'historique
+      if (likeHistory.length > 100) {
+        likeHistory.length = 100;
+      }
+      
+      await AsyncStorage.setItem('likeHistory', JSON.stringify(likeHistory));
+      
+      console.log(`Reel ${reelId} ${isLiked ? 'liked' : 'unliked'} saved locally with timestamp ${timestamp}`);
+      
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des likes:', error);
+    }
   };
 
   // Double-tap for like
@@ -135,6 +211,66 @@ const ReelsScreen = () => {
     }
   };
 
+  // Gestionnaire complet d'état de l'application
+  useEffect(() => {
+    isScreenMounted.current = true;
+    
+    // Gérer les changements d'état de l'application
+    const appStateSubscription = AppState.addEventListener('change', nextAppState => {
+      console.log('App state changed to:', nextAppState);
+      
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setAppInBackground(true);
+        console.log('App going to background, stopping all videos immediately');
+        stopAllVideos();
+      } else if (nextAppState === 'active' && appInBackground) {
+        setAppInBackground(false);
+        console.log('App is active again');
+        // Ne pas redémarrer automatiquement les vidéos
+      }
+    });
+    
+    // Écouter les événements de navigation
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      console.log('Screen focused');
+      setAppInBackground(false);
+      // Ne pas redémarrer automatiquement les vidéos
+    });
+    
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      console.log('Screen lost focus, stopping all videos');
+      setAppInBackground(true);
+      stopAllVideos();
+    });
+    
+    // Écouter les événements du router expo
+    const routerFocus = router?.addListener?.('focus', () => {
+      console.log('Router focus event');
+      setAppInBackground(false);
+    });
+    
+    const routerBlur = router?.addListener?.('blur', () => {
+      console.log('Router blur event');
+      setAppInBackground(true);
+      stopAllVideos();
+    });
+    
+    return () => {
+      console.log('Cleaning up app state and navigation listeners');
+      isScreenMounted.current = false;
+      
+      appStateSubscription.remove();
+      unsubscribeFocus();
+      unsubscribeBlur();
+      
+      if (routerFocus) routerFocus();
+      if (routerBlur) routerBlur();
+      
+      // Arrêter toutes les vidéos
+      stopAllVideos();
+    };
+  }, [reels]);
+
   // Log received parameters and save to storage
   useEffect(() => {
     console.log("Parameters received in ReelsScreen:", { 
@@ -150,11 +286,16 @@ const ReelsScreen = () => {
 
   // Navigation back handler
   const handleGoBack = () => {
-    router.back();
+    // S'assurer que toutes les vidéos sont arrêtées avant de quitter l'écran
+    stopAllVideos().then(() => {
+      router.back();
+    });
   };
 
   // Toggle play/pause for videos
   const togglePlayPause = async (index) => {
+    if (appInBackground) return;
+    
     const ref = videoRefs.current[index.toString()];
     if (!ref) return;
     
@@ -270,14 +411,20 @@ const ReelsScreen = () => {
         };
       });
       
-      setReels(processedReels);
-      console.log(`${processedReels.length} reels processed successfully`);
+      if (isScreenMounted.current) {
+        setReels(processedReels);
+        console.log(`${processedReels.length} reels processed successfully`);
+      }
       
     } catch (error) {
       console.error('Error fetching reels:', error);
-      setError(error.message);
+      if (isScreenMounted.current) {
+        setError(error.message);
+      }
     } finally {
-      setIsLoading(false);
+      if (isScreenMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -287,9 +434,16 @@ const ReelsScreen = () => {
     
     // Cleanup on unmount
     return () => {
+      console.log('Component unmounting, cleaning up all resources');
+      isScreenMounted.current = false;
+      
       // Unload all videos
       Object.values(videoRefs.current).forEach(videoRef => {
-        if (videoRef) videoRef.unloadAsync().catch(() => {});
+        if (videoRef) {
+          videoRef.pauseAsync()
+            .then(() => videoRef.unloadAsync())
+            .catch(() => {});
+        }
       });
       
       // Remove temporary video files
@@ -303,17 +457,20 @@ const ReelsScreen = () => {
 
   // Manage video playback on index change
   useEffect(() => {
-    if (reels.length === 0) return;
+    if (reels.length === 0 || appInBackground) return;
     
     const playCurrentVideo = async () => {
       // Pause all videos
       for (const [id, ref] of Object.entries(videoRefs.current)) {
         if (ref && id !== currentIndex.toString()) {
           try {
-            await ref.pauseAsync();
-            // Unload distant videos to save memory
-            if (Math.abs(parseInt(id) - currentIndex) > 1) {
-              await ref.unloadAsync();
+            const status = await ref.getStatusAsync().catch(() => null);
+            if (status && status.isLoaded) {
+              await ref.pauseAsync().catch(() => {});
+              // Unload distant videos to save memory
+              if (Math.abs(parseInt(id) - currentIndex) > 1) {
+                await ref.unloadAsync().catch(() => {});
+              }
             }
           } catch (e) {
             console.log(`Error pausing video ${id}:`, e);
@@ -321,28 +478,39 @@ const ReelsScreen = () => {
         }
       }
       
-      // Play current video
-      const currentRef = videoRefs.current[currentIndex.toString()];
-      if (currentRef && !pausedVideos[currentIndex]) {
-        try {
-          const status = await currentRef.getStatusAsync();
-          if (!status.isLoaded) {
-            await currentRef.loadAsync({ uri: reels[currentIndex].videoUri });
+      // Play current video only if app is in foreground
+      if (!appInBackground) {
+        const currentRef = videoRefs.current[currentIndex.toString()];
+        if (currentRef && !pausedVideos[currentIndex]) {
+          try {
+            const status = await currentRef.getStatusAsync().catch(() => ({ isLoaded: false }));
+            if (!status.isLoaded) {
+              await currentRef.loadAsync({ uri: reels[currentIndex].videoUri }).catch(() => {});
+              // Double-check app state after loading (might have changed during load)
+              if (appInBackground) {
+                await currentRef.pauseAsync().catch(() => {});
+                return;
+              }
+            }
+            if (status.isLoaded && !status.isPlaying && !appInBackground) {
+              await currentRef.playAsync().catch(() => {});
+            }
+          } catch (e) {
+            console.log(`Error playing video ${currentIndex}:`, e);
           }
-          if (status.isLoaded && !status.isPlaying) {
-            await currentRef.playAsync();
-          }
-        } catch (e) {
-          console.log(`Error playing video ${currentIndex}:`, e);
         }
       }
     };
     
-    playCurrentVideo();
-    
-    // Reset pause state on index change
-    setPausedVideos(prev => ({ ...prev, [currentIndex]: false }));
-  }, [currentIndex, reels]);
+    if (isScreenMounted.current) {
+      playCurrentVideo();
+      
+      // Reset pause state on index change if app is in foreground
+      if (!appInBackground) {
+        setPausedVideos(prev => ({ ...prev, [currentIndex]: false }));
+      }
+    }
+  }, [currentIndex, reels, appInBackground]);
 
   // Render individual reel
   const renderReel = ({ item, index }) => {
@@ -361,7 +529,7 @@ const ReelsScreen = () => {
           source={{ uri: item.videoUri }}
           style={styles.videoBackground}
           resizeMode="contain"
-          shouldPlay={index === currentIndex && !isPaused}
+          shouldPlay={index === currentIndex && !isPaused && !appInBackground}
           isLooping
           volume={1.0}
           isMuted={false}
@@ -370,7 +538,10 @@ const ReelsScreen = () => {
             console.error(`Video playback error for reel ${item.id}:`, error);
           }}
           onPlaybackStatusUpdate={(status) => {
-            if (status.isLoaded && index === currentIndex && !status.isPlaying && !isPaused) {
+            if (appInBackground && status.isPlaying) {
+              // Si l'application est en arrière-plan mais que la vidéo joue toujours, la mettre en pause
+              videoRefs.current[index.toString()]?.pauseAsync().catch(() => {});
+            } else if (status.isLoaded && index === currentIndex && !status.isPlaying && !isPaused && !appInBackground) {
               videoRefs.current[index.toString()]?.playAsync().catch(() => {});
             }
           }}
